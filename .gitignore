@@ -1,0 +1,13 @@
+# As far as I can tell all files of these forms will not be uploaded to git
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+.ipynb_checkpoints/
+data/
+outputs/
+*.h5
+*.nc
+*.zip
