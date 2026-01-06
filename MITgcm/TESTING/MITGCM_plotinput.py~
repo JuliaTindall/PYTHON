@@ -1,0 +1,214 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This will attempt to plot the input from a MITGCM global ocean cube sphere simulation
+"""
+
+import xarray as xr
+import numpy as np
+import xgcm
+import xmitgcm
+#import intake
+from matplotlib import pyplot as plt
+import cartopy.crs as ccrs
+
+
+import netCDF4
+import matplotlib as mpl
+import MITgcmutils as mit
+from MITgcmutils import cs as mitcs
+import iris
+import iris.plot as iplt
+import sys
+import os
+from iris.experimental.equalise_cubes import equalise_attributes
+
+plt.rcParams['figure.figsize'] = (10,6)
+#os.environ['PROJ_LIB'] = 'C:/Users/julia/Miniconda3/envs/py3/Library/share'
+os.environ['PROJ_LIB'] = '/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/share/proj'
+from mpl_toolkits.basemap import Basemap
+
+
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+def plot_input_Tsurf():
+    """
+    read in all the faces and plot to map
+    """
+    
+    
+    raw = np.fromfile(FILESTART + 
+                      'input/lev_surfT_cs_12m.bin', dtype='>f')
+    print('surfT SIZE',np.shape(raw))
+    surfT = np.reshape(raw, (12, 32, 192, 2))
+    print(surfT[0,:,:,0])
+
+    # read in all of the coordinates
+    os.chdir(FILESTART + 'run')
+    
+    ntiles = 12
+    for tile in range(1,ntiles+1):
+        XCname = 'XC.0' + np.str(tile).zfill(2) + '.001'
+        YCname = 'YC.0' + np.str(tile).zfill(2) + '.001'
+
+        XC = mit.rdmds(XCname)
+        YC = mit.rdmds(YCname)
+
+        if tile == 1:
+            nx,ny = np.shape(XC)
+            allXC = np.ma.zeros((ntiles, nx, ny))
+            allYC = np.ma.zeros((ntiles, nx, ny))
+            allTsurf = np.ma.zeros((ntiles, nx, ny))
+
+        allXC[tile-1, :, :] = XC
+        allYC[tile-1, :, :] = YC
+
+    
+    allXCma = np.ma.masked_where(allXC==0.0, allXC)
+    allYCma = np.ma.masked_where(allYC==0.0, allYC)
+    for tile in range(0,ntiles):
+        print(np.shape(surfT))
+        print(np.shape(allTsurf))
+        print(np.shape(allXC))
+        print(tile)
+
+        allTsurf[tile,:,:] = np.ma.masked_where(allXC[tile,:,:]==0.0, surfT[6,:,:,0]) 
+    Tsurf1ma_2 = np.ma.masked_where(allXC[0,:,:]==0.0, surfT[6,:,:,0])     
+
+    print('j1',np.shape(allTsurf[0,:,:]))
+    print('j2',np.shape(Tsurf1ma_2))
+   
+    XC = mit.rdmds('XC')
+    YC = mit.rdmds('YC')
+   
+
+    #plt.plot(XC[0,:])
+    #for i in range(0,12):
+    #    plt.plot(allXCma[i,0,:])
+    #plt.plot(YC[0,:])
+    #plt.show()
+    #sys.exit(0)
+    # plot surfT on a partial grid
+    #print(surfT[0,:,:])
+
+    cs=plt.contourf(surfT[0,:,:,0])
+
+    vals = np.arange(-5000,5000,100)
+#    for i in range(0,ntiles):
+#        cs = plt.contourf(allXCma[i,:,:], allYCma[i,:,:], allTsurf[i,:,:], 
+#                          levels=vals, latlon=True, extend='both')
+         
+    cbar = plt.colorbar(cs)
+    plt.show()
+    sys.exit(0)
+    
+def plot_input_faces():
+    """ 
+    trying to plot input faces
+    """
+
+
+    raw = np.fromfile(FILESTART + 
+                      'input/grid_cs32.face002.bin', dtype='>f')
+    print('FACE2 SIZE',np.shape(raw))
+    #plt.plot(raw)
+    #plt.show()
+    #sys.exit(0)
+    print(raw[0:20])
+
+#    XCsize = 
+#xC yC dxF dyF rA xG yG dxV dyU rAz dxC dyC rAw rAs dxG dyG AngleCS AngleSN
+
+#guess XC, YC dxf, dyf, rA anglecs, anglesn=32*32 *7 = 7168 (halo = 
+#guess Xg, YG dxV, dyU, raZ= 33*17*2 *5 = 5610
+#dxc raw dxg = 33*16*2*3 = 3168
+#dyC ras dyg= 32*17*2*3 = 3264
+#total = 19210 (should be 19602) extra = 392
+
+
+    raw = np.fromfile(FILESTART + 
+                      'input/grid_cs32.face003.bin', dtype='>f')
+    print('FACE3 SIZE',np.shape(raw))
+
+    raw = np.fromfile(FILESTART + 
+                      'input/grid_cs32.face004.bin', dtype='>f')
+    print('FACE4 SIZE',np.shape(raw))
+
+    raw = np.fromfile(FILESTART + 
+                      'input/grid_cs32.face005.bin', dtype='>f')
+    print('FACE5 SIZE',np.shape(raw))
+
+
+    raw = np.fromfile(FILESTART + 
+                      'input/grid_cs32.face006.bin', dtype='>f')
+    print('FACE6 SIZE',np.shape(raw))
+
+    
+
+def plot_input_bathy():
+
+    # get bathymetry file
+    raw = np.fromfile(FILESTART + 
+                      'input/bathy_cs32.bin', dtype='>f')
+    print(np.shape(raw))
+    bathy = np.reshape(raw, (32, 6,32,2))
+
+
+    # get face001
+    raw = np.fromfile(FILESTART + 'input/grid_cs32.face001.bin')
+    #raw = np.fromfile(FILESTART + 'input/proj_cs32_2uEvN.bin')
+    #proj = np.reshape(raw, (32,6,32,2))
+    #print(proj)
+    print(np.shape(raw))
+    plt.plot(raw)
+    plt.show()
+    sys.exit(0)
+    
+    ax1=plt.subplot(3,2,1)
+    cs=ax1.contourf(bathy[:, 0,:,0])
+    cbar = plt.colorbar(cs, extend='both')
+
+    ax2=plt.subplot(3,2,2)
+    cs2=ax2.contourf(bathy[:, 1,:,0])
+    cbar = plt.colorbar(cs2, extend='both')
+   
+    ax3=plt.subplot(3,2,3)
+    cs3=ax3.contourf(bathy[:, 2,:,0])
+    cbar = plt.colorbar(cs3, extend='both')
+
+    ax4=plt.subplot(3,2,4)
+    cs4=ax4.contourf(bathy[:, 3,:,0])
+    cbar = plt.colorbar(cs4, extend='both')
+    
+    ax5=plt.subplot(3,2,5)
+    cs5=ax5.contourf(bathy[:, 4,:,0])
+    cbar = plt.colorbar(cs5, extend='both')
+
+    ax6=plt.subplot(3,2,6)
+    cs6=ax6.contourf(bathy[:, 5,:,0])
+    cbar = plt.colorbar(cs6, extend='both')
+    plt.show()
+    
+    #print(np.shape(bathy))
+    #print(bathy)
+    #lsm = np.where(bathy < 0.0, 1.0, 0.0)
+
+   
+
+
+linux_win = 'L'
+
+if linux_win == 'L':
+    FILESTART = '/nfs/hera1/earjcti/MITgcm/mysetups/global_ocean.cs32x15/'
+else:
+    FILESTART = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\MITgcm\\data"
+NFACES=6
+    
+#plot_input_Tsurf()
+#plot_input_faces()
+plot_input_bathy()
+

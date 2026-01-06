@@ -1,0 +1,28 @@
+nohup: ignoring input
+temp1.5
+2950
+got obj
+start of main get field
+/nfs/hera1/earjcti/um/xpsic/netcdf/xpsica#pd000002950
+/nfs/hera1/earjcti/um/xpsic/netcdf/xpsica#pd000002950 
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/basic_plots/avg_fields.py", line 282, in <module>
+    meancube, stdevcube = obj.main_get_field()
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/basic_plots/avg_fields.py", line 144, in main_get_field
+    cubeoneyear = self.main_get_oneyear(filename, i)
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/basic_plots/avg_fields.py", line 201, in main_get_oneyear
+    cube = iris.load_cube(filename + 'jn' +
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 334, in load_cube
+    cubes = _load_collection(uris, constraints, callback).cubes()
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 271, in _load_collection
+    result = _CubeFilterCollection.from_cubes(cubes, constraints)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/cube.py", line 104, in from_cubes
+    for cube in cubes:
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 256, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 193, in load_files
+    all_file_paths = expand_filespecs(filenames)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 174, in expand_filespecs
+    raise IOError(msg)
+OSError: One or more of the files specified did not exist:
+    * "/nfs/hera1/earjcti/um/xpsic/netcdf/xpsica#pd000002950jn.nc" didn't match any files

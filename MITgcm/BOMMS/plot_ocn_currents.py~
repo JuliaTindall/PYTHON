@@ -1,0 +1,152 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_OCN_CURRENTS
+#PURPOSE
+#    This program will plot the ocean currents for Steve Hunters BOMMS output
+#
+# search for 'main program' to find end of functions
+# Julia 04/11/2020
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+import iris
+
+sys.path.append('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON')
+from jumaps import contourglobe
+
+
+#functions are:
+#  def plotquiver
+
+# from the program on jasmin.
+ #fig = plt.figure(figsize=[12.8, 9.6])
+#    fig = plt.figure(figsize=[25, 20])
+#    for i, ucube in enumerate(u_cubes):
+#        vcube = v_cubes[i]
+#        
+#        subplotno = np.int('43' + np.str(i+1))
+#        ax = fig.add_subplot(subplotno)
+#        
+#        map = Basemap(llcrnrlon=-20.0, urcrnrlon=20.0,
+#                      llcrnrlat=30.0, urcrnrlat=70.0,
+#                      projection='cyl', resolution='l')
+#
+#        latitudes = ucube.coord('latitude').points
+#        longitudes = ucube.coord('longitude').points
+#        
+#        u_shift, lons_shift = shiftgrid(
+#                180, ucube.data, longitudes, start=False)##
+#
+#        v_shift, lons_shift = shiftgrid(
+#                180, vcube.data, longitudes, start=False)
+        
+#        lons, lats = np.meshgrid(lons_shift, latitudes)
+#        x, y = map(lons, lats)
+#        map.drawcoastlines()
+       
+
+#        if i == 0: 
+#           titlename = SLICES[i]
+#           scalesize = 200
+#        else:
+#           scalesize = 50
+#           titlename = SLICES[i]  + '-' + SLICES[0]
+#        if lev == '850':
+#            scalesize = scalesize/3.0
+            
+#        n=1 # plot every nth arrow
+#        Q = map.quiver(x[::n, ::n], y[::n, ::n], 
+#                       u_shift[::n, ::n], v_shift[::n, ::n], scale=scalesize,
+#                       headwidth=7, headlength=9)
+#        plt.title(titlename, fontsize=30, loc='left')
+#        qk = ax.quiverkey(Q, 0.7, 1.05, 10, ' 1 m/s', labelpos='E',
+#                          fontproperties={'size':30})
+       
+       
+
+# functions start here
+def plotquiver(udata,vdata,lon,lat,titlename, fig, i):
+
+
+    lons, lats = np.meshgrid(lon,lat)
+    subplotno = np.int('23' + np.str(i))
+    ax = fig.add_subplot(subplotno)
+      
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    x, y = map(lons, lats)
+   
+    n=19 # plot every nth arrow
+    scalesize=10
+    Q = map.quiver(x[::n, ::n], y[::n, ::n], 
+                   udata[::n, ::n], vdata[::n, ::n], scale=scalesize,
+                   headwidth=7, headlength=9)
+    plt.title(titlename, fontsize=30, loc='left')
+    qk = ax.quiverkey(Q, 0.7, 1.05, 1, ' 1 m/s', labelpos='E',
+                          fontproperties={'size':30})
+    
+#end def plotquiver
+
+
+
+
+
+#enddef zonalmean_ann_height
+def plot_UV(Ucube_top, Vcube_top):
+    """
+    extracts U and V for each month and plots
+    """
+
+    x = Ucube_top.coord('longitude').points
+    y = Ucube_top.coord('latitude').points
+    monthnames = ['Jan','Feb','Mar','Apr','May','Jun']
+    fig = plt.figure(figsize=[25, 20])
+
+    for month in range(1,7):
+        Ucube = Ucube_top.extract(iris.Constraint(month=month))
+        Vcube = Vcube_top.extract(iris.Constraint(month=month))
+         
+        u = Ucube.data
+        v = Vcube.data
+
+        plotquiver(u, v, x, y, monthnames[month-1], fig, month)
+
+    fileout = ('/nfs/hera1/earjcti/MITgcm/processed_results/pyplots/' 
+               + MAP + '_UV0_lev_' + np.str(LEVEL) + '.eps') 
+    plt.savefig(fileout)
+        
+        
+
+
+def main():
+    """
+    main loop
+    """
+
+    Ucube_all = iris.load_cube(FILENAME, 'U')
+    Vcube_all = iris.load_cube(FILENAME, 'V')
+   
+    Ucube_top = Ucube_all.extract(iris.Constraint(depth=-5.0))
+    Vcube_top = Vcube_all.extract(iris.Constraint(depth=-5.0))
+
+    plot_UV(Ucube_top, Vcube_top)
+    
+################################
+# main program
+
+MAP = 'Map28a4x'
+#LEVEL=-5.0
+#LEVEL=-45.0 #
+LEVEL=-154.47001
+
+FILENAME = ('/nfs/hera1/earjcti/MITgcm/processed_results/' + MAP
+           + '_ARC4_48PE_50L_2kyr_UV_Monthly_720360.nc')
+main()
+

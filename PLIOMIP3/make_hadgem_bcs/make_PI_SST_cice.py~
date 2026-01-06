@@ -1,0 +1,392 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created October 2024 by Julia
+
+This program will setup up the SST and sea ice for HadGEM2
+"""
+
+import numpy as np
+import cartopy.crs as ccrs
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import matplotlib
+import matplotlib.pyplot as plt
+from iris.cube import CubeList
+#import matplotlib.ticker as mticker
+#import netCDF4
+#from datetime import date
+#import cmocean to use topo colormap
+import sys
+
+
+def merge_SST_SAT(cubeSST,cubeSAT):
+    """
+    we are going to use SAT in regions where there is not an SST
+    returns a surface temperature field on the best grid possible
+    """  
+    # we want the temperature in kelvin so add 273.15 onto SST
+    cubeSST.data=cubeSST.data + 273.15
+    del cubeSST.attributes["valid_min"]
+    del cubeSST.attributes["valid_max"]
+    
+    # put SAT onto same grid as SST (use linear interpolation because it 
+    # will rarely be used
+
+    cubeSATr = cubeSAT.regrid(cubeSST,iris.analysis.Linear())
+ 
+    # if there is some missing data in SST replace with SAT
+    newSST=np.where(cubeSST.data > 1.0E10, cubeSATr.data, cubeSST.data)
+  
+    # if any values are < 271.40 then replace with 271.40
+    newSST2 = np.where(newSST < 271.40, 271.40, newSST)
+
+    cubeSST_upd = cubeSST.copy(data=newSST2)
+    cubeSST_upd.long_name='combined SATSST'
+
+    
+    return cubeSST_upd
+
+
+def interpolate_SST(cubeSST):
+    """
+    if we have a missing value fill it in by interpolating SST across continents
+    """
+    SST_data = np.copy(cubeSST.data)
+
+    # where missing values are in the middle of the grid
+    for j in range(0,len(cubeSST.coord('latitude').points)):
+    #for j in range(112,113):
+        prevval=-999.
+        nextval=-999.
+        for i in range(0,2*len(cubeSST.coord('longitude').points)):
+            #print('i is',i, SST_data[0,0,j,np.mod(i,288)])
+            if SST_data[0,0,j,np.mod(i,288)] < 1.0E10:
+                prevval = SST_data[0,0,j,np.mod(i,288)]
+            elif prevval > -900:  # need to linear interpolate
+                count=1
+            #    print('tochange')
+                # find how many you need to linearly interpolate over
+                for i2 in range(i+1,2 *len(cubeSST.coord('longitude').points)):
+#                    print('i2',i2,SST_data[0,0,j,np.mod(i2,288)])
+                    if SST_data[0,0,j,np.mod(i2,288)] > 1.0E10:
+                        count=count+1
+                    else:
+                        nextval=SST_data[0,0,j,np.mod(i2,288)]
+                        break
+                #print('to change',count)
+                # linearly interpolate over these values
+                if prevval > -900 and nextval > -900:
+                    for i2 in range(i,i+count):
+                        if SST_data[0,0,j,np.mod(i2,288)] > 1.0E10:
+                 #           print('changing',i2,np.mod(i2,288),count,
+                 #                 SST_data[0,0,j,np.mod(i2,280)])
+                            SST_data[0,0,j,np.mod(i2,288)] = (prevval + 
+                              ((i2-i+1) *(nextval - prevval)/(count+1)))
+                i=i+count
+                count=0
+                prevval=-999
+                nextval=-999
+                       
+            else:
+               pass
+
+        #print(j,SST_data[0,0,j,:])
+
+        #sys.exit(0)
+    newcube = cubeSST.copy(data=SST_data)
+    print('interpolated')
+                     
+    return newcube
+
+def extract_HCM3(field):
+    """
+    extracts the HadCM3 SST and puts into a cube
+    """
+    print('start of extract')
+    cubes = CubeList()
+    cubesSST = CubeList()
+    cubesSAT = CubeList()
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    #months=['ja']
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/netcdf/' + expt
+
+    for year in range(startyear_HCM3,endyear_HCM3):
+        print(year)
+        for month in months:
+            if field == 'SST':
+                file = filestart + 'o#pf00000' + str(year) + month + '+.nc'
+                cubeSST = iris.load_cube(file,'temp')
+                cubesSST.append(cubeSST)
+
+                file = filestart + 'a#pd00000' + str(year) + month + '+.nc'
+                cubeSAT = iris.load_cube(file,
+                                         'SURFACE TEMPERATURE AFTER TIMESTEP')
+                cubesSAT.append(cubeSAT)
+                
+                # one way of getting the temperatures is to merge
+                #temperature_cube = merge_SST_SAT(cubeSST,cubeSAT)
+                #cubes.append(temperature_cube)
+                
+                # the other way of getting the temperatures is to linearly
+                # interpolate across continents
+
+                alt_temperature_cube = interpolate_SST(cubeSST)
+                cubes.append(alt_temperature_cube)
+            
+                
+    iris.util.equalise_attributes(cubes)
+    iris.util.equalise_attributes(cubesSST)
+    iris.util.equalise_attributes(cubesSAT)
+    for cube in cubes:
+        print(cube)
+    allcubes = cubes.concatenate_cube()
+    SATcubes = cubesSAT.concatenate_cube()
+    SSTcubes = cubesSST.concatenate_cube()
+    iris.save([allcubes],'SST_after_extract.nc',fill_value=2.0E20)
+    sys.exit(0)
+
+    return cube
+
+
+
+def extract_and_regrid_HCM3_ice(field):
+    """
+    extracts the HadCM3 seaice
+    we may need 3 fields. 
+    1. Frac of sea ice
+    2. ice edge
+    3. Sea ice depth
+    or we might just need frac of sea ice.  We will just do frac of sea
+    ice at the moment
+    """
+    print('start of extract')
+    cubes = CubeList()
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    #months=['ja']
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/netcdf/' + expt
+
+    grid_cube = iris.load_cube('/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/sst_1871-1900.anc.nc')
+    grid_cuber=grid_cube[0,:,:,:]
+    grid_cuber.coord('longitude').guess_bounds()
+    grid_cuber.coord('latitude').guess_bounds()
+
+    for year in range(startyear_HCM3,endyear_HCM3):
+        print(year)
+        for month in months:
+            file = filestart + 'o#pf00000' + str(year) + month + '+.nc'
+            cubeaice=iris.load_cube(file,'AICE : ICE CONCENTRATION')
+            cubeaice.coord('longitude').guess_bounds()
+            cubeaice.coord('latitude').guess_bounds()
+
+            regrid_cube = cubeaice.regrid(grid_cuber,iris.analysis.Nearest())
+            cubes.append(regrid_cube)
+                
+    iris.util.equalise_attributes(cubes)
+    for cube in cubes:
+        print(cube)
+    allcubes = cubes.concatenate_cube()
+    iris.save([allcubes],'cice_after_extract.nc',fill_value=2.0E20)
+
+    return cube
+
+
+def regrid_HCM3(HadCM3_sst_cube,field):
+    """
+    regrid the SST data onto the HadGEM2 grid.
+    Also correct for celcius to kelvin
+    """
+    if HadCM3_sst_cube == 'file':
+        HadCM3_sst_cube = iris.load_cube('SST_after_extract.nc')
+    HadCM3_sst_cube.data = np.where(HadCM3_sst_cube.data > 1.0E10, 
+                                    -1.8, HadCM3_sst_cube.data)
+    HadCM3_sst_cube.coord('longitude').guess_bounds()
+    HadCM3_sst_cube.coord('latitude').guess_bounds()
+
+    grid_cube = iris.load_cube('/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/sst_1871-1900.anc.nc')
+    grid_cuber=grid_cube[0,:,:,:]
+    grid_cuber.coord('longitude').guess_bounds()
+    grid_cuber.coord('latitude').guess_bounds()
+
+
+    regrid_cube = HadCM3_sst_cube.regrid(grid_cuber,iris.analysis.AreaWeighted())
+    regrid_cube = regrid_cube
+    regrid_cube.convert_units('K')
+    regrid_cube.data = np.where(regrid_cube.data < 271.40, 271.40,
+                                regrid_cube.data)
+    iris.save(regrid_cube,'SST_'+expt+'.nc')
+
+def correct_cice(HadCM3_cice_cube,field,expt):
+    """
+    we have put the sea ice onto the HadGEM grid. However there are some
+    corrections needed because the original field had sea ice over the land
+    1  Check to see where the ocean points without sea ice are.  (Compare
+       LSM and AICE)
+    2. If there is fractional sea ice between land and full sea ice set to 
+       0.990 sea ice
+    3. check there is no uniced area where temperature < -1.0
+    
+    """
+    if expt == 'xpsic':
+        lsmcube = iris.load_cube('/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/qrparm.mask.nc','LAND MASK (No halo) (LAND=TRUE)')
+    lsmdata=lsmcube.data
+      
+    if HadCM3_cice_cube == 'file':
+        HadCM3_cice_cube = iris.load_cube('cice_after_extract.nc')
+    cice_data=HadCM3_cice_cube.data
+
+    nt,nz,ny,nx=np.shape(HadCM3_cice_cube.data)
+    
+    # antarctica should be an easy fix.  copy sea ice from margins of
+    # Antarctica right to the pole
+
+    latitudes=HadCM3_cice_cube.coord('latitude').points
+    longitudes=HadCM3_cice_cube.coord('longitude').points
+    for t in range(0,nt):
+        for i in range(0,len(longitudes)):
+            prevcice=-999.
+            for j in range(30,0,-1):
+                if cice_data[t,0,j,i] > 0.0:
+                    prevcice=cice_data[t,0,j,i]
+                elif prevcice > 0.0:
+                    cice_data[t,0,j,i]=prevcice
+                else:
+                    continue
+
+    # northern hemisphere.  
+    # if a point is next to land and has zero sea ice and is next to a point
+    # which has > 0.8 sea ice then set to the same as the sea ice point
+
+    origcice=np.copy(cice_data)
+    for t in range(0,nt):
+        for i in range(1,len(longitudes)-1):
+            prevcice=-999.
+            for j in range(112,142):
+                if cice_data[t,0,j,i] < 0.1 and lsmdata[0,0,j,i]==0.0:
+                    # if there is a land point to the south, and a sea ice
+                    # point to the north set to the sea ice
+                    if lsmdata[0,0,j-1,i]==1.0 and origcice[t,0,j+1,i] > 0.8:
+                        cice_data[t,0,j,i]=origcice[t,0,j+1,i]
+                    # if there is a land point to the north, and a sea ice
+                    # point to the sorth set to the sea ice
+                    if lsmdata[0,0,j+1,i]==1.0 and origcice[t,0,j-1,i] > 0.8:
+                        cice_data[t,0,j,i]=origcice[t,0,j-1,i]
+                    # if there is a land point to the west, and a sea ice
+                    # point to the east set to the sea ice
+                    if lsmdata[0,0,j,i-1]==1.0 and origcice[t,0,j,i+1] > 0.8:
+                        cice_data[t,0,j,i]=origcice[t,0,j,i+1]
+                    # if there is a land point to the east, and a sea ice
+                    # point to the west set to the sea ice
+                    if lsmdata[0,0,j,i+1]==1.0 and origcice[t,0,j,i-1] > 0.8:
+                        cice_data[t,0,j,i]=origcice[t,0,j,i-1]
+                  
+                        
+    for i in range(1,len(longitudes)-1):
+        if longitudes[i]==268.125:
+        # add a manual correction for 268.125E 71.25N and 72.5N.
+        # These are gridboxes that have land to 3 sides 
+        # set them both to value at 270.0 77.5 
+
+            for j in range(112,142):
+                if latitudes[j]==71.25:
+                    cice_data[:,0,j,i]=cice_data[:,0,j+5,i+1]
+                    cice_data[:,0,j+1,i]=cice_data[:,0,j+5,i+1]
+                    print('corrected',longitudes[i],latitudes[j])
+                    print('corrected',longitudes[i],latitudes[j+1])
+                    print('with',longitudes[i+1],latitudes[j+5])
+                    print(' ')
+
+        if longitudes[i]==187.5:
+        # add a manual correction near bering strait
+        # 189.375E, 187.5E 67.5N, 68.75N
+        # if these are zero and the gridbox to North is all ice
+        # set to same as gridbox to north
+
+            for j in range(112,142):
+                if latitudes[j]==67.5:
+                    cice_data[:,0,j,i]=np.where(cice_data[:,0,j+2,i] > 0.9,
+                                                cice_data[:,0,j+2,i],
+                                                cice_data[:,0,j,i])
+                    cice_data[:,0,j+1,i]=np.where(cice_data[:,0,j+2,i] > 0.9,
+                                                cice_data[:,0,j+2,i],
+                                                cice_data[:,0,j+1,i])
+                    cice_data[:,0,j,i+1]=np.where(cice_data[:,0,j+2,i+1] > 0.9,
+                                                cice_data[:,0,j+2,i+1],
+                                                cice_data[:,0,j,i+1])
+                    cice_data[:,0,j+1,i+1]=np.where(cice_data[:,0,j+2,i+1] > 0.9,
+                                                cice_data[:,0,j+2,i+1],
+                                                cice_data[:,0,j+1,i+1])
+                    print('corrected',longitudes[i],latitudes[j])
+                    print('corrected',longitudes[i],latitudes[j+1])
+                    print('with',longitudes[i],latitudes[j+2])
+                    print(' ')
+                    print('corrected',longitudes[i+1],latitudes[j])
+                    print('corrected',longitudes[i+1],latitudes[j+1])
+                    print('with',longitudes[i+1],latitudes[j+2])
+                    print(' ')
+         
+        if longitudes[i]==292.5:
+        # add a manual correction above greenland
+        # 292.5E, 294.375E 80.N, 81.25N
+        # if these are zero and the gridbox to North is all ice
+        # set to same as gridbox to east
+
+            for j in range(112,142):
+                if latitudes[j]==80.0:
+                    cice_data[:,0,j,i]=np.where(cice_data[:,0,j+1,i+2] > 0.8,
+                                                cice_data[:,0,j+1,i+2],
+                                                cice_data[:,0,j,i])
+                    cice_data[:,0,j+1,i]=np.where(cice_data[:,0,j+1,i+2] > 0.8,
+                                                cice_data[:,0,j+1,i+2],
+                                                cice_data[:,0,j+1,i])
+                    cice_data[:,0,j,i+1]=np.where(cice_data[:,0,j+1,i+2] > 0.8,
+                                                cice_data[:,0,j+1,i+2],
+                                                cice_data[:,0,j,i+1])
+                    cice_data[:,0,j+1,i+1]=np.where(cice_data[:,0,j+1,i+2] > 0.8,
+                                                cice_data[:,0,j+1,i+2],
+                                                cice_data[:,0,j+1,i+1])
+                    print('corrected',longitudes[i],latitudes[j])
+                    print('corrected',longitudes[i],latitudes[j+1])
+                    print('with',longitudes[i+2],latitudes[j+1])
+                    print(' ')
+                    print('corrected',longitudes[i+1],latitudes[j])
+                    print('corrected',longitudes[i+1],latitudes[j+1])
+                    print('with',longitudes[i+1],latitudes[j+1])
+                    print(' ')
+         
+            
+
+
+    testcube=HadCM3_cice_cube.copy()
+    #print(np.shape(lsmcube.data))
+    #print(np.shape(testcube.data))
+    #print(nt)
+   
+    for t in range(0,nt):
+        testcube.data[t,0,:,:] = testcube.data[t,0,:,:]+lsmcube.data[0,0,:,:]
+    
+    # if land + ice > 1.0 then it doesn't matter so reset to 1.0
+    testcube.data = np.where(testcube.data > 1.0, 1.0,testcube.data)
+    
+  
+
+
+    iris.save(testcube,'temporary2.nc')
+    iris.save(HadCM3_cice_cube,expt + '_cice.nc')
+
+
+##########################################################################
+# setup what to change
+
+expt = 'xpsic'
+startyear_HCM3=2890 
+endyear_HCM3=3000
+startyear_HGEM=1850
+
+#HCM3_sst_cube = extract_HCM3('SST')
+#HCM3r_sst_cube = regrid_HCM3('file','SST')
+
+
+HCM3_cice_cube = extract_and_regrid_HCM3_ice('CICE')
+HCM3c_cice_cube = correct_cice('file','CICE',expt)

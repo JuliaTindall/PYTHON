@@ -1,0 +1,117 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on April 3rd 2019
+"""
+The NorESM group have now uploaded averaged data for SST.  We will need to 
+get this in the required format for our paper.  
+"""
+
+
+import numpy as np
+import iris
+import iris.analysis.cartography
+import iris.coord_categorisation
+import sys
+
+
+##############################################
+def write_avg_to_file(moncube, anncube):
+    """
+    average the data and write to a file
+    """
+
+
+    textout = FILEDIR + PERIOD + '.SST.data.txt'
+
+    file1 =  open(textout, "w")
+
+    # 1, globalmean
+
+    anncube.coord('latitude').guess_bounds()
+    anncube.coord('longitude').guess_bounds()
+    grid_areas  =  iris.analysis.cartography.area_weights(anncube)
+    tempcube = anncube.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas)
+    meanann = tempcube.data
+    stdevann=-999.999
+
+
+    # get mean for each latitude
+    tempcube = anncube.collapsed(['longitude'], iris.analysis.MEAN)
+    meanlat = tempcube.data
+    meanlat = np.squeeze(meanlat)
+    stdevlat = np.zeros(np.shape(meanlat)) - 1000.
+
+
+
+    # write out to a file
+    file1.write('global annual mean and standard deviation\n')
+    file1.write('------------------------------------------\n')
+    file1.write(np.str(np.round(meanann, 2))+', '+np.str(np.round(stdevann, 3))+'\n')
+
+    # get monthly means and standard deviation
+    file1.write('monthly means and standard deviations \n')
+    file1.write('----------------------------------------')
+    file1.write('month    mean    sd  \n')
+
+    moncube.coord('latitude').guess_bounds()
+    moncube.coord('longitude').guess_bounds()
+    grid_areas2  =  iris.analysis.cartography.area_weights(moncube)
+    tempcube = moncube.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas2)
+    meanmon = tempcube.data
+    stdevmon = np.zeros(12) - 1000.
+
+    for i in range(0, 12):
+        file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+
+    # get latitudinal means and standard deviation
+    file1.write('zonal means and standard deviations \n')
+    file1.write('----------------------------------------\n')
+    file1.write('latitude    mean    sd  \n')
+    for i in range(0, len(meanlat)):
+        file1.write(np.str(anncube.coord('latitude').points[i])+', '+np.str(np.round(meanlat[i], 2))+', '+np.str(np.round(stdevlat[i], 3))+'\n')
+
+    file1.close()
+
+
+    
+    
+def main():
+    """
+    reprocesses the NorESM SST data.  
+    We have a monthly averaged netcdf file.  
+    We need an annual averaged netcdf file + a text file containing all the averages
+    """
+
+    filein = FILEDIR + PERIOD + '.SST.mean_month.nc'
+    cube = iris.load_cube(filein, 'Ocean surface temperature')
+    
+    # write mean cube to a file
+    meancube = cube.collapsed(['time'],  iris.analysis.MEAN)
+    iris.save(meancube, FILEDIR + PERIOD + '.SST.allmean.nc', 
+              netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+    
+    # get text data
+
+    write_avg_to_file(cube, meancube)
+    print('end of prog')
+   
+    
+##########################################################
+# main program
+
+
+print('start')
+LINUX_WIN = 'l'
+MODELNAME = 'NorESM-L'
+PERIOD = 'E280' #EOI400 E280
+
+if LINUX_WIN == 'w':
+    FILESTART = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+else:
+    FILESTART = '/nfs/hera1/earjcti/'
+    
+FILEDIR = (FILESTART + 'regridded/' + MODELNAME + '/')
+main()

@@ -1,0 +1,7 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "HadCM3_sensitivities_NA_prog2.py", line 221, in <module>
+    cntlmean = get_mean(cntl,longfield.get(FIELDNAME))
+  File "HadCM3_sensitivities_NA_prog2.py", line 153, in get_mean
+    exptname + 'a@pd' + EXTRA.get(exptname))
+TypeError: can only concatenate str (not "NoneType") to str

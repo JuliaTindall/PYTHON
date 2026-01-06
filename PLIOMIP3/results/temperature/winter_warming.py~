@@ -1,0 +1,147 @@
+"""
+#NAME
+#    Summer_warming.py
+#PURPOSE 
+#
+#  This program will show the SAT warming in the last 30 years of each 
+#  experiment for the months djf
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import math
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+import iris.plot as iplt
+from netCDF4 import Dataset, MFDataset
+import sys
+#from netCDF4 import Dataset, MFDataset
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_avg(jobid, startyear):
+    """
+    gets the average data fpr the field
+    """  
+
+    longfield = {'temp' : 'TEMPERATURE AT 1.5M',
+                 'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
+                 'precipmm' : 'TOTAL PRECIPITATION RATE MM/DAY',
+                 'cloud_cover' : 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
+                 'mslp' : 'PRESSURE AT MEAN SEA LEVEL',
+                 'mslp_hPa' : 'PRESSURE AT MEAN SEA LEVEL hPa',
+                 'evapsea' : 'EVAPORATION FROM SEA (GBM)   KG/M2/S',
+                 'seaiceconc' : 'AICE : ICE CONCENTRATION',
+                 'icefrac' : 'SEA ICE FRACTION AFTER TIMESTEP',
+                 'oceansurftemp' : 'OCN TOP-LEVEL TEMPERATURE          K',
+                 'oceansurftempK' : 'OCN TOP-LEVEL TEMPERATURE K',
+                 'surfsalinity': 'SALINITY (OCEAN)       (PSU-35)/1000',
+                 'surfsalinitypsu': 'SALINITY (OCEAN) (PSU)',
+                 'MLD' : 'MIXED LAYER DEPTH (OCEAN)          M',
+                 'MLDm' : 'MIXED LAYER DEPTH (OCEAN) M',
+                 'AMOC' : 'Meridional Overturning Stream Function (Atlantic)'   
+                     }
+    
+    alltemps = np.zeros((73,96))
+    count=0.
+
+      
+    for year in range(startyear, startyear+NYEARS):
+        print(year)
+        
+        dccube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+                 jobid + 'a#pd' + str(year-1).zfill(9) + 'dc+.nc',field)
+        jacube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+                 jobid + 'a#pd' + str(year).zfill(9) + 'ja+.nc',field)
+        fbcube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+                 jobid + 'a#pd' + str(year).zfill(9) + 'fb+.nc',field)
+
+        tempavg = np.squeeze((dccube.data + jacube.data + fbcube.data) / 3.0)
+
+        alltemps = alltemps + tempavg
+        count=count+1.
+
+    templatecube = iris.util.squeeze(dccube)   
+    avgtempcube=templatecube.copy(data=alltemps / count)
+    return avgtempcube
+                   
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+
+
+LINUX_WIN='l'
+NYEARS = 100
+SEASON = 'ann'
+
+# data from new experiemnt
+MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
+
+EXPT = 'xqbwj'  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPT_STARTYEAR = 3900
+#EXPT = 'Eoi400_ARC4_2450-2499'
+
+# data from good experiment
+CNTL = 'xqbwd'  # xpsic pi, xpsid lp400
+CNTL_STARTYEAR = EXPT_STARTYEAR
+
+#FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
+#          'seaiceconc','oceansurftemp',
+#          'surfsalinity','MLD', 'evapsea']
+
+#FIELDS  = ['surfsalinity','MLD', 'evapsea']
+
+#FIELDS_STEVE = ['temp1.5','precipmm','cloud_cover','mslp_hPa',
+#          'icefrac','oceansurftempK',
+#          'surfsalinity','MLD', 'evapsea']
+
+#FIELDS = ['AMOC']
+FIELDS = ['temp']
+
+
+for field in FIELDS:
+    expt_cube = get_avg(EXPT,EXPT_STARTYEAR)
+    print('got expt_cube')
+    cntl_cube = get_avg(CNTL,CNTL_STARTYEAR)
+    print('got cntl cube')
+    diff_cube = expt_cube - cntl_cube
+
+    # get means
+    diff_cube.coord('longitude').guess_bounds()
+    diff_cube.coord('latitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(diff_cube)
+    meandiff = diff_cube.collapsed(['longitude','latitude'],
+                                   iris.analysis.MEAN, weights=grid_areas)
+    diffchar = str(np.around(meandiff.data,2))
+   
+    print('about to plot')
+    vals = np.arange(-4.0, 4.5,0.5)
+#    vals = np.arange(-8.0, 9.0, 1.0)
+    
+    if CNTL == 'xpsid' or CNTL == 'xpsig' or CNTL == 'xpsie':
+        vals = np.arange(-4.0, 4.5,0.5)
+    if CNTL == 'xpsic':
+        vals = np.arange(-8.0, 9.0, 1.0)
+    if EXPT == 'xpsin' or EXPT=='xpsio' or EXPT == 'xpsip' or EXPT == 'xpsiq':
+        vals = np.arange(-6.0, 7.0, 1.0)
+    qplt.contourf(diff_cube,levels=vals,extend='both',cmap='RdBu_r')
+    titlename = EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) + '.Meandiff =' +  diffchar
+    plt.title(titlename, fontsize=10)
+    plt.gca().coastlines()
+      
+    print('about to write to file')
+    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field + '.eps')
+    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field + '.png')

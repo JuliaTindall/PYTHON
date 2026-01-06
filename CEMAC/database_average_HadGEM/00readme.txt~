@@ -1,0 +1,3 @@
+We would like to run BIOME4 against our HadGEM data.  However the BIOME4 inputs come from the database and I am not convinced that the database is correct for HadGEM.
+
+What we will here do is make some files which look like database files for HadGEM but we will do this from first principles in order to make sure they are correct.

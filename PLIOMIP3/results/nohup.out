@@ -1,0 +1,40 @@
+Traceback (most recent call last):
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/core/__init__.py", line 23, in <module>
+    from . import multiarray
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/core/multiarray.py", line 10, in <module>
+    from . import overrides
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/core/overrides.py", line 6, in <module>
+    from numpy.core._multiarray_umath import (
+ImportError: PyCapsule_Import could not import module "datetime"
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/SAT_warming.py", line 13, in <module>
+    import numpy as np
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/__init__.py", line 144, in <module>
+    from . import core
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/core/__init__.py", line 49, in <module>
+    raise ImportError(msg)
+ImportError: 
+
+IMPORTANT: PLEASE READ THIS FOR ADVICE ON HOW TO SOLVE THIS ISSUE!
+
+Importing the numpy C-extensions failed. This error can happen for
+many reasons, often due to issues with your setup or how NumPy was
+installed.
+
+We have compiled some common reasons and troubleshooting tips at:
+
+    https://numpy.org/devdocs/user/troubleshooting-importerror.html
+
+Please note and check the following:
+
+  * The Python version is: Python3.10 from "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/bin/python3"
+  * The NumPy version is: "1.22.4"
+
+and make sure that they are the versions you expect.
+Please carefully study the documentation linked above for further help.
+
+Original error was: PyCapsule_Import could not import module "datetime"
+

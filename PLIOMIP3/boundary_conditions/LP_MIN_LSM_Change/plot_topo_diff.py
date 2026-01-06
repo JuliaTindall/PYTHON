@@ -1,0 +1,535 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created May 2022 by Julia
+
+This program will plot the difference in topography between the 
+LP_MIN_LSM_Change experiment and EOI400 from PlioMIP2
+This is for inclusion in Alans paper.  
+
+"""
+
+import numpy as np
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import matplotlib.pyplot as plt
+import netCDF4
+from datetime import date
+import cartopy.crs as ccrs
+import matplotlib.colors as mplcol
+from matplotlib.collections import LineCollection
+import sys
+
+
+def get_files(fileend, eoi400_fieldname, lp_min_lsm_fieldname):
+    """
+    gets the original and new pliocene
+    """
+
+    filestart = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/'     
+    eoi400_filename = 'Plio_enh/Plio_enh/Plio_enh_' + fileend + '.nc'
+    eoi400_cube = iris.load_cube(filestart + eoi400_filename,eoi400_fieldname)
+
+    minlsm_cube = iris.load_cube('LP_MinLSM_topo_v1.0.nc',lp_min_lsm_fieldname)
+    
+    e280_cube = iris.load_cube(filestart + 'Modern_std/Modern_std/Modern_std_topo_v1.0.nc','etopo1_topo')
+   
+    return eoi400_cube, minlsm_cube, e280_cube
+
+
+###############################################
+def plot_difference(cubeminLSM, cubeEOI400):
+    """
+    here we plot the difference between the two topographies
+    """
+
+    cubediff= cubeminLSM - cubeEOI400
+    cubediff.data.mask = np.where(cubediff.data==0.0, 1.0, 0.0)
+
+    
+    # get pliocene land sea mask
+    eoi400lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc'
+    eoi400_lsmcube=iris.load_cube(eoi400lsm)
+  
+    e280lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Modern_std/Modern_std/Modern_std_LSM_v1.0.nc'
+    e280_lsmcube=iris.load_cube(e280lsm)
+  
+
+
+    # plot
+   
+    ax=plt.subplot(2,2,1,projection=ccrs.NorthPolarStereo())
+    ax.set_extent([-180,180,55,90],ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cubediff, cmap='winter',vmin=-200,vmax=0)
+    plt.colorbar(cs,orientation='horizontal')
+    qplt.contour(e280_lsmcube,[0.5],colors='red',linewidths=0.75)
+    qplt.contour(eoi400_lsmcube,[0.5],colors='black',linewidths=0.75,linestyle='dashed')
+    ax.gridlines()
+   
+   # plt.gca().coastlines()
+    plt.title('LP_MIN_LSM - EOI400')
+
+    ax=plt.subplot(2,2,2,projection=ccrs.PlateCarree())
+    ax.set_extent([90,180,-30,30],ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cubediff, cmap='winter',vmin=-200,vmax=0)
+    plt.colorbar(cs,orientation='horizontal')
+    qplt.contour(e280_lsmcube,[0.5],colors='red',linewidths=0.75)
+    qplt.contour(eoi400_lsmcube,[0.5],colors='black',linewidths=0.75,linestyle='dashed')
+    ax.gridlines()
+   # plt.gca().coastlines()
+    plt.title('LP_MIN_LSM - EOI400')
+
+
+    ax=plt.subplot(2,2,3,projection=ccrs.PlateCarree())
+    ax.set_extent([-90,-30,70,90],ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cubediff, cmap='winter',vmin=-200,vmax=0)
+    plt.colorbar(cs,orientation='horizontal')
+    qplt.contour(e280_lsmcube,[0.5],colors='red',linewidths=0.75)
+    qplt.contour(eoi400_lsmcube,[0.5],colors='black',linewidths=0.75,linestyle='dashed')
+    ax.gridlines()
+   # plt.gca().coastlines()
+    plt.title('CAA: LP_MIN_LSM - EOI400')
+
+
+    ax=plt.subplot(2,2,4,projection=ccrs.PlateCarree(central_longitude=180))
+    ax.set_extent([-200,-150,50,80],ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cubediff, cmap='winter',vmin=-200,vmax=0)
+    plt.colorbar(cs,orientation='horizontal')
+    qplt.contour(e280_lsmcube,[0.5],colors='red',linewidths=0.75)
+    qplt.contour(eoi400_lsmcube,[0.5],colors='black',linewidths=0.75,linestyle='dashed')
+    ax.gridlines()
+   # plt.gca().coastlines()
+    plt.title('BS: LP_MIN_LSM - EOI400')
+
+
+    plt.tight_layout()
+    plt.show()
+    
+    sys.exit(0)
+    plt.savefig('LSM_anom.png')
+
+
+##############################################
+def box_regions(ax, region):
+   """
+   this will draw a box around the regions we are interested in
+   region is of form lonmin, lonmax, latmin, latmax
+   """
+   # note I have got the longitudes a bit mixed up on the plot so 
+   # I have corrected it here
+
+   lonmin=region[0]+180.
+   lonmax=region[1]+180.
+   latmin=region[2]
+   latmax=region[3]
+
+   if lonmin > 180.: lonmin=lonmin-360.
+   if lonmax > 180.: lonmax=lonmax-360.
+
+   box=[ [[lonmin, latmin], [lonmin, latmax]],
+         [[lonmax, latmin], [lonmax, latmax]],
+         [[lonmin, latmin], [lonmax, latmin]],
+         [[lonmin, latmax], [lonmax, latmax]] ]
+
+   ax.add_collection(LineCollection(box, lw=2, colors='red'))
+
+
+##############################################
+def add_iso_line(ax, x, y, lsm, value, color):
+        """
+        this will draw the land sea mask around squar boxes
+        """
+
+        # x is currengly 0.5, 1.5, ....359.5
+        # we will use instead -180, -179, -178, -177,....180 for drawing
+        x=np.arange(-180.0,181.0,1.0)
+
+        # y is currently -89.5, -88.5,.......88.5, 89.5
+        # we will use instead -90.0, -89.0,   89.0, 90.0 for drawing
+        y=np.arange(-90.0, 91.0, 1.0)
+    
+      
+        v=np.diff(lsm > value, axis=1)
+        h=np.diff(lsm > value, axis=0)
+
+        l=np.argwhere(v.T)  # this is a list of lines to draw.
+                            # v.T is where the line should be drawn
+       
+        vlines=np.array(list(zip(np.stack((x[l[:, 0] + 1], y[l[:, 1]])).T,
+                                 np.stack((x[l[:, 0] + 1], y[l[:, 1] + 1])).T)))
+
+        l=np.argwhere(h.T)
+      
+
+        hlines=np.array(list(zip(np.stack((x[l[:, 0]], y[l[:, 1] + 1])).T,
+                                 np.stack((x[l[:, 0] + 1], y[l[:, 1]+1])).T)))
+
+        lines =  np.vstack((vlines,hlines))
+        ax.add_collection(LineCollection(lines, lw=2, colors=color))
+
+
+###############################################
+def plot_global_difference(cubeminLSM, cubeEOI400, cubeE280):
+    """
+    here we find where the topographies are different
+    and plot the depth of the ocean in the new topography
+    """
+
+
+   
+    fig = plt.figure(figsize=[15.0, 12.0])
+    cubediff= cubeminLSM - cubeEOI400
+    cubediff.data.mask = np.where(cubediff.data==0.0, 1.0, 0.0)
+    # find where land in both pliocene and pi
+    land = np.where(cubeEOI400.data > 0.0, 1.0, 0.0)
+    land = np.where(cubeE280.data > 0.0, land, 0.0)
+
+    # put land on both to a high value
+    minLSMdepth = np.ma.where(land, 100, 0.0)
+    # put differenced data after land so that it overwrites if necessary
+    minLSMdepth = np.ma.where(cubediff.data != 0.0, cubeminLSM.data, minLSMdepth)
+ 
+
+
+    # if land set on both set mask to false
+    # otherwise mask out bits that haven't changed
+    minLSMdepth.mask = np.where(cubediff.data==0.0, True, False)
+    minLSMdepth.mask = np.where(land == 1.0, False, minLSMdepth.mask)
+
+    minLSMdepth_cube = cubeminLSM.copy(data=minLSMdepth)
+    minLSMdepth_cube.data.mask = np.where(minLSMdepth_cube.data==0.0, 1.0, 0.0)
+    #minLSMdepth_cube.data.mask = minLSMdepth_mask
+    cubediff=0
+
+  
+    
+    # get pliocene land sea mask
+    eoi400lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc'
+    eoi400_lsmcube_origgrid=iris.load_cube(eoi400lsm)
+  
+    e280lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Modern_std/Modern_std/Modern_std_LSM_v1.0.nc'
+    e280_lsmcube_origgrid=iris.load_cube(e280lsm)
+    newgrid = e280_lsmcube_origgrid.copy()
+    print(newgrid.coord('longitude').points)
+    newlons = np.arange(0.5, 360.5, 1.0)
+    newgrid.coord('longitude').points = newlons
+    e280lsmcube = e280_lsmcube_origgrid.regrid(newgrid,iris.analysis.Linear())
+    eoi400lsmcube = eoi400_lsmcube_origgrid.regrid(newgrid,iris.analysis.Linear())
+  
+
+
+    # plot
+
+    # set up colormap
+    #boundaries = np.arange(-1000., 1100., 100)
+    boundaries=np.arange(-100,10,10)
+    cmap_winter = plt.cm.get_cmap('winter',len(boundaries))
+    colors=list(cmap_winter(np.arange(len(boundaries))))
+    cmap_winter.set_over([0.90,0.90,0.90])  # put land as grey
+    cmap_winter.set_under(colors[0])  # set to first color
+
+
+    crs180 = ccrs.PlateCarree(central_longitude=180.) #for plotting map
+    ax=plt.subplot(1,1,1,projection=crs180)
+    #ax.set_extent([-180,180,55,90],ccrs.PlateCarree())
+    print('boundaries',boundaries)
+    cs=iplt.pcolormesh(minLSMdepth_cube, cmap=cmap_winter,
+                       norm = mplcol.BoundaryNorm(boundaries, 
+                                                  ncolors=len(boundaries),
+                                                  clip=False))
+   
+    add_iso_line(ax, e280lsmcube.coord('longitude').points,
+                 e280lsmcube.coord('latitude').points,
+                 e280lsmcube.data, 0.9, 'orange')#
+
+    
+
+    add_iso_line(ax, eoi400lsmcube.coord('longitude').points,
+                 eoi400lsmcube.coord('latitude').points,
+                 eoi400lsmcube.data, 0.9, 'black')#
+
+
+    # draw a box around region of interest
+    box_regions(ax, REGION_BERING_STRAIT)
+    box_regions(ax, REGION_CAA)
+    box_regions(ax, REGION_AUS)
+
+   
+    cbar=plt.colorbar(cs,orientation='horizontal',extend='min')
+    cbar.set_label('depth (m)',size=30)
+    cbar.ax.tick_params(labelsize=30)
+    plt.title(' ')
+
+   
+ 
+    plt.savefig('LSM_global_anom.jpeg')
+    plt.savefig('LSM_global_anom.pdf')
+    plt.savefig('LSM_global_anom.eps')
+    plt.savefig('LSM_global_anom.png')
+   
+
+
+###############################################
+def plot_reg_diff(cubeminLSM, cubeEOI400, cubeE280, region, name):
+    """
+    here we find where the topographies are different
+    and plot the depth of the ocean in the new topography
+    
+    this is like the global plot but we focus on a region
+    """
+
+
+   
+    fig = plt.figure(figsize=[4.0, 4.0])
+    cubediff= cubeminLSM - cubeEOI400
+    cubediff.data.mask = np.where(cubediff.data==0.0, 1.0, 0.0)
+    # find where land in both pliocene and pi
+    land = np.where(cubeEOI400.data > 0.0, 1.0, 0.0)
+    land = np.where(cubeE280.data > 0.0, land, 0.0)
+
+
+    # quick test what are values at 80.5 latitude 66.5 longitude
+#    lats = cubeEOI400.coord('latitude').points
+#    for i, lat in enumerate(lats):
+#        if lat==80.5:
+#            latix=i
+#    lons = cubeEOI400.coord('longitude').points
+#    for i, lon in enumerate(lons):
+#        if lon==-66.5:
+#            lonix=i#
+
+
+#    print(latix,lonix)
+#    print('land details',cubeEOI400.data[latix,lonix], cubeE280.data[latix,lonix], land[latix,lonix])
+
+    # put land on both to a high value
+    minLSMdepth = np.ma.where(land, 100, 0.0)
+    # put differenced data after land so that it overwrites if necessary
+    minLSMdepth = np.ma.where(cubediff.data != 0.0, cubeminLSM.data, minLSMdepth)
+ 
+
+    # if land set on both set mask to false
+    # otherwise mask out bits that haven't changed
+    minLSMdepth.mask = np.where(cubediff.data==0.0, True, False)
+    minLSMdepth.mask = np.where(land == 1.0, False, minLSMdepth.mask)
+
+    minLSMdepth_cube = cubeminLSM.copy(data=minLSMdepth)
+    minLSMdepth_cube.data.mask = np.where(minLSMdepth_cube.data==0.0, 1.0, 0.0)
+    #minLSMdepth_cube.data.mask = minLSMdepth_mask
+    cubediff=0
+
+#    print(minLSMdepth_cube.data[latix,lonix])
+#    sys.exit(0)
+    
+    # get pliocene land sea mask
+    eoi400lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc'
+    eoi400_lsmcube_origgrid=iris.load_cube(eoi400lsm)
+  
+    e280lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Modern_std/Modern_std/Modern_std_LSM_v1.0.nc'
+    e280_lsmcube_origgrid=iris.load_cube(e280lsm)
+    newgrid = e280_lsmcube_origgrid.copy()
+    print(newgrid.coord('longitude').points)
+    newlons = np.arange(0.5, 360.5, 1.0)
+    newgrid.coord('longitude').points = newlons
+    e280lsmcube = e280_lsmcube_origgrid.regrid(newgrid,iris.analysis.Linear())
+    eoi400lsmcube = eoi400_lsmcube_origgrid.regrid(newgrid,iris.analysis.Linear())
+  
+
+
+    # plot
+
+    # set up colormap
+    #boundaries = np.arange(-1000., 1100., 100)
+    boundaries=np.arange(-100,10,10)
+    cmap_winter = plt.cm.get_cmap('winter',len(boundaries))
+    colors=list(cmap_winter(np.arange(len(boundaries))))
+    cmap_winter.set_over([0.90,0.90,0.90])  # put land as grey
+    cmap_winter.set_under(colors[0])  # set to first color
+
+
+    crs180 = ccrs.PlateCarree(central_longitude=180.) #for plotting map
+    ax=plt.subplot(1,1,1,projection=crs180)
+    ax.set_extent(region,ccrs.PlateCarree())
+    print('boundaries',boundaries)
+    cs=iplt.pcolormesh(minLSMdepth_cube, cmap=cmap_winter,
+                       norm = mplcol.BoundaryNorm(boundaries, 
+                                                  ncolors=len(boundaries),
+                                                  clip=False))
+   
+    add_iso_line(ax, e280lsmcube.coord('longitude').points,
+                 e280lsmcube.coord('latitude').points,
+                 e280lsmcube.data, 0.9, 'orange')#
+
+    
+
+    add_iso_line(ax, eoi400lsmcube.coord('longitude').points,
+                 eoi400lsmcube.coord('latitude').points,
+                 eoi400lsmcube.data, 0.9, 'black')#
+
+    ax.outline_patch.set_edgecolor('red')
+    ax.outline_patch.set_linewidth(3)
+
+   
+ 
+    plt.savefig('LSM_'+name+'_anom.jpeg')
+    plt.savefig('LSM_'+name+'_anom.pdf')
+    plt.savefig('LSM_'+name+'_anom.eps')
+    plt.savefig('LSM_'+name+'_anom.png')
+   
+
+
+###############################################
+def plot_reg_absolute(cubeminLSM, cubeEOI400, cubeE280, origregion, name):
+    """
+    here we plot the topographies in the new_plio, orig_plio and prindustrial
+    We are looking at the region of interest
+    """
+   
+    region = [origregion[0]-5, origregion[1]+5, origregion[2]-5,
+              min(origregion[3]+5,90)]
+
+    fig = plt.figure(figsize=[9.0, 3.0])
+    
+    # get pliocene land sea mask and preindustrial land sea mask
+    eoi400lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc'
+    eoi400_lsmcube_origgrid=iris.load_cube(eoi400lsm)
+  
+    e280lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Modern_std/Modern_std/Modern_std_LSM_v1.0.nc'
+    e280_lsmcube_origgrid=iris.load_cube(e280lsm)
+    newgrid = e280_lsmcube_origgrid.copy()
+    print(newgrid.coord('longitude').points)
+    newlons = np.arange(0.5, 360.5, 1.0)
+    newgrid.coord('longitude').points = newlons
+    e280lsmcube = e280_lsmcube_origgrid.regrid(newgrid,iris.analysis.Linear())
+    eoi400lsmcube = eoi400_lsmcube_origgrid.regrid(newgrid,iris.analysis.Linear())
+  
+
+
+    boundaries=np.arange(-1000,1100,10)
+  
+    # set up colormap
+    #boundaries = np.arange(-1000., 1100., 100)
+    cmap_winter = plt.cm.get_cmap('RdBu_r',len(boundaries))
+    colors=list(cmap_winter(np.arange(len(boundaries))))
+    cmap_winter.set_over([0.90,0.90,0.90])  # put land as grey
+    cmap_winter.set_under([0.9,0.9,0.9])  # set to first color
+
+ 
+    # plot topogrpahy in new version
+
+   
+    crs180 = ccrs.PlateCarree(central_longitude=180.) #for plotting map
+    ax=plt.subplot(1,3,1,projection=crs180)
+    ax.set_extent(region,ccrs.PlateCarree())
+    print('boundaries',boundaries)
+    cs=iplt.pcolormesh(cubeminLSM, cmap=cmap_winter,
+                       norm = mplcol.BoundaryNorm(boundaries, 
+                                                  ncolors=len(boundaries),
+                                                  clip=False))
+    
+
+    add_iso_line(ax, eoi400lsmcube.coord('longitude').points,
+                 eoi400lsmcube.coord('latitude').points,
+                 eoi400lsmcube.data, 0.9, 'black')#
+
+    ax.outline_patch.set_edgecolor('red')
+    plt.title('LP_min_LSM_change')
+ 
+
+
+    # plot topogrpahy in EOI400
+
+   
+    crs180 = ccrs.PlateCarree(central_longitude=180.) #for plotting map
+    ax=plt.subplot(1,3,2,projection=crs180)
+    ax.set_extent(region,ccrs.PlateCarree())
+    print('boundaries',boundaries)
+    cs=iplt.pcolormesh(cubeEOI400, cmap=cmap_winter,
+                       norm = mplcol.BoundaryNorm(boundaries, 
+                                                  ncolors=len(boundaries),
+                                                  clip=False))
+   
+    
+
+    add_iso_line(ax, eoi400lsmcube.coord('longitude').points,
+                 eoi400lsmcube.coord('latitude').points,
+                 eoi400lsmcube.data, 0.9, 'black')#
+
+    ax.outline_patch.set_edgecolor('red')
+    ax.outline_patch.set_linewidth(3)
+    plt.title('EOI400')
+ 
+  
+
+  # plot topogrpahy in E280
+
+   
+    crs180 = ccrs.PlateCarree(central_longitude=180.) #for plotting map
+    ax=plt.subplot(1,3,3,projection=crs180)
+    ax.set_extent(region,ccrs.PlateCarree())
+    print('boundaries',boundaries)
+    cs=iplt.pcolormesh(cubeE280, cmap=cmap_winter,
+                       norm = mplcol.BoundaryNorm(boundaries, 
+                                                  ncolors=len(boundaries),
+                                                  clip=False))
+   
+    
+
+    add_iso_line(ax, eoi400lsmcube.coord('longitude').points,
+                 eoi400lsmcube.coord('latitude').points,
+                 eoi400lsmcube.data, 0.9, 'black')#
+
+    ax.outline_patch.set_edgecolor('red')
+    plt.title('E280')
+ 
+    cbar=plt.colorbar(cs,orientation='vertical',extend='both')
+    #cbar.set_label('depth (m)',size=30)
+    #cbar.ax.tick_params(labelsize=30)
+
+ 
+    plt.savefig('LSM_'+name+'_abs.jpeg')
+    plt.savefig('LSM_'+name+'_abs.pdf')
+    plt.savefig('LSM_'+name+'_abs.eps')
+    plt.savefig('LSM_'+name+'_abs.png')
+   
+  
+     
+###############################################
+# main program
+
+# regions are lonmin, lonmax, latmin, latmax
+REGION_BERING_STRAIT = [-190, -155, 55,75]
+#REGION_CAA = [-80.0, -60, 75,85]
+REGION_CAA = [-75.0, -60, 75,85]
+REGION_AUS = [95.0, 155, -25, 13]
+
+
+# get Pliocene and preindustrial files
+
+(eoi400_topo_cube, 
+ LP_minLSM_cube, e280_topo_cube) = get_files('topo_v1.0','p4_topo',
+                                             'p4_topo_Min_LSM_Chg')
+
+# plot the difference between the two cubes
+#plot_difference(LP_minLSM_cube, eoi400_topo_cube)
+
+
+plot_global_difference(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube)
+
+plot_reg_diff(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube, REGION_BERING_STRAIT,
+              'Bering_Strait')
+plot_reg_diff(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube, REGION_CAA,
+              'CAA')
+plot_reg_diff(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube, REGION_AUS,
+             'AUS')
+
+
+# plot the absolute values of topography in the region
+
+#plot_reg_absolute(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube, REGION_CAA,
+#              'CAA')
+#plot_reg_absolute(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube, REGION_BERIN#G_STRAIT,
+#              'Bering_Strait')
+#plot_reg_absolute(LP_minLSM_cube,eoi400_topo_cube, e280_topo_cube, REGION_AUS,
+#              'Aus')

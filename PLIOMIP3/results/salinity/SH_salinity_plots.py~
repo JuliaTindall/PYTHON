@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+#  plot the SH (antarctic) salinity averaged over the year
+#
+#
+
+import cartopy.crs as ccrs
+import cartopy as cy
+import matplotlib.pyplot as plt
+import matplotlib.path as mpath
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
+
+
+
+def polarCentral_set_latlim(lat_lims, ax):
+    ax.set_extent([-180, 180, lat_lims[0], lat_lims[1]], ccrs.PlateCarree())
+    # Compute a circle in axes coordinates, which we can use as a boundary
+    # for the map. We can pan/zoom as much as we like - the boundary will be
+    # permanently circular.
+    theta = np.linspace(0, 2*np.pi, 100)
+    center, radius = [0.5, 0.5], 0.5
+    verts = np.vstack([np.sin(theta), np.cos(theta)]).T
+    circle = mpath.Path(verts * radius + center)
+
+    ax.set_boundary(circle, transform=ax.transAxes)
+
+def get_lsm(expt,cntl):
+    """
+    land sea mask is where the point is ocean in both pliocene and pi
+    """
+    filestart = '/nfs/hera1/earjcti/um/'
+    lsm_plio_file = (filestart + expt + '/database_averages/' + expt + 
+                     '_Annual_Average_#pf_SSS_' + str(startyear)
+                     + '_' + str(endyear) + 
+                     '.nc')
+    lsm_pi_file = (filestart + cntl + '/database_averages/' + cntl + 
+                     '_Annual_Average_#pf_SSS_' + str(startyear) + 
+                   '_' + str(endyear) + 
+                     '.nc')
+
+    sst_pi_cube = iris.load_cube(lsm_pi_file,)
+    sst_plio_cube = iris.load_cube(lsm_plio_file)
+    
+    lsm_pi_cube = sst_pi_cube.copy(data=sst_pi_cube.data.mask)
+    lsm_plio_cube = sst_plio_cube.copy(data=sst_plio_cube.data.mask)
+  
+    lsm_pi_cube = iris.util.squeeze(lsm_pi_cube)
+    lsm_plio_cube = iris.util.squeeze(lsm_plio_cube)
+
+    # find where both cubes are land
+    lsm_both_data = np.minimum(lsm_pi_cube.data,lsm_plio_cube.data)
+    lsm_both_cube = lsm_plio_cube.copy(lsm_both_data)
+    
+    return lsm_pi_cube, lsm_plio_cube, lsm_both_cube
+
+
+def plot_SH_salin(cube,month,lsm_cube):
+    """
+    plots the SH salinity for the experiment
+    """
+    outstart = ('/nfs/hera1/earjcti/um/' + expt + '/avgplots/SH_salin/' + 
+                str(startyear) + '_' + str(endyear) + '_')
+    
+    levels=np.arange(0.0, 1.01, 0.01)
+    lat_lims=[-60,-90]
+
+    custom_cmap = plt.cm.get_cmap('Blues_r',len(levels))
+    custom_cmap.set_under('grey')
+    custom_cmap.set_over('white')
+
+
+    # plot
+    ax=plt.subplot(1,1,1,projection=ccrs.SouthPolarStereo())
+    polarCentral_set_latlim(lat_lims,ax)
+    axplot=iplt.pcolormesh(cube,cmap=custom_cmap,
+                 norm=mpl.colors.BoundaryNorm(levels, 
+                                             ncolors=len(levels)-1,
+                                             clip=False))
+    cbar = plt.colorbar(axplot,  orientation= 'vertical')
+    cbar.set_label('psu')   
+    cbar.set_ticks([0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0])  
+    plt.title(month+': ' + name.get(expt))
+    iplt.contour(lsm_cube, levels=[-2,0.5,2],
+                  colors='black', linewidths=0.1)
+    plt.savefig(outstart + expt + '_' + month + '_SH_salin.eps')
+
+ 
+
+
+def plot_SH_salin_anom(cubeexpt,cubecntl,month,lsm_cube):
+    """
+    plots the salinity for the SH 
+    """
+    outstart = ('/nfs/hera1/earjcti/um/' + expt + '/avgplots/SH_salin/'
+                + str(startyear) + '-' +str(endyear))
+    
+    #levels=np.arange(0.0, 1.01, 0.01)
+    levels=[-1.0,-0.4,-0.2,-0.1,-0.05,0.05,0.1,0.2,0.4,1.0]
+    #levels=levels/10.
+    lat_lims=[-60,-90]
+
+    custom_cmap = plt.cm.get_cmap('RdBu_r',len(levels)+1)
+    custom_cmap.set_under('grey')
+    custom_cmap.set_over('white')
+
+    cube = cubeexpt-cubecntl
+    # plot
+    ax=plt.subplot(1,1,1,projection=ccrs.SouthPolarStereo())
+    polarCentral_set_latlim(lat_lims,ax)
+    axplot=iplt.pcolormesh(cube,cmap=custom_cmap,
+                 norm=mpl.colors.BoundaryNorm(levels, 
+                                             ncolors=len(levels)+1,
+                                             clip=False))
+    cbar = plt.colorbar(axplot,  orientation= 'vertical')
+    cbar.set_label('psu')   
+    #cbar.set_ticks([0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0])  
+    cbar.set_ticks(levels)  
+    plt.title(month+': ' + name.get(expt) +  '-' + name.get(cntl))
+    iplt.contour(lsm_cube, levels=[-2,0.5,2],
+                  colors='black', linewidths=0.1)
+    plt.savefig(outstart + expt + '-' +  cntl + '_' + month + '_SH_salin.png')
+    plt.savefig(outstart + expt + '-' + cntl + '_' + month + '_SH_salin.eps')
+
+ 
+
+#################
+# MAIN PROGRAM
+################
+
+name = {'xqbwc':'PI','xpsic':'PI',
+        'xqbwd':'Late Pliocene', 'xqbwe':'Early Pliocene - 400ppmv',
+        'xqbwr':'Late Pliocene (min_LSM)', 'xqbwg':'Early Pliocene',
+        'xpsig':'Early Pliocene',
+        'xpsie':'Early Pliocene 400ppmv'}
+
+# read in multimodel mean monthly SST data (EOI400-E280)
+expt='xpsie'
+cntl='xpsic'
+startyear=800
+endyear=1400
+
+MP_cube = iris.load_cube('/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Annual_Average_#pf_SSS_' + str(startyear) + '_' + str(endyear) + '.nc', 'OCN TOP-LEVEL SALINITY')
+PI_cube =iris.load_cube('/nfs/hera1/earjcti/um/'+cntl+'/database_averages/'+cntl+'_Annual_Average_#pf_SSS_' + str(startyear) + '_' + str(endyear) + '.nc', 'OCN TOP-LEVEL SALINITY') 
+#anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
+#                           'NearSurfaceTemperatureplio - pi')
+
+lsm_cube, lsm_plio_cube, lsm_both_cube = get_lsm(expt,cntl)
+# set land to -100
+MP_cube.data[0,0,:,:] = np.where(lsm_plio_cube.data == 1.0, -100.,
+                                     MP_cube.data[0,0,:,:])
+
+
+
+
+# day 45.5 represents february, 255.5 represents july
+annMP_cube = iris.util.squeeze(MP_cube.collapsed('time',iris.analysis.MEAN))
+annPI_cube = iris.util.squeeze(PI_cube.collapsed('time',iris.analysis.MEAN))
+
+# plot SH salinity anomaly
+plot_SH_salin_anom(annMP_cube,annPI_cube,'Annual',lsm_both_cube)
+

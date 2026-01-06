@@ -1,0 +1,132 @@
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Updated from ~earjcti/PYTHON/PROGRAMS/PlioMIP_new/vegetation_data_analysis/seasonal_dmc_plot_v2.py
+
+Changed April 2023 to just show HadCM3 and HadCM3 with the new parameters
+
+
+
+FROM ~earjcti/PYTHON/PROGRAMS/PlioMIP_new/vegetation_data_analysis/seasonal_dmc_plot_v2.py
+Created January 2021 by Julia
+
+This program will produce a lat /lon dmc plot from Ulrichs spreadsheet
+The difference between this and version 1 is that we will group the data
+by dating / proxy
+
+"""
+
+import numpy as np
+import pandas as pd
+import iris
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.quickplot as qplt
+import iris.plot as iplt
+import cartopy.crs as ccrs
+import netCDF4
+
+import sys
+
+def get_lat_grad_pliocene(model):
+    """
+    gets the temperature for each latitude from the model
+    """
+    filename = ('/nfs/hera1/earjcti/regridded/' + model + 
+                '/EOI400.NearSurfaceTemperature.data.txt')
+    f = open(filename,'r')
+    lines = f.readlines()
+
+    latfound = 'n'
+    lats = []
+    temps=[]
+
+    for i,line in enumerate(lines):
+        if latfound == 'y':  # if we are in the latitude range
+            lat,temp,stdev = line.split(',')
+            lats.append(float(lat))
+            if model == 'HadCM3_new':
+                temps.append(float(temp)-273.15)
+            else:
+                temps.append(float(temp))
+           
+        if line[0:6] == 'latitu':  # see if we are at start of latitudes
+            print('found start of latitudes')
+            latfound='y'
+    
+    lat_arr = np.asarray(lats)
+    temp_arr = np.asarray(temps)
+    
+
+    print(lat_arr)
+    print(temp_arr)
+  
+    return lat_arr,temp_arr
+
+
+  
+
+def main():
+    """
+    calling structure
+    a) read in latitudinal gradient
+    b) plot
+    """
+
+   
+    # read in latitudinal gradient
+    alllats = []
+    alltemps = []
+    for model in MODELNAMES:
+        (lats,temperature) = get_lat_grad_pliocene(model)
+        alllats.append(lats)
+        alltemps.append(temperature)
+
+    # plot data
+    plt.subplot(2,1,1)
+    for i,lats in enumerate(alllats):
+        temperature = alltemps[i]
+        plt.plot(lats,temperature,label=MODELNAMES[i])
+
+    plt.ylabel('(degC)')
+    plt.xlabel('latitude')
+    plt.title('Pliocene temperature')
+    plt.legend()
+
+    plt.subplot(2,1,2)
+    tempanom = alltemps[1] - alltemps[0]
+    plt.plot(lats,tempanom)
+    plt.title('Temperature (Pliocene_new_params - Pliocene_old_params)')
+    plt.ylabel('deg C)')
+    plt.xlabel('latitude')
+   
+    plt.tight_layout()
+    
+   
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/' + 
+               'newparams/Pliocene_latitude_plot.eps')
+    plt.savefig(fileout)
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/' + 
+                   'newparams/Pliocene_latitude_plot.png')
+    plt.savefig(fileout)
+    plt.close()
+
+ 
+##########################################################
+# main program
+
+
+LINUX_WIN = 'l'
+FILESTART = '/nfs/hera1/earjcti/'
+DATABASE = '/nfs/hera1/pliomip2/data/'
+
+MODELNAMES = ['HadCM3','HadCM3_new']
+
+
+
+main()
+

@@ -1,0 +1,2217 @@
+::::::::::::::
+extract_data_near_site.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#Updated for JH on 17th May 2021
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the SST data from near Niels site and
+#   write to a netcdf
+#
+#
+# This program has been ammended from 
+#PlioMIP2/large_scale_features/extract_data_locations.py
+#
+#
+
+#from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import iris
+#import xlwt
+#from xlwt import Workbook
+import os
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+from iris.cube import CubeList
+import sys
+
+
+
+
+    
+def extract_lon_lat(cube):
+    """
+    extracts the points near LON_REQ and LAT_REQ
+    """ 
+
+    
+    #cubelats = cube.coord('latitude').points
+    #cubelons = cube.coord('longitude').points
+
+    # find nearest latitude and lontiude to the value
+    #latix = (np.abs(cubelats - LAT_REQ)).argmin()
+    #lonix = (np.abs(cubelons - LON_REQ)).argmin()
+
+    lonmin = LON_REQ - 10.0
+    lonmax = LON_REQ + 10.0
+    latmin = LAT_REQ - 10.0
+    latmax = LAT_REQ + 10.0
+    lon_constraint = iris.Constraint(longitude = lambda cell: 
+                                     lonmin < cell < lonmax)
+    lat_constraint = iris.Constraint(latitude = lambda cell: 
+                                     latmin < cell < latmax)
+
+    lon_slice  =  cube.extract(lon_constraint)
+    data_slice = lon_slice.extract(lat_constraint)
+   
+    return data_slice
+
+def extract_data():
+    """
+    extracts the data within ??deg of the required lat and long
+    """
+   
+    eoi400_allcubes = CubeList([])
+    e280_allcubes = CubeList([])
+    anom_allcubes = CubeList([])
+
+    for i, model in enumerate(MODELNAMES):
+        filestart = '/nfs/hera1/earjcti/regridded/' + model + '/'
+        eoi400_cube = iris.load_cube(filestart + 'EOI400.'+ FIELD + '.mean_month.nc')
+        print(eoi400_cube.coord('longitude'))
+        print(eoi400_cube.coord('longitude').units)
+        print(eoi400_cube.coord('longitude').coord_system)
+        print(eoi400_cube.coord('longitude').metadata)
+        print(eoi400_cube.coord('longitude').attributes)
+        print(eoi400_cube.coord('longitude').points)
+        eoi400_cube_slice = extract_lon_lat(eoi400_cube)
+        print(eoi400_cube_slice)
+        sys.exit(0)
+        name = model + '_' + FIELD + '_EOI400'
+        eoi400_cube_slice.long_name = name
+        eoi400_cube_slice.data = np.ma.where(eoi400_cube_slice.data.mask == 1.0, -99999, eoi400_cube_slice.data)
+        eoi400_cube_slice.data.mask = np.where(eoi400_cube_slice.data == -99999, 1.0, 0.0)
+        if model == 'NorESM1-F' or model == 'NorESM-L':
+            eoi400_cube_slice.coord('time').rename('month')
+        try:
+            eoi400_cube_slice.remove_coord('time')
+        except:
+            pass
+        try:
+            eoi400_cube_slice.remove_coord('year')
+        except:
+            pass
+        eoi400_cube_slice.cell_methods=None
+        eoi400_allcubes.append(eoi400_cube_slice)
+        
+
+        e280_cube = iris.load_cube(filestart + 'E280.'+ FIELD+ '.mean_month.nc')
+        e280_cube_slice = extract_lon_lat(e280_cube)
+        name = model + '_' + FIELD + '_E280'
+        e280_cube_slice.long_name = name
+        e280_cube_slice.data = np.ma.where(e280_cube_slice.data.mask == 1.0, -99999, e280_cube_slice.data)
+        e280_cube_slice.data.mask = np.where(e280_cube_slice.data == -99999, 1.0, 0.0)
+        if model == 'NorESM1-F' or model == 'NorESM-L':
+            e280_cube_slice.coord('time').rename('month')
+        try:
+            e280_cube_slice.remove_coord('time')
+        except:
+            pass
+        try:
+            e280_cube_slice.remove_coord('year')
+        except:
+            pass
+        e280_cube_slice.cell_methods=None
+        e280_allcubes.append(e280_cube_slice)
+
+         
+        anom_data = eoi400_cube_slice.data - e280_cube_slice.data
+        print(eoi400_cube_slice.data.mask)
+        anom_data.mask = np.maximum(eoi400_cube_slice.data.mask,
+                                e280_cube_slice.data.mask)
+        anom_data = np.where(anom_data.mask == 1.0, -99999, anom_data)
+        anom_cube = e280_cube_slice.copy(data=anom_data)
+        name = model + '_' + FIELD + '_EOI400-E280'
+        anom_cube.long_name = name
+      
+        anom_allcubes.append(anom_cube)
+                            
+    
+    return eoi400_allcubes, e280_allcubes,anom_allcubes    
+        
+
+
+#################
+# MAIN PROGRAM
+################
+
+###################################
+# get initial data including the lats and longs we require
+
+linuxwin = 'l'
+LAT_REQ = 52.5 # 51.2N, 4.4E
+LON_REQ = 3.0
+test ='y'
+#FIELD = 'NearSurfaceTemperature'
+FIELD = 'SST'
+#FIELD = 'Salinity'
+
+if test == 'y':
+     MODELNAMES = ['CESM2','NorESM1-F','HadCM3']
+else:
+     MODELNAMES = ['CCSM4', 'CCSM4-UoT', 'CCSM4-Utr',  'CESM1.2','CESM2',
+                   'COSMOS', 'EC-Earth3.3', 'GISS2.1G', 'HadCM3','HadGEM3',
+                   'IPSLCM6A', 'IPSLCM5A2', 'IPSLCM5A', 'MIROC4m', 'MRI2.3',
+                   'NorESM-L', 'NorESM1-F'
+                               ]
+eoi400_alldata, e280_alldata, anom_alldata = extract_data()
+fileoutstart = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'
+iris.save(eoi400_alldata,fileoutstart + 'EOI400_' + FIELD + '.nc', netcdf_format = "NETCDF3_CLASSIC",fill_value = -99999)
+iris.save(e280_alldata,fileoutstart + 'E280_' + FIELD + '.nc', netcdf_format = "NETCDF4", fill_value = -99999)
+iris.save(anom_alldata,fileoutstart + 'EOI400-E280_anom_' + FIELD + '.nc', netcdf_format = "NETCDF4", fill_value=-99999)
+::::::::::::::
+extract_HadCM3_data_near_site_d18o.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#Updated for JH on 17th May 2021
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the d18osw and d18op data from near Niels site and
+#   write to a netcdf.  It will extract the data from HadCM3 experiments
+#
+#
+# This program has been ammended from 
+#extract_HadCM3_data_near_site
+#
+#
+
+#from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import iris
+#import xlwt
+#from xlwt import Workbook
+import os
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+from iris.cube import CubeList
+import sys
+
+
+
+
+    
+def extract_lon_lat(cube):
+    """
+    extracts the points near LON_REQ and LAT_REQ
+    """ 
+
+    
+    #cubelats = cube.coord('latitude').points
+    #cubelons = cube.coord('longitude').points
+
+    # find nearest latitude and lontiude to the value
+    #latix = (np.abs(cubelats - LAT_REQ)).argmin()
+    #lonix = (np.abs(cubelons - LON_REQ)).argmin()
+
+    lonmin = LON_REQ - 10.0
+    lonmax = LON_REQ + 10.0
+    latmin = LAT_REQ - 10.0
+    latmax = LAT_REQ + 10.0
+    lon_constraint = iris.Constraint(longitude = lambda cell: 
+                                     lonmin < cell < lonmax)
+    lat_constraint = iris.Constraint(latitude = lambda cell: 
+                                     latmin < cell < latmax)
+
+    lon_slice  =  cube.extract(lon_constraint)
+    data_slice = lon_slice.extract(lat_constraint)
+   
+    return data_slice
+
+def extract_data():
+    """
+    extracts the data within ??deg of the required lat and long
+    """
+   
+    allcubes = CubeList([])
+  
+    # this file was obtained from program regrid_HCM3_50_year_avg
+    filename = ('/nfs/hera1/earjcti/um/' + model + '/' + FIELD + '/means/mean_month.nc')
+    cube = iris.load_cube(filename)
+    cube_slice = extract_lon_lat(cube)
+    name = FIELD 
+    cube_slice.long_name = name
+    cube_slice.data = np.ma.where(cube_slice.data.mask == 1.0, -99999, cube_slice.data)
+    cube_slice.data.mask = np.where(cube_slice.data == -99999, 1.0, 0.0)
+    try:
+        cube_slice.remove_coord('time')
+    except:
+        pass
+    try:
+        cube_slice.remove_coord('year')
+    except:
+        pass
+    cube_slice.cell_methods=None
+                            
+    
+    return cube_slice  
+        
+
+
+#################
+# MAIN PROGRAM
+################
+
+###################################
+# get initial data including the lats and longs we require
+
+period = {'xozzb':'EOI400','xozza':'PI'}
+linuxwin = 'l'
+LAT_REQ = 52.5 # 51.2N, 4.4E
+LON_REQ = 3.0
+FIELD = 'd18osw'  # field = d18osw
+
+model = 'xozzb'
+
+alldata = extract_data()
+fileoutstart = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'
+iris.save(alldata,fileoutstart  + FIELD +'_'+ period.get(model) + '_'+ model + '.nc', netcdf_format = "NETCDF3_CLASSIC",fill_value = -99999)
+::::::::::::::
+extract_HadCM3_data_near_site.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#Updated for JH on 17th May 2021
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the SST data from near Niels site and
+#   write to a netcdf.  It will extract the data from the HadCM3
+#   orbital experiments
+#
+#
+# This program has been ammended from 
+#PlioMIP2/large_scale_features/extract_data_near_site.py
+#
+#
+
+#from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import iris
+#import xlwt
+#from xlwt import Workbook
+import os
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+from iris.cube import CubeList
+import sys
+
+
+
+
+    
+def extract_lon_lat(cube):
+    """
+    extracts the points near LON_REQ and LAT_REQ
+    """ 
+
+    
+    #cubelats = cube.coord('latitude').points
+    #cubelons = cube.coord('longitude').points
+
+    # find nearest latitude and lontiude to the value
+    #latix = (np.abs(cubelats - LAT_REQ)).argmin()
+    #lonix = (np.abs(cubelons - LON_REQ)).argmin()
+
+    lonmin = LON_REQ - 10.0
+    lonmax = LON_REQ + 10.0
+    latmin = LAT_REQ - 10.0
+    latmax = LAT_REQ + 10.0
+    lon_constraint = iris.Constraint(longitude = lambda cell: 
+                                     lonmin < cell < lonmax)
+    lat_constraint = iris.Constraint(latitude = lambda cell: 
+                                     latmin < cell < latmax)
+
+    lon_slice  =  cube.extract(lon_constraint)
+    data_slice = lon_slice.extract(lat_constraint)
+   
+    return data_slice
+
+def extract_data():
+    """
+    extracts the data within ??deg of the required lat and long
+    """
+   
+    timeslice = {'xozzb':'KM5c','xozzc':'K1','xozzd':'G17','xozze':'KM3',
+                 'xozzf':'3.053Ma'}
+    orbital_allcubes = CubeList([])
+  
+    for i, model in enumerate(MODELNAMES):
+        filename = ('/nfs/hera1/earjcti/um/' + model + '/' + FIELD + '/means/mean_month.nc')
+        cube = iris.load_cube(filename)
+        cube_slice = extract_lon_lat(cube)
+        name = timeslice.get(model) + '_' + FIELD 
+        cube_slice.long_name = name
+        cube_slice.data = np.ma.where(cube_slice.data.mask == 1.0, -99999, cube_slice.data)
+        cube_slice.data.mask = np.where(cube_slice.data == -99999, 1.0, 0.0)
+        try:
+            cube_slice.remove_coord('time')
+        except:
+            pass
+        try:
+            cube_slice.remove_coord('year')
+        except:
+            pass
+        cube_slice.cell_methods=None
+        orbital_allcubes.append(cube_slice)
+                            
+    
+    return orbital_allcubes  
+        
+
+
+#################
+# MAIN PROGRAM
+################
+
+###################################
+# get initial data including the lats and longs we require
+
+linuxwin = 'l'
+LAT_REQ = 52.5 # 51.2N, 4.4E
+LON_REQ = 3.0
+test ='n'
+FIELD = 'NearSurfaceTemperature'
+FIELD = 'SST'
+
+if test == 'y':
+     MODELNAMES = ['xozzb']
+else:
+     MODELNAMES = ['xozzb', 'xozzc', 'xozzd',  'xozze','xozzf']
+
+orbital_alldata = extract_data()
+fileoutstart = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'
+iris.save(orbital_alldata,fileoutstart + 'orbital_' + FIELD + '.nc', netcdf_format = "NETCDF3_CLASSIC",fill_value = -99999)
+::::::::::::::
+extract_surface_salinity_near_site.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#Updated for JH on 17th May 2021
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the SST data from near Niels site and
+#   write to a netcdf
+#
+#
+# This program has been ammended from 
+#PlioMIP2/large_scale_features/extract_data_locations.py
+#
+#
+
+#from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import iris
+#import xlwt
+#from xlwt import Workbook
+import os
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+from iris.cube import CubeList
+import iris.coord_categorisation
+import sys
+
+
+
+
+    
+def extract_lon_lat(cube):
+    """
+    extracts the points near LON_REQ and LAT_REQ
+    """ 
+
+    
+    #cubelats = cube.coord('latitude').points
+    #cubelons = cube.coord('longitude').points
+
+    # find nearest latitude and lontiude to the value
+    #latix = (np.abs(cubelats - LAT_REQ)).argmin()
+    #lonix = (np.abs(cubelons - LON_REQ)).argmin()
+
+    lonmin = LON_REQ - 10.0
+    if lonmin < 0.0: lonmin=0.
+    lonmax = LON_REQ + 10.0
+    latmin = LAT_REQ - 10.0
+    latmax = LAT_REQ + 10.0
+    print('j1',cube.coord('longitude').points,lonmin,lonmax)
+    lon_constraint = iris.Constraint(longitude = lambda cell: 
+                                     lonmin <= cell <= lonmax)
+    #print('j2',lon_constraint)
+    lat_constraint = iris.Constraint(latitude = lambda cell: 
+                                     latmin <= cell <= latmax)
+    #print('j3',lat_constraint)
+
+    lon_slice  =  cube.extract(lon_constraint)
+    #print('j4',lon_slice)
+    data_slice = lon_slice.extract(lat_constraint)
+    return data_slice
+
+def extract_data():
+    """
+    extracts the data within ??deg of the required lat and long
+    """
+   
+    eoi400_allcubes = CubeList([])
+    e280_allcubes = CubeList([])
+    anom_allcubes = CubeList([])
+    fieldname = {'HadCM3':'SALINITY (OCEAN) (PSU)',
+                 'COSMOS':'salinity','EC-Earth3.3':'sea_water_salinity',
+                 'IPSL-CM6A-LR':'Sea Water Salinity',
+                 'IPSLCM5A2':'sea_water_salinity',
+                 'IPSLCM5A':'sea_water_salinity',
+                 'MIROC4m':'so',}
+
+    directory = '/nfs/b0164/Data/3D_ocean_salinity_Eoi400_E280/'
+
+    for i, model in enumerate(MODELNAMES):
+
+        if model in ['CCSM4','CESM1.2','CESM2','HadCM3',
+                     'COSMOS','IPSLCM5A','IPSLCM5A2',
+                     'IPSL-CM6A-LR','MIROC4m']:
+            file_eoi400 = directory + 'Eoi400_' + model + '_so.nc'
+            file_e280 = directory + 'E280_' + model + '_so.nc'
+            eoi400_cube = iris.load_cube(file_eoi400,
+                                         fieldname.get(model,'Salinity'))
+            e280_cube = iris.load_cube(file_e280,fieldname.get(model,'Salinity'))
+        elif model == 'CCSM4-UoT':
+            # eoi400
+            file_eoi400 = ('/nfs/b0164/Data/UofT/UofT-CCSM4/Eoi400/Omon/sos_Omon_UofT-CCSM4_midPliocene-eoi400_r1i1p1f1_gr1_160101-170012.nc')
+            fullcube = iris.load_cube(file_eoi400,'Sea Surface Salinity')
+            iris.coord_categorisation.add_month_number(fullcube,'time',name='month')
+            eoi400_cube = fullcube.aggregated_by('month',iris.analysis.MEAN)
+            iris.util.promote_aux_coord_to_dim_coord(eoi400_cube,'month')
+            eoi400_cube.coord('longitude').rename('lonaux')
+            points=eoi400_cube.coord('lonaux').points[0]
+            eoi400_cube.add_dim_coord(iris.coords.DimCoord(points,
+                 standard_name = 'longitude',  long_name = 'longitude',
+                 var_name = 'longitude', units='degrees',
+                 coord_system = None,  circular = True), 2)
+            eoi400_cube.coord('latitude').rename('lataux')
+            points=eoi400_cube.coord('lataux').points[:,0]
+            eoi400_cube.add_dim_coord(iris.coords.DimCoord(points,
+                 standard_name = 'latitude',  long_name = 'latitude',
+                 var_name = 'latitude',
+                 coord_system = None,  circular = False), 1)
+
+            # e280
+            file_e280 = ('/nfs/b0164/Data/UofT/UofT-CCSM4/E280/Omon/sos_Omon_UofT-CCSM4_piControl_r1i1p1f1_gr1_150101-160012.nc')
+            fullcube = iris.load_cube(file_e280,'Sea Surface Salinity')
+            iris.coord_categorisation.add_month_number(fullcube,'time',name='month')
+            e280_cube = fullcube.aggregated_by('month',iris.analysis.MEAN)
+            iris.util.promote_aux_coord_to_dim_coord(e280_cube,'month')
+            e280_cube.coord('longitude').rename('lonaux')
+            points=e280_cube.coord('lonaux').points[0]
+            e280_cube.add_dim_coord(iris.coords.DimCoord(points,
+                 standard_name = 'longitude',  long_name = 'longitude',
+                 var_name = 'longitude', units='degrees',
+                 coord_system = None,  circular = True), 2)
+            e280_cube.coord('latitude').rename('lataux')
+            points=e280_cube.coord('lataux').points[:,0]
+            e280_cube.add_dim_coord(iris.coords.DimCoord(points,
+                 standard_name = 'latitude',  long_name = 'latitude',
+                 var_name = 'latitude',
+                 coord_system = None,  circular = False), 1)
+
+
+
+        elif model == 'HadGEM3':
+            # eoi400
+            file_eoi400 = ('/nfs/b0164/Data/HadGEM3_new/climatologies/Eoi400/ocean/clims_hadgem3_pliocene_sal_final.nc')
+            eoi400_cube = iris.load_cube(file_eoi400,'sal')
+
+            # e280
+            file_e280 = ('/nfs/b0164/Data/HadGEM3_new/climatologies/E280/ocean/clims_hadgem3_pi_sal.nc')
+            e280_cube = iris.load_cube(file_e280,'sal')
+
+        elif model == 'NorESM-L':
+            # eoi400
+            file_eoi400 = ('/nfs/b0164/Data/'+model+'/' + model + '_Eoi400.sss.climo.nc')
+            eoi400_cube = iris.load_cube(file_eoi400,'Ocean surface salinity')
+            print('eoi400',model,eoi400_cube)
+
+            # e280
+            file_e280 = ('/nfs/b0164/Data/'+model+'/' + model + '_E280.sss.climo.nc')
+            e280_cube = iris.load_cube(file_e280,'Ocean surface salinity')
+            print('e280',model,e280_cube)
+
+        elif model == 'NorESM1-F':
+            # eoi400
+            file_eoi400 = ('/nfs/b0164/Data/'+model+'/' + model + '_Eoi400_sss_climo.nc')
+            eoi400_cube = iris.load_cube(file_eoi400,'Ocean surface salinity')
+            print('eoi400',model,eoi400_cube)
+
+            # e280
+            file_e280 = ('/nfs/b0164/Data/'+model+'/' + model + '_E280_sss_climo.nc')
+            e280_cube = iris.load_cube(file_e280,'Ocean surface salinity')
+            print('e280',model,e280_cube)
+
+
+        else:
+            print('setup model',model)
+            sys.exit(0)
+
+
+        eoi400_cube_slice = extract_lon_lat(eoi400_cube)
+        name = model + '_Salinity_EOI400'
+        eoi400_cube_slice.long_name = name
+        eoi400_cube_slice.data = np.ma.where(eoi400_cube_slice.data.mask == 1.0, -99999, eoi400_cube_slice.data)
+        eoi400_cube_slice.data.mask = np.where(eoi400_cube_slice.data == -99999, 1.0, 0.0)
+        eoi400_cube_slice.cell_methods=None
+        eoi400_cube_slice.coord('time').bounds = None
+        try:
+            eoi400_cube_slice.coord('depth').bounds = None
+        except:
+            pass
+        eoi400_allcubes.append(eoi400_cube_slice)
+        
+
+        e280_cube_slice = extract_lon_lat(e280_cube)
+        name = model + '_Salinity_E280'
+        e280_cube_slice.long_name = name
+        e280_cube_slice.data = np.ma.where(e280_cube_slice.data.mask == 1.0, -99999, e280_cube_slice.data)
+        e280_cube_slice.data.mask = np.where(e280_cube_slice.data == -99999, 1.0, 0.0)
+        e280_cube_slice.cell_methods=None
+        e280_cube_slice.coord('time').bounds = None
+        try:
+            e280_cube_slice.coord('depth').bounds = None
+        except:
+            pass
+        e280_allcubes.append(e280_cube_slice)
+
+         
+        anom_data = eoi400_cube_slice.data - e280_cube_slice.data
+        anom_data.mask = np.maximum(eoi400_cube_slice.data.mask,
+                                e280_cube_slice.data.mask)
+        anom_data = np.where(anom_data.mask == 1.0, -99999, anom_data)
+        anom_cube = e280_cube_slice.copy(data=anom_data)
+        name = model + '_' + FIELD + '_EOI400-E280'
+        anom_cube.long_name = name
+      
+        anom_allcubes.append(anom_cube)
+                            
+    
+    return eoi400_allcubes, e280_allcubes,anom_allcubes    
+        
+
+
+#################
+# MAIN PROGRAM
+################
+
+###################################
+# get initial data including the lats and longs we require
+
+linuxwin = 'l'
+LAT_REQ = 52.5 # 51.2N, 4.4E
+LON_REQ = 3.0
+test ='n'
+FIELD='Salinity'
+if test == 'y':
+     MODELNAMES = ['HadGEM3','HadCM3','NorESM-L','NorESM1-F']
+else:
+     MODELNAMES = ['COSMOS', 'HadCM3',
+                   'IPSL-CM6A-LR', 'IPSLCM5A2', 'IPSLCM5A', 'MIROC4m', 
+                    'NorESM1-F','CCSM4-UoT','HadGEM3','NorESM-L']
+     julia = ['CCSM4-Utr','GISS2.1G',
+                   'EC-Earth3.3',  'HadGEM3', 'MRI2.3']
+eoi400_alldata, e280_alldata, anom_alldata = extract_data()
+fileoutstart = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'
+iris.save(eoi400_alldata,fileoutstart + 'EOI400_' + FIELD + '.nc', netcdf_format = "NETCDF3_CLASSIC",fill_value = -99999)
+iris.save(e280_alldata,fileoutstart + 'E280_' + FIELD + '.nc', netcdf_format = "NETCDF4", fill_value = -99999)
+iris.save(anom_alldata,fileoutstart + 'EOI400-E280_anom_' + FIELD + '.nc', netcdf_format = "NETCDF4", fill_value=-99999)
+::::::::::::::
+plot_annual_cycle_at_site.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#Updated for JH on 17th May 2021
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the SST data from the pliovar site locations and process
+#
+#
+# This program has been ammended from 
+#PlioMIP2/large_scale_features/extract_data_locations.py
+#
+#
+
+import pandas as pd
+import csv
+import sys
+from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import iris
+import xlwt
+from xlwt import Workbook
+import os
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+
+
+
+############################################################################
+class Getinitialdata:
+# get all of the initial data, including filenames and the lons and lats where
+# we require model output
+    def __init__(self, linuxwin_, datafile_):
+        self.linuxwin = linuxwin_
+        if self.linuxwin == 'l':
+            filename = '/nfs/hera1/earjcti/PLIOMIP2/proxydata/'
+        else:
+            filename = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\proxydata\\'
+
+        if datafile_ == 'Jonathan':
+            self.filenamein = filename + 'metadata_JH_based_on_pliovar.csv'
+            self.latcolumn = 3
+            self.loncolumn = 2
+            self.sitecolumn = 1
+            self.outend = 'modeloutput_JH.xls'
+            self.sitesreq = ['ODP662','ODP999','DSDP606','DSDP607','U1313',
+                             'U1308','DSDP552','ODP982','ODP642']
+        if datafile_ == 'Other':
+            self.filenamein = filename + 'one_locality.csv'
+            self.latcolumn = 1
+            self.loncolumn = 2
+            self.sitecolumn = 0
+            self.outend = 'test_localities.xls'
+
+        if self.linuxwin == 'l':
+            self.filestart = '/nfs/hera1/earjcti/regridded/'
+            if pliomip1 == 'y':
+                self.fileout = '/nfs/hera1/earjcti/PLIOMIP2/proxydata/pliomip1_'+self.outend
+            else:
+                self.fileout = '/nfs/hera1/earjcti/PLIOMIP2/proxydata/'+self.outend
+        else:
+            self.filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\regridded\\'
+            self.fileout = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\proxydata\\'+self.outend
+        
+
+
+    def read_file(self):
+        count = 0
+        latlist = []
+        lonlist = []
+        lonlist_alt = []
+        sitelist = self.sitesreq
+
+        df = pd.read_csv(self.filenamein, delimiter=',')
+        for site in sitelist:
+            print('site is',site)
+            dfrow = df.loc[lambda df: df['name'] == site]
+            print(dfrow)
+            lat = dfrow.iloc[:, self.latcolumn]
+            lon = dfrow.iloc[:, self.loncolumn]
+            latlist.append(pd.DataFrame.to_numpy(lat)[0])
+            lonarr = pd.DataFrame.to_numpy(lon)[0]
+            lonlist_alt.append(lonarr)
+            if lonarr < 0.:# longitude goes from 0-360 in models
+                lonlist.append(lonarr+360.)
+            else:
+                lonlist.append(lonarr)
+            lonlist.append
+           
+
+        for i, site in enumerate(sitelist):
+            print(site, lonlist[i], lonlist_alt[i], latlist[i])
+
+        returndata = self.filestart,self.fileout,lonlist, latlist, lonlist_alt, sitelist
+        return returndata
+
+# end of class getinitdata
+###############################################################################
+
+class Getmodeldata:
+    # get all of the data from the model at the required gridpoints
+    def __init__(self, test, modelstart_, field, latlist, lonlist, period):
+
+        fieldunits = {
+            "SST" : "degC",
+            "TotalPrecipitation" : "mm/day"
+                        }
+
+
+        self.fieldnames = field
+        self.latlist = latlist
+        self.lonlist = lonlist
+        self.modelstart = modelstart_ # the start of the filename for the model
+        self.period = period
+
+       
+        if period == 'E280':
+            self.modelnames.append('HadISST')
+            self.modelnames.append('NOAAERSST5')
+
+        self.units = fieldunits.get(fieldnames)
+
+
+        #
+    def extract_model_points(self, filenameuse):
+        """
+        will extract the data at each point from 'filenameuse'
+
+        calls: get_near_data
+        """
+
+        cube = iris.load_cube(filenameuse)
+
+        cubelats = cube.coord('latitude').points
+        cubelons = cube.coord('longitude').points
+
+        model_data = np.zeros(len(self.lonlist))
+        model_data_near = np.zeros(len(self.lonlist)) # values near the point
+        near_distance = np.zeros(len(self.lonlist)) # how far away we have to look to get data
+        ngbox_avg = np.zeros(len(self.lonlist)) # how many gridboxes we are averaging over to get data
+
+        for i in range(0,len(self.lonlist)):
+            # find nearest latitude and lontiude to the value
+            latix = (np.abs(cubelats-self.latlist[i])).argmin()
+            lonix = (np.abs(cubelons-self.lonlist[i])).argmin()
+
+            print(self.latlist[i], self.lonlist[i])
+            # get data from this location
+            data_slice  =  cube.extract(iris.Constraint(
+                        latitude = cubelats[latix],longitude = cubelons[lonix]))
+            
+            data_slice_data = data_slice.data
+            if -100. < data_slice_data < 100.: 
+                model_data[i] = data_slice_data
+            else:
+                model_data[i] = float('NaN')
+        
+            model_data_near[i] = model_data[i]
+
+            count_near_gb = 0 # how many gridboxes away are we looking for data
+            ngboxes = 1 # number of gridboxes we are averaging over when looking at 'near points'
+
+            # while value is unknown gradually expand the region to look for near gridboxes
+            while np.isnan(model_data_near[i]):
+                # get nearest neighbours within 'count_near_gb' gridboxes
+                count_near_gb = count_near_gb+1
+                print(count_near_gb)
+                neardata,ngboxes = self.get_near_data(cube,lonix,latix,cubelons,cubelats,count_near_gb)
+                model_data_near[i] = neardata
+
+            near_distance[i] = count_near_gb # how far away are we looking for data
+            ngbox_avg[i] = ngboxes
+
+
+        returndata = [model_data,model_data_near,near_distance,ngbox_avg]
+        return returndata
+
+
+
+    def get_near_data(self, cube, lonix, latix, cubelons, cubelats, npt):
+    # if there is no data at the given gridpoint get the data near the gridpoint
+
+        count_finite = 0
+        count_nan = 0
+        totdata = 0.
+        nlons = len(cubelons)
+        for i2 in range(lonix-npt,lonix+npt+1):
+            i3 = i2
+            if i2 >=  nlons:
+                i3 = i2-nlons
+            for j2 in range(latix-npt,latix+npt+1):
+                data_slice_new = cube.extract(iris.Constraint(
+                     latitude = cubelats[j2],longitude = cubelons[i3]))
+                data2 = data_slice_new.data
+                if np.ma.is_masked(data2):
+                    count_nan = count_nan+1
+                else:
+                    count_finite = count_finite+1
+                    totdata = totdata+data2
+        if count_finite > 0:
+            data_near = totdata/count_finite
+        else:
+            data_near = float('NaN') # if no data near set to nan
+
+        return data_near,count_finite
+
+
+    def extract_all(self):
+        """
+        extract points from all models for timeperiod.
+        timeperiod is likely to be 'E280' or 'EOI400'
+
+        returns
+        modelnames (strarr) modelnames used for this period
+        sitevals (np.arr): the values at the sites
+        sitenear (np.arr): an average of the values nearest to the sites
+        sitenear_dist (np.arr): how far away the values presented are
+        sitenear_ngbox_avg) (np.arr): the number of gridboxes averaged where the
+                      values near to the sites are used
+
+        """
+
+        npoints = len(self.lonlist)
+        nmodels = len(self.modelnames)
+        sitenear = np.zeros((nmodels, npoints)) # data near point
+        sitevals = np.zeros((nmodels, npoints)) # data at point
+        sitenear_dist = np.zeros((nmodels, npoints)) # how far away we have to look
+        sitenear_ngbox_avg = np.zeros((nmodels, npoints)) # how many gridboxes we are averaging over
+
+
+        for model in range(0, len(self.modelnames)):
+            print(self.modelnames[model])
+            filename = (self.modelstart + self.modelnames[model] + '/' +
+                               self.period + '.SST.allmean.nc')
+
+            # get model points and how far away they are from data
+            (sitevals[model,:],sitenear[model,:],sitenear_dist[model,:],
+                sitenear_ngbox_avg[model,:]) = self.extract_model_points(filename)
+
+        return [self.modelnames,sitevals,
+                sitenear,sitenear_dist,sitenear_ngbox_avg]
+
+# end of class Getmodeldata
+
+###############################################################################
+
+class Getmodeldata_p1:
+    # get all of the data from the pliomip1 models at the required gridpoints
+    def __init__(self, test, modelstart_, field, latlist, lonlist, period):
+
+        fieldunits = {
+            "SST" : "degC",
+            "TotalPrecipitation" : "mm/day"
+                        }
+
+
+        self.fieldnames = field
+        self.latlist = latlist
+        self.lonlist = lonlist
+        self.modelstart = modelstart_ # the start of the filename for the model
+        self.period = period
+
+        if test == 'y':
+            self.modelnames = ['NOR']
+        else:
+            self.modelnames = ['COSMOS', 'Had', 'CCSM',
+                               'IPSL', 'MIROC', 'MRI', 'NOR']
+
+        if period == 'E280':
+            self.modelnames.append('HadISST')
+            self.modelnames.append('NOAAERSST5')
+
+        self.units = fieldunits.get(fieldnames)
+
+
+    def extract_obs(self, filenameuse):
+        """
+        will extract the data at each point from NOAAERSST5 or HadISST
+        """
+
+        cube = iris.load_cube(filenameuse)
+
+        cubelats = cube.coord('latitude').points
+        cubelons = cube.coord('longitude').points
+
+        model_data = np.zeros(len(self.lonlist))
+        for i in range(0,len(self.lonlist)):
+            # find nearest latitude and lontiude to the value
+            latix = (np.abs(cubelats-self.latlist[i])).argmin()
+            lonix = (np.abs(cubelons-self.lonlist[i])).argmin()
+
+            # get data from this location
+            data_slice  =  cube.extract(iris.Constraint(
+                        latitude = cubelats[latix],longitude = cubelons[lonix]))
+            
+            data_slice_data = data_slice.data
+            if -100. < data_slice_data < 100.: 
+                model_data[i] = data_slice_data
+            else:
+                model_data[i] = float('NaN')
+        
+         
+        return model_data
+
+    def extract_model_points_p1(self, model):
+        """
+        will extract the data at each point from 'filenameuse'
+
+        calls: get_near_data
+        """
+        filename = '/nfs/hera1/earjcti/PLIOMIP/PlioMIP1_regridded.nc'
+        print(self.period, model)
+        if self.period == 'E280':
+            field = model + '_ctrl_sst'
+        if self.period == 'EOI400':
+            field = model + '_plio_sst'
+
+        cubeall = iris.load(filename)
+        for cube_temp in cubeall:
+            var = cube_temp.var_name
+            if field.lower() in var.lower():
+               cube=cube_temp
+
+        print(field, cube)
+       
+        cubelats = cube.coord('latitude').points
+        cubelons = cube.coord('longitude').points
+
+        model_data = np.zeros(len(self.lonlist))
+       
+        for i in range(0,len(self.lonlist)):
+            # find nearest latitude and lontiude to the value
+            if self.lonlist[i] > 180.:
+                lonreq = self.lonlist[i] - 360.
+            else:
+                lonreq = self.lonlist[i]
+            
+            latix = (np.abs(cubelats-self.latlist[i])).argmin()
+            lonix = (np.abs(cubelons-lonreq)).argmin()
+            # get data from this location
+            data_slice  =  cube.extract(iris.Constraint(
+                        latitude = cubelats[latix],longitude = cubelons[lonix]))
+            
+            if model == 'NOR':
+                data_slice_data = data_slice.data - 273.15
+            else:
+                data_slice_data = data_slice.data
+
+            if -100. < data_slice_data < 100.: 
+                model_data[i] = data_slice_data
+            else:
+                model_data[i] = float('NaN')
+       
+        return model_data
+
+
+
+   
+
+    def extract_all_p1(self):
+        """
+        extract points from all models for timeperiod.
+        timeperiod is likely to be 'E280' or 'EOI400'
+
+        returns
+        modelnames (strarr) modelnames used for this period
+        sitevals (np.arr): the values at the sites
+       
+        """
+
+        npoints = len(self.lonlist)
+        nmodels = len(self.modelnames)
+        sitevals = np.zeros((nmodels, npoints)) # data at point
+
+        for modno, modelname in enumerate(self.modelnames):
+           if modelname == 'HadISST' or modelname == 'NOAAERSST5':
+              filename = (self.modelstart + modelname + '/' +
+                          self.period + '.SST.allmean.nc')
+
+              sitevals[modno,:] = self.extract_obs(filename)
+           else:
+               # get model data
+               sitevals[modno,:] = self.extract_model_points_p1(modelname)
+
+        return [self.modelnames,sitevals]
+# end of class Getmodeldata
+
+###############################################################################
+def plotpoints(lonlist,latlist,datalist):
+# plot the points we have got from the file
+
+
+
+    fig,ax = plt.subplots()
+    alllons = np.arange(-180,180,1)
+    alllats = np.arange(-90,90,1)
+    lons,lats = np.meshgrid(alllons,alllats)
+    map = Basemap(llcrnrlon = -180.0,urcrnrlon = 180.0,llcrnrlat = -90.0,
+                urcrnrlat = 90.0,projection = 'cyl',resolution = 'c')
+    map.drawmapboundary
+    x,y = map(lons,lats)
+    map.drawcoastlines()
+
+    valmin = np.nanmin(datalist)
+    valmax = np.nanmax(datalist)
+
+    norm  =  mpl.colors.Normalize(vmin = valmin, vmax = valmax)
+    cmap  =  cm.brg
+
+
+    xpts,ypts = map(lonlist,latlist)
+    incr = (valmax-valmin+1.0)/10.
+    V = np.arange(valmin,valmax,incr)
+    cvals = (datalist-valmin)/(valmax-valmin) # scale cval onto same scale as colorbar
+    coluse = cmap(cvals)
+    cs  =  map.scatter(xpts,ypts,color = coluse,marker = 'o')
+
+    sm  =  plt.cm.ScalarMappable(cmap = cmap, norm = norm)
+    sm.set_array([])
+    plt.colorbar(sm, ticks = V,#ticks = np.linspace(valmin,valmax,incr),
+             orientation = "horizontal",extend = "both")
+
+    plt.show()
+
+def model_correct():
+    # calculate eoi400 - e280 + noaa_ersstv5 and eoi400-e280 + hadisst
+    noaaix = modelnames_e280.index('NOAAERSST5')
+    hadix = modelnames_e280.index('HadISST')
+
+    ny, nx = eoi400.shape
+    eoi400_corr_hadiss = eoi400 - e280[0:ny,:] + e280[hadix, :]
+    eoi400_corr_noaa = eoi400 - e280[0:ny,:] + e280[noaaix, :]
+   
+    print(eoi400_corr_noaa.shape, eoi400.shape)
+    return eoi400_corr_hadiss, eoi400_corr_noaa
+
+def write_sheet(wb, style, sheetname, modelnames, lonlist_alt, latlist, datawrite, sitename):
+    sheet  =  wb.add_sheet(sheetname)
+    sheet.write(0,0,'site')
+    sheet.write(0,1,'lat')
+    sheet.write(0,2,'lon')
+    for model in range(0,nmodels):
+        sheet.write(0,3+model,modelnames[model])
+
+    for i in range(0,npoints):
+        sheet.write(i+1,0,sitename[i],style)
+        sheet.write(i+1,1,latlist[i],style)
+        sheet.write(i+1,2,lonlist_alt[i],style)
+        for model in range(0,nmodels):
+            sheet.write(i+1,3+model,datawrite[model,i],style)
+
+    sheet.write(0,3+nmodels,'MMM')
+    sheet.write(0,4+nmodels,'MM-SD')
+    for i in range(0,npoints):
+        sheet.write(i+1,3+nmodels,np.nanmean(datawrite[0:nmodels,i]),style)
+        sheet.write(i+1,4+nmodels,np.nanstd(datawrite[0:nmodels,i]),style)
+
+    # add extra columns if we have them  this is likely to be hadisst
+    if len(modelnames) > nmodels:
+        print(modelnames,nmodels)
+        for model in range(nmodels,len(modelnames)):
+            sheet.write(0,5+model,modelnames[model])
+            for i in range(0,npoints):
+                sheet.write(i+1,5+model,datawrite[model,i],style)
+
+
+
+######################################################################################
+def write_to_book(fileout,lonlist,latlist,lonlist_alt, sitename):
+    # write to workbook
+    # calls write_sheet
+
+    # Workbook is created
+    wb  =  Workbook()
+
+    style  =  xlwt.XFStyle()
+    style.num_format_str  =  '0.00'
+
+
+    # add_sheet for Eoi400 E280 and difference
+    write_sheet(wb,style, 'EOI400_corr_NOAA', modelnames_eoi400, lonlist_alt, latlist, eoi400_corr_noaa, sitename)
+    write_sheet(wb,style, 'EOI400_RAW', modelnames_eoi400, lonlist_alt, latlist, eoi400, sitename)
+    write_sheet(wb,style, 'E280', modelnames_e280, lonlist_alt, latlist,e280, sitename)
+    write_sheet(wb,style, 'EOI400-E280',modelnames_eoi400,lonlist_alt,latlist,
+                eoi400[0:nmodels]-e280[0:nmodels], sitename)
+
+    # add_sheet near Eoi400 E280 and difference
+    # JULIA NOTE:  I HAVE GOT RID OF ALL THESE FOR JH BECAUSE ALL HIS POINTS
+    # ARE DEFINATELY OCEAN.  
+    #write_sheet(wb,style, 'EOI400near',modelnames_eoi400,lonlist_alt,latlist,eoi400_near, sitename)
+    #write_sheet(wb,style, 'E280near',modelnames_e280,lonlist_alt,latlist,e280_near, sitename)
+    #write_sheet(wb,style, 'EOI400-E280near',modelnames_eoi400,lonlist_alt,latlist,
+    #            eoi400_near[0:nmodels]-e280_near[0:nmodels], sitename)
+
+    # add sheet for how far away we need to look for data
+    #write_sheet(wb,style, 'EOI400distance',modelnames_eoi400,lonlist_alt,latlist,eoi400_near_distance, sitename)
+    #write_sheet(wb,style, 'E280distance',modelnames_e280,lonlist_alt,latlist,e280_near_distance, sitename)
+
+    # add sheet for how many gridboxes we are averaging over
+    #write_sheet(wb,style, 'EOI400nboxes',modelnames_eoi400,lonlist_alt,latlist,eoi400_ngbox_avg, sitename)
+    #write_sheet(wb,style, 'E280nboxes',modelnames_e280,lonlist_alt,latlist,e280_ngbox_avg, sitename)
+
+
+
+
+    # remove output file if it exists
+    exists  =  os.path.isfile(fileout)
+    if exists:
+        os.remove(fileout)
+    wb.save(fileout)
+
+#################################################################################
+#def plot_points():
+    # plot all the points from eoi400_near[model,i]-3280_near[model,i] to a map
+#    for model in range(0,len(modelnames)):
+
+
+def plot_by_lat(SST, lat, outmid):
+# do a temperature by latitude plot for all of the data
+    print(modelnames_eoi400)
+    print(SST.shape, np.mean(SST, axis=0))
+    plt.scatter(lat, np.mean(SST, axis=0),label='multimodel mean')
+    for i, model in enumerate(modelnames_eoi400):
+        if i < 8:
+            plt.scatter(lat, SST[i, :], s=5, marker='^', label=model)
+        else:
+            plt.scatter(lat, SST[i, :], s=5, marker='v', label=model)
+   
+    plt.errorbar(np.asarray(lat)-1.0, np.mean(SST, axis=0), yerr=np.std(SST, axis=0))
+    plt.title(outmid)
+    plt.xlabel('latitude')
+    plt.ylabel('temp deg C')
+    plt.legend(ncol=2, prop={'size':6})
+    
+
+    outstart = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/'
+    outstart = outstart + 'Collaborators/Jonathan_Hall/'
+    if pliomip1 == 'y':
+        outstart + outstart + 'PlioMIP1_'
+    plt.savefig(outstart + outmid + '.png')
+    plt.savefig(outstart + outmid + '.eps')
+    plt.close()
+
+
+def plot_data(eoi400_data, e280_data):
+    """
+    eoi400/e280_data = np.zeros(len modelnames, nmonths)
+    """
+
+    # also write data to a text file
+    textout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'+ FIELD + '_seas_cyc_at_'+np.str(LAT_REQ)+'N_'+np.str(LON_REQ)+'E.txt')
+    f1 = open(textout,'w+')
+   
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    colors = ['tab:blue','tab:orange','tab:green','tab:red','tab:purple','tab:brown','tab:pink','tab:grey','tab:olive','tab:cyan','lightgray','indigo','coral','palegreen','salmon','chocolate','orchid']
+    # absolute values
+    ax1 = plt.subplot(2,1,1)
+    mean400=np.zeros(12)
+    meancount=0
+    f1.write('absolute values \n')
+    f1.write('modelname,')
+    for month in months: f1.write(month + ', ')
+    f1.write('\n')
+    for i, model in enumerate(MODELNAMES):
+        if (-500 < eoi400_data[i,0] < 1E10):
+            ax1.plot(months, eoi400_data[i, :],color=colors[i], label=model,
+                     linestyle='dashed')
+            f1.write(model + ', ')
+            for val in eoi400_data[i,:]: f1.write(np.str(np.round(val,2)) + ', ')
+            f1.write('\n')
+            mean400 = mean400 + eoi400_data[i, :]
+            meancount = meancount+1
+    mean400 = mean400 / meancount
+    ax1.plot(months, mean400,color='black', label='MEAN')
+          
+    plt.title('mPWP temperature at '+np.str(LAT_REQ)+'N: '+np.str(LON_REQ)+'E')
+    plt.legend(ncol=2,prop={'size':6})
+    plt.ylabel('temp deg C')
+  
+    # anomaly
+    f1.write('\nanomalies Plio-PI \n')
+    f1.write('Modelname, ')
+    for month in months: f1.write(month + ', ')
+    f1.write('\n')
+   
+    ax2 = plt.subplot(2,1,2)
+    meananom=np.zeros(12)
+    meancount=0
+    for i, model in enumerate(MODELNAMES):
+        if ((-500 < eoi400_data[i,0]  < 1E10) 
+            and (-500 < e280_data[i,0] < 1E10))  :
+            ax2.plot(months, eoi400_data[i, :] - e280_data[i,:], 
+                     color=colors[i],label=model, linestyle='dashed')
+            # write to file
+            f1.write(model + ', ')
+            for val in eoi400_data[i,:] -  e280_data[i,:]: 
+                f1.write(np.str(np.round(val,2)) + ', ')
+            f1.write('\n')
+            
+            meananom = meananom + eoi400_data[i, :] - e280_data[i,:]
+            meancount = meancount+1
+    meananom = meananom / meancount
+    ax2.plot(months, meananom,color='black', label='MEAN')
+    print('anom is',meananom)
+    f1.close()
+  
+    plt.title('mPWP - PI temperature at '+np.str(LAT_REQ)+'N: '+np.str(LON_REQ)+'E')
+    plt.ylabel('temp deg C')
+  
+    plt.tight_layout()
+
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'+ FIELD + '_seas_cyc_at_'+np.str(LAT_REQ)+'N_'+np.str(LON_REQ)+'E')
+    plt.savefig(fileout + '.png')
+    plt.savefig(fileout + '.eps')
+    plt.close()
+    sys.exit(0)
+
+    
+def extract_lon_lat(cube):
+    """
+    extracts the required longitude and latitude from the cube
+    """ 
+
+    cubelats = cube.coord('latitude').points
+    cubelons = cube.coord('longitude').points
+
+    # find nearest latitude and lontiude to the value
+    latix = (np.abs(cubelats - LAT_REQ)).argmin()
+    lonix = (np.abs(cubelons - LON_REQ)).argmin()
+
+    data_slice  =  cube.extract(iris.Constraint(
+                        latitude = cubelats[latix],longitude = cubelons[lonix]))
+       
+
+    return data_slice
+
+def extract_data():
+    """
+    extracts the data at the required lat and long
+    """
+   
+    eoi400_alldata = np.zeros((len(MODELNAMES),12))
+    e280_alldata = np.zeros((len(MODELNAMES),12))
+
+    for i, model in enumerate(MODELNAMES):
+        filestart = '/nfs/hera1/earjcti/regridded/' + model + '/'
+        eoi400_cube = iris.load_cube(filestart + 'EOI400.'+ FIELD + '.mean_month.nc')
+        eoi400_cube_slice = extract_lon_lat(eoi400_cube)
+        eoi400_alldata[i, :] = eoi400_cube_slice.data
+    
+
+        eoi400_cube = iris.load_cube(filestart + 'E280.'+ FIELD+ '.mean_month.nc')
+        e280_cube_slice = extract_lon_lat(eoi400_cube)
+        e280_alldata[i, :] = e280_cube_slice.data
+    
+    return eoi400_alldata, e280_alldata    
+        
+
+
+#################
+# MAIN PROGRAM
+################
+
+###################################
+# get initial data including the lats and longs we require
+
+linuxwin = 'l'
+LAT_REQ = 52.5 # 51.2N, 4.4E
+LON_REQ = 3.0
+test ='n'
+#FIELD = 'NearSurfaceTemperature'
+FIELD = 'SST'
+
+if test == 'y':
+     MODELNAMES = ['NorESM1-F', 'HadCM3']
+else:
+     MODELNAMES = ['CCSM4', 'CCSM4-UoT', 'CCSM4-Utr',  'CESM1.2','CESM2',
+                   'COSMOS', 'EC-Earth3.3', 'GISS2.1G', 'HadCM3','HadGEM3',
+                   'IPSLCM6A', 'IPSLCM5A2', 'IPSLCM5A', 'MIROC4m', 'MRI2.3',
+                   'NorESM-L', 'NorESM1-F'
+                               ]
+eoi400_alldata, e280_alldata = extract_data()
+
+plot_data(eoi400_alldata, e280_alldata)
+::::::::::::::
+sea_ice_plots.py
+::::::::::::::
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+#
+# we would like to look at winter and summer sea ice for the pliocene and preind
+#
+#
+#
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import numpy as np
+
+       
+
+
+#################
+# MAIN PROGRAM
+################
+
+
+# read in multimodel mean monthly SST data (EOI400-E280)
+
+MP_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SeaIceConc_multimodelmean_month.nc', 'SeaIceConcmean_plio')
+PI_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SeaIceConc_multimodelmean_month.nc', 'SeaIceConcmean_pi')
+#anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
+#                           'NearSurfaceTemperatureplio - pi')
+janMP_cube = MP_cube.extract(iris.Constraint(time=1))
+julMP_cube = MP_cube.extract(iris.Constraint(time=7))
+janPI_cube = PI_cube.extract(iris.Constraint(time=1))
+julPI_cube = PI_cube.extract(iris.Constraint(time=7))
+
+
+levels=np.arange(0.1, 1.1, 0.1)
+#print(janMP_cube)
+#print(janMP_cube.data)
+#plt.subplot(2,2,1,projection=ccrs.Orthographic(60,90))
+#qplt.contourf(janMP_cube,levels=levels)
+#plt.show()
+#sys.exit(0)
+ax=plt.subplot(2,2,1,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(janMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,2,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(julMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,3,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(janPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January PI')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,4,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(julPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July PI')
+plt.gca().coastlines()
+
+
+plt.savefig('summer_and_winter_seaice_orth.png')
+plt.savefig('summer_and_winter_seaice_orth.eps')
+
+
+ax=plt.subplot(2,2,1,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,2,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,3,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January PI')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,4,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July PI')
+plt.gca().coastlines()
+
+
+plt.savefig('summer_and_winter_seaice_NA.png')
+plt.savefig('summer_and_winter_seaice_NA.eps')
+
+::::::::::::::
+seasonal_contrast.py
+::::::::::::::
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+# He wondered whether this was a global signal or just a local signal.
+# This program is to see what the models show
+#
+#
+#
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import numpy as np
+
+       
+
+
+#################
+# MAIN PROGRAM
+################
+
+
+# read in multimodel mean monthly SST data (EOI400-E280)
+
+mPWP_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SST_multimodelmean_month.nc','SSTmean_plio')
+PI_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SST_multimodelmean_month.nc','SSTmean_pi')
+
+
+janmpwp_cube = mPWP_cube.extract(iris.Constraint(time=1))
+julmpwp_cube = mPWP_cube.extract(iris.Constraint(time=7))
+
+janpi_cube = PI_cube.extract(iris.Constraint(time=1))
+julpi_cube = PI_cube.extract(iris.Constraint(time=7))
+
+pi_contrast_cube = julpi_cube - janpi_cube
+mpwp_contrast_cube = julmpwp_cube - janmpwp_cube
+
+
+levels = np.arange(0,11,1)
+
+ax=plt.subplot(1,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(mpwp_contrast_cube,levels=levels,extend='both')
+plt.title('mPWP (July - January)')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(pi_contrast_cube,levels=levels,extend='both')
+plt.title('PI (July - January)')
+plt.gca().coastlines()
+plt.savefig('seasonal_contrast_NA.png')
+plt.savefig('seasonal_contrast_NA.eps')
+
+levels = np.arange(4,12.5,0.5)
+ax=plt.subplot(1,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-20,20,40,70],crs=ccrs.PlateCarree())
+qplt.contourf(mpwp_contrast_cube,levels=levels,extend='both')
+plt.title('mPWP (July - January)')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-20,20,40,70],crs=ccrs.PlateCarree())
+qplt.contourf(pi_contrast_cube,levels=levels,extend='both')
+plt.title('PI (July - January)')
+plt.gca().coastlines()
+plt.savefig('seasonal_contrast_NA_east.png')
+plt.savefig('seasonal_contrast_NA_east.eps')
+
+
+levels = np.arange(3,8.5,0.5)
+ax=plt.subplot(1,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-100,-60,20,60],crs=ccrs.PlateCarree())
+qplt.contourf(mpwp_contrast_cube,levels=levels,extend='both')
+plt.title('mPWP (July - January)')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-100,-60,20,60],crs=ccrs.PlateCarree())
+qplt.contourf(pi_contrast_cube,levels=levels,extend='both')
+plt.title('PI (July - January)')
+plt.gca().coastlines()
+plt.savefig('seasonal_contrast_NA_west.png')
+plt.savefig('seasonal_contrast_NA_west.eps')
+::::::::::::::
+summer_warming_vs_winter_cloudfrac.py
+::::::::::::::
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+# He wondered whether this was a global signal or just a local signal.
+# This program is to see what the models show
+#
+#
+#
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import iris.plot as iplt
+import numpy as np
+import sys
+
+def get_MMM_cube(fileend):
+    """
+    gets the multimodel mean from fileend
+    """
+
+    filestart = '/nfs/hera1/earjcti/regridded/'
+    allcubes = CubeList([])
+
+    for i, model in enumerate(MMM_modelnames):
+        filename = filestart + model + fileend
+        cube = iris.load_cube(filename)
+        
+        # set up for concatenate
+        if model == 'HadCM3':
+            cube = cube * 100. # convert tp [ercemtage
+            
+        if i == 0:
+            nt, ny, nx = np.shape(cube.data)
+            alldata = np.zeros((len(MMM_modelnames), nt, ny ,nx))
+        alldata[i,:,:,:] = cube.data
+
+    alldatamean = np.mean(alldata, axis=0)
+    MMM_cube = cube.copy(data=alldatamean)
+    
+
+    return MMM_cube
+
+#################
+# MAIN PROGRAM
+################
+
+
+
+field = 'totcloud'
+model='MMM'
+
+MMM_modelnames = ['CESM2','HadCM3','IPSLCM6A','MIROC4m'] # to be used in the MMM
+
+
+if model == 'MMM':
+    eoi400_cube = get_MMM_cube('/EOI400.' + field + '.mean_month.nc')
+    e280_cube = get_MMM_cube('/E280.' + field + '.mean_month.nc')
+else:
+    eoi400_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+model+'/EOI400.' + field + '.mean_month.nc')
+    e280_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+model+'/E280.' + field + '.mean_month.nc')
+
+
+if model == 'HadCM3':
+    eoi400_cube = eoi400_cube * 100.
+    e280_cube = e280_cube * 100.
+janpi_cube = e280_cube.extract(iris.Constraint(month=1))
+julpi_cube = e280_cube.extract(iris.Constraint(month=7))
+janplio_cube = eoi400_cube.extract(iris.Constraint(month=1))
+julplio_cube = eoi400_cube.extract(iris.Constraint(month=7))
+
+
+levels=np.arange(10., 100., 10.)
+ax=plt.subplot(3,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janplio_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('January (MP):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julplio_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('July (MP):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,3,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janpi_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('January (PI):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,4,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julpi_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('July (pi):' + model)
+plt.gca().coastlines()
+
+levels=np.arange(-22, 26, 4)
+ax=plt.subplot(3,2,5,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janplio_cube - janpi_cube,levels=levels,extend='both',cmap='RdBu_r')
+plt.title('January (mpwp-pi):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,6,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julplio_cube - julpi_cube,levels=levels,extend='both',cmap='RdBu_r')
+plt.title('July (mpwp-pi):' + model)
+plt.gca().coastlines()
+
+plt.tight_layout()
+#plt.show()
+#sys.exit(0)
+plt.savefig('summer_and_winter_cloudfrac_' + model + '.png')
+plt.savefig('summer_and_winter_cloudfrac_' + model + '.eps')
+
+plt.close()
+### plot jul-jan plio - jul-jan pi
+anom_anom_cube = (julplio_cube - janplio_cube) - (julpi_cube - janpi_cube)
+levels=np.arange(-22, 26, 4)
+cs = iplt.contourf(anom_anom_cube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+
+
+plt.gca().coastlines()
+plt.title('cloud:'+model+' (mPWP_jul - MPWP_jan) - (PI_jul - PI_jan)')
+plt.savefig('anom_cloudfrac_'+ model + '.png')
+plt.savefig('anom_cloudfrac_'+ model + '.eps') 
+plt.close()
+
+### plot jul_plio-jul_pi  and jan_plio - jan_pi on one plot
+julcube = (julplio_cube - julpi_cube)
+jancube = (janplio_cube - janpi_cube)
+levels=np.arange(-22, 26, 4)
+plt.subplot(1,2,2)
+cs = iplt.contourf(julcube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+plt.title('jul cloud anom mpwp -pi')
+plt.gca().coastlines()
+plt.subplot(1,2,1)
+cs = iplt.contourf(jancube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+plt.title('jan cloud anom mpwp -pi')
+plt.gca().coastlines()
+
+plt.savefig('jul_jan_anomcloudfrac_'+ model + '.eps') 
+plt.savefig('jul_jan_anomcloudfrac_'+ model + '.png')
+
+plt.close()
+
+
+# plot over north atlantic only
+
+lat_constraint = iris.Constraint(latitude = lambda cell:  20 < cell < 70.0)  
+
+lon_slice  =  anom_anom_cube.intersection(longitude=(-90., 20.))       
+anom_anom_region_cube = lon_slice.extract(lat_constraint) 
+
+cs = iplt.contourf(anom_anom_region_cube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+
+
+plt.gca().coastlines()
+plt.savefig('anom_anom_cloudfrac_'+ model + '_NA.png')
+plt.savefig('anom_anom_cloudfrac_'+ model + '_NA.eps') 
+::::::::::::::
+summer_warming_vs_winter_SSTind.py
+::::::::::::::
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.  We have been looking to see if this is related to clouds.
+#
+# I have plotted a multimodel mean from clouds but we don't have all the models
+#  This will do a partial MMM plot for SST
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import iris.plot as iplt
+import numpy as np
+import sys
+
+def get_MMM_cube(fileend):
+    """
+    gets the multimodel mean from fileend
+    """
+
+    filestart = '/nfs/hera1/earjcti/regridded/'
+    allcubes = CubeList([])
+
+    for i, model in enumerate(MMM_modelnames):
+        filename = filestart + model + fileend
+        cube = iris.load_cube(filename)
+            
+        if i == 0:
+            nt, ny, nx = np.shape(cube.data)
+            alldata = np.zeros((len(MMM_modelnames), nt, ny ,nx))
+        alldata[i,:,:,:] = cube.data
+
+    alldatamean = np.mean(alldata, axis=0)
+    MMM_cube = cube.copy(data=alldatamean)
+    
+    print(MMM_cube.data)
+
+    return MMM_cube
+
+#################
+# MAIN PROGRAM
+################
+
+
+
+field = 'NearSurfaceTemperature'
+model='MMMsubset'
+
+MMM_modelnames = ['CESM2','HadCM3','IPSLCM6A','MIROC4m'] # to be used in the MMM
+
+label = {'SST' : 'degC', 'NearSurfaceTemperature' : 'degC',
+         'TotalPrecipitation' : 'mm/day'}
+
+if model == 'MMMsubset':
+    eoi400_cube = get_MMM_cube('/EOI400.' + field + '.mean_month.nc')
+    e280_cube = get_MMM_cube('/E280.' + field + '.mean_month.nc')
+else:
+    eoi400_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+model+'/EOI400.' + field + '.mean_month.nc')
+    e280_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+model+'/E280.' + field + '.mean_month.nc')
+
+
+janpi_cube = e280_cube.extract(iris.Constraint(month=1))
+julpi_cube = e280_cube.extract(iris.Constraint(month=7))
+janplio_cube = eoi400_cube.extract(iris.Constraint(month=1))
+julplio_cube = eoi400_cube.extract(iris.Constraint(month=7))
+
+janpi_cube.data = np.where(janpi_cube.data > 1.0e10, np.nan, janpi_cube.data)
+julpi_cube.data = np.where(julpi_cube.data > 1.0e10, np.nan, julpi_cube.data)
+janplio_cube.data = np.where(janplio_cube.data > 1.0e10, np.nan, janplio_cube.data)
+julplio_cube.data = np.where(julplio_cube.data > 1.0e10, np.nan, julplio_cube.data)
+
+
+levels=np.arange(-10., 40., 5.)
+
+if field == 'TotalPrecipitation':
+    levels=levels/10.
+ax=plt.subplot(3,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janplio_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('January (MP):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julplio_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('July (MP):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,3,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janpi_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('January (PI):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,4,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julpi_cube,levels=levels,extend='both')
+plt.title('July (pi):' + model)
+plt.gca().coastlines()
+
+levels=np.arange(-7, 9, 2)
+if field == 'TotalPrecipitation':
+    levels=levels/10.
+
+ax=plt.subplot(3,2,5,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janplio_cube - janpi_cube,levels=levels,extend='both',cmap='RdBu_r')
+plt.title('January (mpwp-pi):' + model)
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,6,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julplio_cube - julpi_cube,levels=levels,extend='both',cmap='RdBu_r')
+plt.title('July (mpwp-pi):' + model)
+plt.gca().coastlines()
+
+plt.tight_layout()
+plt.savefig('summer_and_winter_' + field + '_' + model + '.png')
+plt.savefig('summer_and_winter_' + field + '_' + model + '.eps')
+
+plt.close()
+### plot jul-jan plio - jul-jan pi
+anom_anom_cube = (julplio_cube - janplio_cube) - (julpi_cube - janpi_cube)
+#levels=np.arange(-22, 26, 4)
+cs = iplt.contourf(anom_anom_cube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label=label.get(field),ticks=levels)
+
+
+plt.gca().coastlines()
+plt.title(field + ':' +model+' (mPWP_jul - MPWP_jan) - (PI_jul - PI_jan)')
+plt.savefig('anom_' + field + '_'+ model + '.png')
+plt.savefig('anom_' + field + '_'+ model + '.eps') 
+plt.close()
+
+### plot jul_plio-jul_pi  and jan_plio - jan_pi on one plot
+julcube = (julplio_cube - julpi_cube)
+jancube = (janplio_cube - janpi_cube)
+levels=np.arange(1, 11, 1)
+if field == 'TotalPrecipitation':
+    levels=levels/10.
+
+plt.subplot(1,2,2)
+cs = iplt.contourf(julcube,levels=levels,cmap='gist_heat_r',extend='both')
+cs.cmap.set_under('white')
+cbar = plt.colorbar(cs,orientation='horizontal',label=label.get(field),ticks=levels)
+plt.title('jul ' +field+' anom mpwp -pi')
+plt.gca().coastlines()
+plt.subplot(1,2,1)
+cs = iplt.contourf(jancube,levels=levels,cmap='gist_heat_r',extend='both')
+cs.cmap.set_under('white')
+cbar = plt.colorbar(cs,orientation='horizontal',label=label.get(field),ticks=levels)
+plt.title('jan '+field+' anom mpwp -pi')
+plt.gca().coastlines()
+
+plt.savefig('jul_jan_anom_' + field + '_'+ model + '.eps') 
+plt.savefig('jul_jan_anom_' + field + '_' +  model + '.png')
+
+plt.close()
+
+
+# plot over north atlantic only
+
+levels=np.arange(-7, 9, 2)
+if field == 'TotalPrecipitation':
+    levels=levels/10.
+
+lat_constraint = iris.Constraint(latitude = lambda cell:  20 < cell < 70.0)  
+
+lon_slice  =  anom_anom_cube.intersection(longitude=(-90., 20.))       
+anom_anom_region_cube = lon_slice.extract(lat_constraint) 
+
+cs = iplt.contourf(anom_anom_region_cube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label=label.get(field),ticks=levels)
+
+
+plt.gca().coastlines()
+plt.savefig('anom_anom_'+ field + '_' + model + '_NA.png')
+plt.savefig('anom_anom_'+ field + '_' + model + '_NA.eps') 
+::::::::::::::
+summer_warming_vs_winter_warming.py
+::::::::::::::
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+# He wondered whether this was a global signal or just a local signal.
+# This program is to see what the models show
+#
+#
+#
+
+
+import cartopy as cart
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import numpy as np
+import sys
+
+       
+
+
+#################
+# MAIN PROGRAM
+################
+
+
+# read in multimodel mean monthly SST data (EOI400-E280)
+
+field = 'NearSurfaceTemperature' # NearSurfaceTemperature, SST, TotalPrecipitation
+
+if field == 'TotalPrecipiation':
+    cmapname = 'bwr'
+else:
+    cmapname = 'rainbow'
+
+
+anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+field+'_multimodelmean_month.nc', field + 'plio - pi')
+
+jan_cube = anom_cube.extract(iris.Constraint(time=1))
+jul_cube = anom_cube.extract(iris.Constraint(time=7))
+
+summer_min_winter_cube = jul_cube - jan_cube
+summer_min_winter_cube.long_name='(mPWP_July - mPWP_Jan) - (PI_July - PI_Jan)'
+print(summer_min_winter_cube)
+
+vals=np.arange(-5.0,6.0,1.0)
+
+
+ax=plt.subplot(1,1,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(summer_min_winter_cube,cmap='RdBu_r',levels=vals,extend='both')
+plt.title(' ')
+#plt.gca().coastlines()
+if field == 'SST': 
+    ax.add_feature(cart.feature.LAND, zorder=1,facecolor='white',edgecolor='black')
+else:
+    ax.coastlines()
+plt.savefig('summer_minus_winter_'+field+'_NA.png')                             
+plt.savefig('summer_minus_winter_'+field+'_NA.eps')
+
+sys.exit(0)                             
+
+levels=np.arange(0,11.0,1.0)
+if field == 'TotalPrecipitation':
+    levels = np.arange(-2.2, 2.4, 0.4)
+print(levels)
+ax=plt.subplot(1,2,1,projection=ccrs.Orthographic(45,90))
+#ax.set_extent([-180,180,45,90])
+qplt.contourf(jan_cube,levels=levels,extend='both',cmap='rainbow')
+plt.title('January')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.Orthographic(45,90))
+qplt.contourf(jul_cube,levels=levels,extend='both')
+plt.title('July')
+plt.gca().coastlines()
+plt.savefig('summer_and_winter_orth_'+field+'.png')
+plt.savefig('summer_and_winter_orth_'+field+'.eps')
+
+ax=plt.subplot(1,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+qplt.contourf(jan_cube,levels=levels,extend='both',cmap=cmapname)
+plt.title('January (mPWP-PI)')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+qplt.contourf(jul_cube,levels=levels,extend='both',cmap=cmapname)
+plt.title('July (mPWP - PI)')
+plt.gca().coastlines()
+plt.savefig('summer_and_winter_NA_'+field+'.png')
+plt.savefig('summer_and_winter_NA_'+field+'.eps')
+
+
+ax=plt.subplot(1,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+#ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(jan_cube,levels=levels,extend='both',cmap=cmapname)
+plt.title('January (mPWP-PI)')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+#ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(jul_cube,levels=levels,extend='both',cmap=cmapname)
+plt.title('July (mPWP - PI)')
+plt.gca().coastlines()
+plt.savefig('summer_and_winter_'+field+'.png')
+plt.savefig('summer_and_winter_'+field+'.eps')
+::::::::::::::
+wind_plots_NA.py
+::::::::::::::
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+# He wondered whether this was a global signal or just a local signal.
+# This program is to see what the models show
+#
+#
+#
+
+
+import cartopy as cart
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import iris.plot as iplt
+import iris.coord_categorisation
+import numpy as np
+import sys
+
+       
+
+def get_data(exptname,fieldname):
+    """
+    gets the data if it is a single model
+    gets the multimodel mean if it is multimodels
+    """
+
+    if MODEL == 'MMMsubset':
+        cubelist = CubeList([])
+        for model in MMMss_mods:
+            cube = iris.load_cube(filestart + model + '/' + exptname + 
+                                  '.' + fieldname + '_850.0.mean_month.nc')
+            cube.attributes = None
+            cube.cell_methods = None
+            for coord in cube.coords():
+                if coord.var_name == 'air_pressure':
+                   cube.remove_coord(coord)
+                else:
+                    print(coord.var_name)
+            cubelist.append(cube)
+        iris.util.equalise_attributes(cubelist)
+        alldata_cube = cubelist.concatenate_cube()
+
+        print(alldata_cube)
+        sys.exit(0)
+#################
+# MAIN PROGRAM
+################
+
+
+# read in multimodel mean monthly winds
+MMMss_mods = ['CCSM4-UoT','COSMOS','EC-Earth3.3','GISS2.1G',
+              'HadCM3','IPSLCM6A','MIROC4m','NorESM1-F']
+MMMss_mods = ['CCSM4-UoT','COSMOS']
+
+MODEL = 'MMMsubset'
+
+filestart = '/nfs/hera1/earjcti/regridded/'
+
+
+EOI400_ua = get_data('EOI400','ua')
+EOI400_va = get_data('EOI400','va')
+EOI280_ua = get_data('E280','ua')
+EOI280_va = get_data('E280','va')
+
+
+EOI400_jan_ua = EOI400_ua.extract(iris.Constraint(month=1))
+EOI400_jul_ua = EOI400_ua.extract(iris.Constraint(month=7))
+EOI400_jan_va = EOI400_va.extract(iris.Constraint(month=1))
+EOI400_jul_va = EOI400_va.extract(iris.Constraint(month=7))
+
+E280_jan_ua = E280_ua.extract(iris.Constraint(month=1))
+E280_jul_ua = E280_ua.extract(iris.Constraint(month=7))
+E280_jan_va = E280_va.extract(iris.Constraint(month=1))
+E280_jul_va = E280_va.extract(iris.Constraint(month=7))
+
+x = E280_jan_ua.coord('longitude').points
+y = E280_jan_ua.coord('latitude').points
+ulon = E280_jan_ua.coord('longitude')
+
+fig = plt.figure(figsize=[12,12])
+
+ax = plt.subplot(3,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+#transform = ulon.coord_system.as_cartopy_projection()
+Q=plt.quiver(x[::5],y[::5],
+           E280_jan_ua.data[::5,::5], E280_jan_va.data[::5,::5], 
+           pivot="middle") 
+qk=ax.quiverkey(Q, 0.9, 0.9, 10, r'$10 \frac{m}{s}$',
+                labelpos='E', coordinates='figure')
+          # transform=transform)
+plt.title('Jan PI')
+ax.coastlines()
+
+
+
+ax = plt.subplot(3,2,3,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+#transform = ulon.coord_system.as_cartopy_projection()
+Q=plt.quiver(x[::5],y[::5],
+           EOI400_jan_ua.data[::5,::5], EOI400_jan_va.data[::5,::5], 
+           pivot="middle") 
+qk=ax.quiverkey(Q, 0.9, 0.9, 10, r'$10 \frac{m}{s}$',
+                labelpos='E', coordinates='figure')
+          # transform=transform)
+plt.title('Jan MP')
+ax.coastlines()
+
+ax = plt.subplot(3,2,5,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+#transform = ulon.coord_system.as_cartopy_projection()
+Q=plt.quiver(x[::5],y[::5],
+           EOI400_jan_ua.data[::5,::5] - E280_jan_ua.data[::5,::5],
+           EOI400_jan_va.data[::5,::5] - E280_jan_va.data[::5,::5], 
+           pivot="middle") 
+qk=ax.quiverkey(Q, 0.9, 0.9, 10, r'$10 \frac{m}{s}$',
+                labelpos='E', coordinates='figure')
+          # transform=transform)
+plt.title('Jan MP - PI')
+ax.coastlines()
+
+
+ax = plt.subplot(3,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+#transform = ulon.coord_system.as_cartopy_projection()
+Q=plt.quiver(x[::5],y[::5],
+           E280_jul_ua.data[::5,::5], E280_jul_va.data[::5,::5], 
+           pivot="middle") 
+qk=ax.quiverkey(Q, 0.9, 0.9, 10, r'$10 \frac{m}{s}$',
+                labelpos='E', coordinates='figure')
+          # transform=transform)
+plt.title('Jul PI')
+ax.coastlines()
+
+
+
+ax = plt.subplot(3,2,4,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+#transform = ulon.coord_system.as_cartopy_projection()
+Q=plt.quiver(x[::5],y[::5],
+           EOI400_jul_ua.data[::5,::5], EOI400_jul_va.data[::5,::5], 
+           pivot="middle") 
+qk=ax.quiverkey(Q, 0.9, 0.9, 10, r'$10 \frac{m}{s}$',
+                labelpos='E', coordinates='figure')
+          # transform=transform)
+plt.title('Jul MP')
+ax.coastlines()
+
+
+ax = plt.subplot(3,2,6,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-80,35,20,90],crs=ccrs.PlateCarree())
+#transform = ulon.coord_system.as_cartopy_projection()
+Q=plt.quiver(x[::5],y[::5],
+           EOI400_jul_ua.data[::5,::5] - E280_jul_ua.data[::5,::5], 
+           EOI400_jul_va.data[::5,::5] - E280_jul_va.data[::5,::5], 
+           pivot="middle") 
+qk=ax.quiverkey(Q, 0.9, 0.9, 10, r'$10 \frac{m}{s}$',
+                labelpos='E', coordinates='figure')
+          # transform=transform)
+plt.title('Jul MP - PI')
+ax.coastlines()
+
+
+
+
+plt.savefig('summer_and_winter_winds_850mb' + model + '.png')
+plt.savefig('summer_and_winter_winds_850mb' + model + '.eps')

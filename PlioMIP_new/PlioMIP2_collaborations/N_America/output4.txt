@@ -1,0 +1,3 @@
+nohup: ignoring input
+nice: a command must be given with an adjustment
+Try `nice --help' for more information.

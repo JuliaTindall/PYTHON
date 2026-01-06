@@ -1,0 +1,322 @@
+#NAME
+#    means_and_standard_deviations.py
+#PURPOSE 
+#    Ruza wants me to calculate the means from suzies experiments.
+#    The experiments are in
+#        /nfs/lise/ee14s2r/work/um
+#    The output is on /nfs/annie/earpal/database/experiments/exptid/climatology
+#
+#
+# Julia 10.11.2022
+
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import iris
+from iris.cube import CubeList
+from iris import coord_categorisation
+import sys
+
+def get_all_fields():
+    """
+    gets all the fieldnames in the filetype from the first file
+    """
+
+    #if MONTH == 'ann':
+    #    if TYPE == 'pg':
+    #        filename = (INFILE_START + str(STARTYEAR).zfill(4) + 'c1+.nc')
+    #    else:
+    #        filename = (INFILE_START + str(STARTYEAR).zfill(4) + 'ja+.nc')
+    #else:
+    #    filename = (INFILE_START + str(STARTYEAR).zfill(4) + MONTHIN.get(MONTH)
+    #               + '+.nc')
+    #cubes = iris.load(filename)
+    #varnames = []
+    #for cube in cubes:
+    #    varnames.append(cube.var_name)
+    #print(varnames)
+    #sys.exit(0)
+
+    if TYPE == 'pd':
+        varnames = ['totCloud_mm_ua', 'solar_mm_s3_srf', 'downSol_mm_TOA', 'upSol_mm_s3_TOA',  'downSol_Seaice_mm_s3_srf', 'longwave_mm_s3_srf', 'olr_mm_s3_TOA', 'ilr_mm_s3_srf', 'sh_mm_hyb', 'taux_mm_hyb', 'tauy_mm_hyb',  'u_mm_10m', 'v_mm_10m', 'evap_mm_srf', 'canopyEvap_mm_can',  'evapsea_mm_srf', 'lh_mm_srf', 'temp_mm_1_5m', 'srfSublim_mm_srf','transpiration_mm_srf', 'precip_mm_srf',  'sm_mm_soil', 'soiltemp_mm_soil',  'p_mm_msl', 'p_mm_srf',  'snowdepth_mm_srf', 'temp_mm_srf',  'iceconc_mm_srf', 'icedepth_mm_srf' ]
+
+    if TYPE == 'pc':
+        varnames = ['u_mm_p',  'v_mm_p', 'ht_mm_p', 'temp_mm_p',]
+
+    if TYPE == 'pf':
+        if EXPT == 'xpdea':
+            varnames = ['field645_mm_dpth', 'field646_mm_dpth', 'ucurrTot_mm_dpth','vcurrTot_mm_dpth', 'uVelSeaice_mm_uo',  'vVelSeaice_mm_uo', 'temp_mm_uo','dSeaiceSnowDepthdt_mm_uo',  'temp_mm_dpth', 'salinity_mm_dpth', 'streamFn_mm_uo', 'mixLyrDpth_mm_uo',  'iceconc_mm_uo', 'icedepth_mm_uo', 'PLE_mm_uo', 'outflow_mm_uo', 'temp_mm_uo_1', 'temp_mm_uo_2', 'temp_mm_uo_3', 'temp_mm_uo_4', 'otracer16_mm_dpth',   'otracer16_mm_dpth_1', 'otracer16_mm_dpth_2',  'otracer16_mm_dpth_3', 'otracer16_mm_dpth_4', 'otracer16_mm_dpth_5']
+        else:
+            varnames = ['field645_mm_dpth', 'field646_mm_dpth', 'ucurrTot_mm_dpth','vcurrTot_mm_dpth', 'srfSalFlux_mm_uo', 'uVelSeaice_mm_uo',  'vVelSeaice_mm_uo', 'temp_mm_uo', 'dSeaiceDepthdttherm_mm_uo', 'dSeaiceSnowDepthdttherm_mm_uo', 'temp_mm_dpth', 'salinity_mm_dpth', 'streamFn_mm_uo', 'mixLyrDpth_mm_uo',  'iceconc_mm_uo', 'icedepth_mm_uo', 'PLE_mm_uo', 'outflow_mm_uo', 'temp_mm_uo_1', 'temp_mm_uo_2', 'temp_mm_uo_3', 'temp_mm_uo_4', 'otracer16_mm_dpth',   'otracer16_mm_dpth_1', 'otracer16_mm_dpth_2',  'otracer16_mm_dpth_3', 'otracer16_mm_dpth_4', 'otracer16_mm_dpth_5']
+
+    if TYPE == 'pg':
+        varnames = ['W_mm_dpth', 'insitu_T_mm_dpth',  'W_ym_dpth',  'ucurrTot_ym_dpth', 'vcurrTot_ym_dpth', 'srfSalFlux_ym_uo', 'temp_ym_dpth', 'salinity_ym_dpth', 'otracer16_ym_dpth', 'otracer16_ym_dpth_1', 'streamFn_ym_uo', 'iceconc_ym_uo', 'icedepth_ym_uo', 'anomSaltFlux_ym_uo' ]
+
+    return varnames
+
+def get_average_for_variable(variable):
+    """
+    gets the average for this variable over all the files
+    """
+
+    allcubes = CubeList([])
+    for year in range(STARTYEAR, ENDYEAR+1):
+        filename = (INFILE_START + str(year).zfill(4) + MONTHIN.get(MONTH) 
+                    + '+.nc')
+        cube = iris.load_cube(filename,variable)
+        cube.coord('t').attributes =None
+        allcubes.append(cube)
+
+    print(allcubes)
+    iris.util.equalise_attributes(allcubes)
+    iris.util.unify_time_units(allcubes)
+    #print(variable)
+    #print(allcubes[0].coord('t').metadata)
+    #print(allcubes[1].coord('t').metadata)
+    #print(allcubes[2].coord('t').metadata)
+    concatcube = allcubes.concatenate_cube(allcubes)
+    #print(concatcube)
+    meancube = concatcube.collapsed('t',iris.analysis.MEAN)
+    meancube.coord('t').bounds = None
+    meancubedata = meancube.data
+    data2 = np.ma.where(meancubedata < 1.0E30, meancubedata, 1.0E20)
+    meancube2 = meancube.copy(data=data2)
+   
+    stdevcube = concatcube.collapsed('t',iris.analysis.STD_DEV)
+    stdevcube.coord('t').bounds = None
+    sdcubedata = stdevcube.data
+    data3 = np.ma.where(sdcubedata < 1.0E30, sdcubedata, 1.0E20)
+    sdcube2 = stdevcube.copy(data=data3)
+
+   
+    return meancube2, sdcube2
+
+
+def get_average_for_variable_pg(variable):
+    """
+    gets the average for this variable over all the files if it is pg
+    (not this is seperate because a few variables were in the pg as 12 months)
+    """
+
+    allcubes = CubeList([])
+    for year in range(STARTYEAR, ENDYEAR+1):
+        filename = (INFILE_START + str(year).zfill(4) +  'c1+.nc')
+        cube = iris.load_cube(filename,variable)
+        # check how many times
+        try:
+            times = cube.coord('t').points
+            tname='t'
+        except:
+            times = cube.coord('t_1').points
+            tname='t_1'
+
+        if len(times) >=2:
+            tgt1=True
+        else:
+            tgt1=False
+        if tgt1:
+            iris.coord_categorisation.add_month_number(cube, tname, name='month')
+        cube.coord(tname).attributes = None
+        if tgt1:
+            cube.coord('month').attributes = None
+        allcubes.append(cube)
+      
+    iris.util.equalise_attributes(allcubes)
+    iris.util.unify_time_units(allcubes)
+    #print(variable)
+    #print(allcubes[0].coord('t'))
+    #print(allcubes[1].coord('t'))
+    #print(allcubes[2].coord('t'))
+    #print(allcubes)
+    concatcube = allcubes.concatenate_cube(allcubes)
+    if tgt1:
+        meancube = concatcube.aggregated_by(['month'],iris.analysis.MEAN)
+        stdevcube = concatcube.aggregated_by(['month'],iris.analysis.STD_DEV)
+   
+    else:
+        meancube = concatcube.collapsed(tname,iris.analysis.MEAN)
+        stdevcube = concatcube.collapsed(tname,iris.analysis.STD_DEV)
+   
+    meancube.coord(tname).bounds = None
+    meancubedata = meancube.data
+    data2 = np.ma.where(meancubedata < 1.0E30, meancubedata, 1.0E20)
+    meancube2 = meancube.copy(data=data2)
+   
+    stdevcube.coord(tname).bounds = None
+    sdcubedata = stdevcube.data
+    data3 = np.ma.where(sdcubedata < 1.0E30, sdcubedata, 1.0E20)
+    sdcube2 = stdevcube.copy(data=data3)
+
+   
+    return meancube2, sdcube2
+    
+def get_avgs():
+    """
+    gets data and averages
+    """
+
+    varnames = get_all_fields()  # gets the fields in the files
+    allmncubes = CubeList([])
+    allstcubes = CubeList([])
+  
+    for i, name in enumerate(varnames):
+        print(name)
+        avgcube,stdevcube = get_average_for_variable(name)
+        allmncubes.append(avgcube)
+        allstcubes.append(stdevcube)
+
+    print(allmncubes)
+    fileout = (FILEOUTSTART + EXPT + ATM_OCN.get(TYPE) + '.' + TYPE + 
+               'cl' + MONTH + 
+               '.' + str(STARTYEAR) + '.' + str(ENDYEAR) + '.nc')
+    iris.save(allmncubes,fileout, netcdf_format = "NETCDF3_CLASSIC", fill_value = 1.0E20)
+  
+    fileout = (FILEOUTSTART + EXPT + ATM_OCN.get(TYPE) + '.' + TYPE + 
+               'sd' + MONTH + 
+               '.' + str(STARTYEAR) + '.' + str(ENDYEAR) + '.nc')
+    iris.save(allstcubes,fileout, netcdf_format = "NETCDF3_CLASSIC", fill_value = 1.0E20)
+
+def get_pg_avg():
+    """
+    gets data and averages for pg files
+    """
+
+    varnames = get_all_fields()  # gets the fields in the files
+    allmncubes = CubeList([])
+    allstcubes = CubeList([])
+  
+    for i, name in enumerate(varnames):
+        print(name)
+        avgcube,stdevcube = get_average_for_variable_pg(name)
+        allmncubes.append(avgcube)
+        allstcubes.append(stdevcube)
+
+    print(allmncubes)
+    fileout = (FILEOUTSTART + EXPT + ATM_OCN.get(TYPE) + '.' + TYPE + 
+               'clann' + '.' + str(STARTYEAR) + '.' + str(ENDYEAR) + '.nc')
+    iris.save(allmncubes,fileout, netcdf_format = "NETCDF3_CLASSIC", fill_value = 1.0E20)
+  
+    fileout = (FILEOUTSTART + EXPT + ATM_OCN.get(TYPE) + '.' + TYPE + 
+               'sdann' +  '.' + str(STARTYEAR) + '.' + str(ENDYEAR) + '.nc')
+    iris.save(allstcubes,fileout, netcdf_format = "NETCDF3_CLASSIC", fill_value = 1.0E20)
+
+def get_avg_for_year(year,variable):
+    """
+    gets the average for field: variable and year: year
+    """
+    monthsreq = ['ja','fb','mr','ar','my','jn','jl','ag','sp',
+                     'ot','nv','dc']
+
+    cubes = CubeList([])
+    for monthuse in monthsreq:
+        filename = (INFILE_START + str(year).zfill(4) + monthuse + '+.nc')
+        cube = iris.load_cube(filename,variable)
+        cube.coord('t').attributes = None
+        cubes.append(cube)
+    iris.util.equalise_attributes(cubes)
+    yearcube = cubes.concatenate_cube()
+    meanyear = yearcube.collapsed('t',iris.analysis.MEAN)
+    meanyear_n = iris.util.new_axis(meanyear,scalar_coord = 't')
+   
+   
+    return meanyear_n
+
+def get_ann_average_for_variable(variable):
+    """
+    gets the average for this variable over all the files
+    """
+
+
+    allcubes = CubeList([])
+    for year in range(STARTYEAR, ENDYEAR+1):
+        cubeyravg = get_avg_for_year(year,variable)
+        allcubes.append(cubeyravg)
+
+    iris.util.equalise_attributes(allcubes)
+    iris.util.unify_time_units(allcubes)
+    #print(variable)
+    #print(allcubes[0].coord('t').metadata)
+    #print(allcubes[1].coord('t').metadata)
+    #print(allcubes[2].coord('t').metadata)
+    concatcube = allcubes.concatenate_cube(allcubes)
+    #print(concatcube)
+    meancube = concatcube.collapsed('t',iris.analysis.MEAN)
+    meancube.coord('t').bounds = None
+    stdevcube = concatcube.collapsed('t',iris.analysis.STD_DEV)
+    stdevcube.coord('t').bounds = None
+   
+
+    meancubedata = meancube.data
+    data2 = np.ma.where(meancubedata < 1.0E30, meancubedata, 1.0E20)
+    meancube2 = meancube.copy(data=data2)
+
+    sdcubedata = stdevcube.data
+    data3 = np.ma.where(sdcubedata < 1.0E30, sdcubedata, 1.0E20)
+    sdcube2 = stdevcube.copy(data=data3)
+
+   
+    return meancube2, sdcube2
+
+
+def get_ann_avg():
+    """
+    gets data and averages
+    """
+
+    varnames = get_all_fields()  # gets the fields in the files
+    allmncubes = CubeList([])
+    allstcubes = CubeList([])
+  
+    for name in varnames:
+        avgcube,stdevcube = get_ann_average_for_variable(name)
+        allmncubes.append(avgcube)
+        allstcubes.append(stdevcube)
+
+    fileout = (FILEOUTSTART + EXPT + ATM_OCN.get(TYPE) + '.' + TYPE + 
+               'cl' + MONTH + 
+               '.' + str(STARTYEAR) + '.' + str(ENDYEAR) + '.nc')
+    iris.save(allmncubes,fileout, netcdf_format = "NETCDF3_CLASSIC", fill_value=1.0E20)
+  
+    fileout = (FILEOUTSTART + EXPT + ATM_OCN.get(TYPE) + '.' + TYPE + 
+               'sd' + MONTH + 
+               '.' + str(STARTYEAR) + '.' + str(ENDYEAR) + '.nc')
+    iris.save(allstcubes,fileout, netcdf_format = "NETCDF3_CLASSIC", fill_value = 1.0E20)
+
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+# for program to run
+EXPT='xpdea'
+STARTYEAR=4901
+ENDYEAR=5000
+TYPE = 'pg'
+MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','ann']
+#MONTHS = ['jan','ann']
+#MONTHS = ['ann']
+
+# dictionaries
+TYPEEXPT = {'pc' : 'pcpd','pd':'pcpd'}
+ATM_OCN = {'pc' : 'a','pd':'a', 'pf' :'o', 'pg' :'o'}
+MONTHIN = {'jan' : 'ja',   'feb':'fb',  'mar':'mr', 'apr':'ar',  'may':'my',
+           'jun' : 'jn',   'jul':'jl',  'aug':'ag', 'sep':'sp',  'oct':'ot',
+           'nov' : 'nv',   'dec':'dc'}
+
+#program
+
+#FILEOUTSTART = '/nfs/annie/earjcti/climatologies/' + EXPT + '/'
+FILEOUTSTART = ''
+INFILE_START = ('/nfs/lise/ee14s2r/work/um/' + EXPT + '/' + 
+                        TYPEEXPT.get(TYPE,TYPE) + '/' + EXPT + 
+                        ATM_OCN.get(TYPE) + 
+                        '#' + TYPE + '00000')
+
+if TYPE == 'pg':
+    get_pg_avg()
+else:
+    for MONTH in MONTHS:
+        if MONTH == 'ann':
+            get_ann_avg()
+        else:
+            get_avgs()    

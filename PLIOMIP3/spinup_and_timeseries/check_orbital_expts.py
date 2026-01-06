@@ -1,0 +1,301 @@
+#!/usr/bin/env python2.7
+#NAME
+#    check_orbital_expts.py
+#PURPOSE
+#
+#  This program is looking at the toa radiation to check that I have
+#  implemented the boundary conditions properly in the orbital experiments
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import cartopy.crs as ccrs
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+
+
+def plot_toa_insolation():
+    # 1 get the toa insolation from expt (by latitude and month)
+    # 2 get the toa insolation from cntl
+    # 3 calculate expt-toa insol - cntl_toa insolation
+    # 4 plot a month-latitude plot showing the difference
+
+    exptfilestart = ('/nfs/hera1/earjcti/um/'+expt+
+                     '/netcdf/'+expt+'a#pd000002099')
+    cntlfilestart = ('/nfs/hera1/earjcti/um/'+cntl+
+                     '/netcdf/'+cntl+'a#pd000002099')
+
+
+    exptnames = {'xpsin' : 'LP_highNH_lowSH_orbit',
+                 'xpsio' : 'LP_lowNH_highSH_orbit',
+                 'xpsic' :'PI'}
+
+    monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    #monthnames = ['ja','fb']
+    # 1/2. get toa insolation from expt and control
+  
+    exptcubelist = CubeList()
+    cntlcubelist = CubeList()
+
+    for i, month in enumerate(monthnames):
+        expt_cube = iris.load_cube(exptfilestart + month + '+.nc',
+                                        'field200')
+        cntl_cube = iris.load_cube(cntlfilestart + month + '+.nc',
+                                        'field200')
+        exptcubelist.append(expt_cube)
+        cntlcubelist.append(cntl_cube)
+
+    iris.util.equalise_attributes(exptcubelist)
+    expt_insw_yearcube = exptcubelist.concatenate_cube()
+   
+    iris.util.equalise_attributes(cntlcubelist)
+    cntl_insw_yearcube = cntlcubelist.concatenate_cube()
+    
+    # get the time latitude cube for plotting
+    expt_insw_lat_time_cube = iris.util.squeeze(expt_insw_yearcube[:,:,:,0]) 
+    cntl_insw_lat_time_cube = iris.util.squeeze(cntl_insw_yearcube[:,:,:,0]) 
+
+    anom_cube = expt_insw_lat_time_cube - cntl_insw_lat_time_cube    
+    
+    # plot the experiment, the control and the anomaly
+    plt.figure(0,figsize=[15.0,5.0])
+    plt.subplot(1,3,1) 
+    cs=plt.contourf(monthnames,expt_insw_lat_time_cube.coord('latitude').points,
+                    np.transpose(expt_insw_lat_time_cube.data),
+                    levels=np.arange(0,600,50),extend='max')
+    plt.title(exptnames.get(expt))
+    plt.colorbar(cs,orientation='horizontal',label='W/m2')
+
+    plt.subplot(1,3,2)
+    cs2=plt.contourf(monthnames,
+                     cntl_insw_lat_time_cube.coord('latitude').points,
+                     np.transpose(cntl_insw_lat_time_cube.data),
+                     levels=np.arange(0,600,50),extend='max')
+    plt.title(exptnames.get(cntl))
+    plt.colorbar(cs2,orientation='horizontal',label='W/m2')
+
+  
+    plt.subplot(1,3,3)
+    cs3=plt.contourf(monthnames,anom_cube.coord('latitude').points,
+                     np.transpose(anom_cube.data),cmap='RdBu_r',
+                     levels=np.arange(-80,100,20),extend='both')
+    plt.title(exptnames.get(expt) + '-'+ exptnames.get(cntl))
+    plt.colorbar(cs3,orientation='horizontal',label='W/m2')
+    
+
+
+    fileout='/nfs/hera1/earjcti/um/'+expt+'/spinup/orbitanom_'+expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+
+#end def annmean
+
+def check_toa_insolation_daily(exptfilestart,cntlfilestart,expt):
+    """
+    plots the daily isolation by latitude and time
+    """
+    monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    exptnames = {'xpsin' : 'LP_highNH_lowSH_orbit',
+                 'xpsio' : 'LP_lowNH_highSH_orbit',
+                 'xpsip' : 'LP_highNH_lowSH_orbit',
+                 'xpsiq' : 'LP_lowNH_highSH_orbit',
+                 'xpsic' :'PI'}
+
+
+    # read in the data
+    exptcubelist = CubeList([])
+    cntlcubelist = CubeList([])
+    for month in monthnames:
+        print(month)
+        expt_cube = iris.load_cube(exptfilestart + month + '+.nc',
+                                        'field200')
+        exptcubelist.append(expt_cube)
+
+        cntl_cube = iris.load_cube(cntlfilestart + month + '.nc',
+                                        'field200')
+        cntlcubelist.append(cntl_cube)
+
+    iris.util.equalise_attributes(exptcubelist)
+    expt_insw_yearcube = exptcubelist.concatenate_cube()
+   
+    iris.util.equalise_attributes(cntlcubelist)
+    cntl_insw_yearcube = cntlcubelist.concatenate_cube()
+
+    
+    # get the time latitude cube for plotting
+    expt_insw_lat_time_cube = iris.util.squeeze(expt_insw_yearcube[:,:,:,0]) 
+    cntl_insw_lat_time_cube = iris.util.squeeze(cntl_insw_yearcube[:,:,:,0]) 
+
+    # find the day of the summer solstace winter solstace and equinox
+    # define: summer solstace - max insolation at NP
+    # define: winter solstace - min insolation at SP
+    expt_NP_data = expt_insw_lat_time_cube.data[:,0]
+    expt_SP_data = expt_insw_lat_time_cube.data[:,72]
+    cntl_NP_data = cntl_insw_lat_time_cube.data[:,0]
+    cntl_SP_data = cntl_insw_lat_time_cube.data[:,72]
+
+    # expt
+    print('NP data',cntl_NP_data)
+    print('SP data',cntl_SP_data)
+    expt_day_ss = np.argmax(expt_NP_data)
+    expt_day_ws = np.argmax(expt_SP_data)
+    cntl_day_ss = np.argmax(cntl_NP_data)
+    cntl_day_ws = np.argmax(cntl_SP_data)
+
+    print('expt day of max NP',expt_day_ss,expt_NP_data[expt_day_ss])
+    print('expt day of max SP',expt_day_ws,expt_SP_data[expt_day_ws])
+ 
+    print('cntl day of max NP',cntl_day_ss,cntl_NP_data[cntl_day_ss])
+    print('cntl day of max SP',cntl_day_ws,cntl_SP_data[cntl_day_ws])
+   
+
+
+    # get the anomaly
+    anom_cube_data = (expt_insw_lat_time_cube.data 
+                      - cntl_insw_lat_time_cube.data)
+    anom_cube = expt_insw_lat_time_cube.copy(data=anom_cube_data)
+    
+    # plot the experiment, the control and the anomaly
+    plt.figure(0,figsize=[15.0,5.0])
+    plt.subplot(2,3,1) 
+    cs=plt.contourf(np.arange(1,361,1),
+                    expt_insw_lat_time_cube.coord('latitude').points,
+                    np.transpose(expt_insw_lat_time_cube.data),
+                    levels=np.arange(0,600,50),extend='max')
+    plt.title(exptnames.get(expt))
+    plt.colorbar(cs,orientation='horizontal',label='W/m2')
+
+    plt.subplot(2,3,2)
+    cs2=plt.contourf(np.arange(1,361,1),
+                     cntl_insw_lat_time_cube.coord('latitude').points,
+                     np.transpose(cntl_insw_lat_time_cube.data),
+                     levels=np.arange(0,600,50),extend='max')
+    plt.title('xozza')
+    plt.colorbar(cs2,orientation='horizontal',label='W/m2')
+
+  
+    plt.subplot(2,3,3)
+    cs3=plt.contourf(np.arange(1,361,1),
+                     anom_cube.coord('latitude').points,
+                     np.transpose(anom_cube.data),cmap='RdBu_r',
+                     levels=np.arange(-60,70,10),extend='both')
+    plt.title(exptnames.get(expt) + '-xozza')
+    plt.colorbar(cs3,orientation='horizontal',label='W/m2')
+
+    # calculate months based on Steves calculation
+    if expt == 'xpsip':
+        # first day of year is 23rd December so shift 8 days to the right
+        expt_shiftdata=np.roll(expt_insw_lat_time_cube.data, 8,axis=0)
+        monthlengths=np.array([34.0,33.0,32.0,31.0,29.0,28.0,28.0,28.0,28.0,30.0,31.0,33.0])
+    if expt == 'xpsiq':
+        # first day of year is 7th January so shift 6 days to the left
+        expt_shiftdata=np.roll(expt_insw_lat_time_cube.data,-6,axis=0)
+        monthlengths=np.array([27.0,28.0,29.0,31.0,32.0,34.0,34.0,33.0,32.0,30.0,28.0,27.0])
+    monthlengths=monthlengths * 360. / 365.
+
+    # calculate first and last day of month
+    firstmonthday = np.zeros(12)
+    lastmonthday = np.zeros(12)
+    for i in range(1,12):
+        firstmonthday[i] = firstmonthday[i-1] + monthlengths[i-1]
+        lastmonthday[i-1] = firstmonthday[i]
+    lastmonthday[11]=360.
+    firstmonthint=np.ceil(firstmonthday).astype(int)
+    lastmonthint=np.floor(lastmonthday).astype(int)
+
+    #print(np.sum(monthlengths))
+    #print(monthlengths)
+    #print(firstmonthint)
+    #print(lastmonthint)
+    #print(lastmonthint - firstmonthint+1)
+
+    expt_mondata = np.zeros((12,73))
+    cntl_mondata = np.zeros((12,73))
+    for mon in range(0,12):
+        expt_mondata[mon,:] = np.mean(expt_shiftdata[firstmonthint[mon]:lastmonthint[mon]+1,:],axis=0)
+        cntl_mondata[mon,:] = np.mean(cntl_insw_lat_time_cube.data[mon*30:(mon+1)*30,:],axis=0)
+    anom_mondata = expt_mondata - cntl_mondata
+
+
+    plt.subplot(2,3,4)
+    cs4=plt.contourf(monthnames,
+                     anom_cube.coord('latitude').points,
+                     np.transpose(expt_mondata),
+                     levels=np.arange(0,600,50),extend='both')
+    plt.title('shift data')
+    plt.colorbar(cs4,orientation='horizontal',label='W/m2')
+
+    plt.subplot(2,3,5)
+    cs5=plt.contourf(monthnames,
+                     anom_cube.coord('latitude').points,
+                     np.transpose(cntl_mondata),
+                     levels=np.arange(0,600,50),extend='both')
+    plt.title('shift data')
+    plt.colorbar(cs5,orientation='horizontal',label='W/m2')
+
+    plt.subplot(2,3,6)
+    cs6=plt.contourf(monthnames,
+                     anom_cube.coord('latitude').points,
+                     np.transpose(anom_mondata),cmap='RdBu_r',
+                     levels=np.arange(-60,70,10),extend='both')
+    plt.title('shift data')
+    plt.colorbar(cs6,orientation='horizontal',label='W/m2')
+
+    
+    plt.show()
+    sys.exit(0)
+
+
+    fileout='/nfs/hera1/earjcti/um/'+expt+'/spinup/orbitanomdaily_'+expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+           
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+HadCM3='y'
+
+# checks the monthly insolation
+#expt = 'xpsin'
+#cntl = 'xpsic'
+#plot_toa_insolation()
+
+# checks using the daily insolation
+# use as baseline xozza which is preindustrial so with modern orbit
+expt='xpsip'
+exptfilestart = '/nfs/hera1/earjcti/um/'+expt+'/datam/'+expt+'a#pb000002167'
+cntlfilestart = '/nfs/hera1/earjcti/um/xozza/netcdf/xozzaa@pam34'
+check_toa_insolation_daily(exptfilestart,cntlfilestart,expt)
+
+
+
+
+
+sys.exit(0)
+
+####
+

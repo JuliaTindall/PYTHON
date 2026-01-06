@@ -1,0 +1,83 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 29.03.2022 by Julia
+
+We are trying to plot cloud regiemes based on Williams and Webb 2008.
+
+We should have extracted:
+1. cloud albedo
+2. cloud top pressure
+3. total cloud cover
+
+use this to get cloud regiemes at a site
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+from numpy.linalg import norm  # used in calculating euclidian distance
+import sys
+
+def get_data():
+    """
+    extracts the data at the nearest gridbox
+    """
+
+    albedo_cube = iris.load_cube(FILEIN,'albedo')
+    ctp_cube = iris.load_cube(FILEIN,'TOTAL CLOUD TOP HEIGHT (KFT)')
+    tcc_cube = iris.load_cube(FILEIN,'TOTAL CLOUD AMOUNT - RANDOM OVERLAP')
+
+    # find nearest longitude and latitude
+    lonix = np.abs(albedo_cube.coord('longitude').points - SITELON).argmin()
+    latix = np.abs(albedo_cube.coord('latitude').points - SITELAT).argmin()
+   
+    albedo = albedo_cube.data[latix,lonix]
+    tcc = tcc_cube.data[latix,lonix]
+    ctp = ctp_cube.data[latix,lonix]
+
+    return albedo, tcc, ctp
+##########################################################################
+def get_ice_free_et_clouds(observations):
+    """
+    input observations are [albedo, total cloud cover, cloud top pressure]
+    normalised on scale 0.1 
+    gets the cloud types for an ice free extra tropics site
+    """
+    REGIEME_NAMES_ET = {0:"Shallow cumulus", 1:"Congestus",
+                  2:"Stratocu./Cu. Transition", 3:"cirrus",
+                  4:"Stratocumulus", 5: "Frontal", 6:"Thin Cirrus"}
+                 
+    REGIEME_CHARACTERISTICS = {0:np.array([0.286, 0.643, 0.473]), 
+                           1:[0.457, 0.607, 0.932],
+                           2:[0.375, 0.799, 0.802],
+                           3:[0.325, 0.430, 0.914],
+                           4:[0.438, 0.723,0.900],
+                           5:[0.581, 0.393, 0.978],
+                           6:[0.220, 0.389, 0.713] }
+
+    norms = np.zeros(7)
+    for cloud_type in range(0, 7):
+        chars = REGIEME_CHARACTERISTICS.get(cloud_type)
+        norms(cloud_type) = norm(observations - chars))
+                                   
+         
+
+
+
+   
+#########################################################################   
+#SITENAME = 'Beaver Pond'
+#SITELAT = 79.0   # 79N
+#SITELON = 278.0  # 82W 278E
+
+SITENAME = 'York'
+SITELAT = 54.0
+SITELON = 0.0
+FILEIN = 'test.nc'
+
+albedo, tcc, ctp = get_data()
+
+cloud_types = get_ice_free_et_clouds(np.array([albedo,tcc,ctp/100000.]))
+

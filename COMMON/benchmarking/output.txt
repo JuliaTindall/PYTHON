@@ -1,0 +1,228 @@
+nohup: ignoring input
+temp1.5
+/nfs/hera1/earjcti/um/xpupd/average/xpupd_temp1.5_djf_mean_2299_2301.nc
+TEMPERATURE AT 1.5M / (K)           (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                             x               -
+        longitude                            -               x
+    Scalar coordinates:
+        ht                          -1.0 m
+        t                           2001-12-06 00:00:00, bound=(2001-12-04 00:00:00, 2001-12-09 00:00:00)
+    Cell methods:
+        mean                        t
+        mean                        t
+    Attributes:
+        Conventions                 'CF-1.7'
+        date                        '01/12/01'
+        name                        'temp_1'
+        source                      'Unified Model Output (Vn 6.6):'
+        time                        '00:00'
+        title                       'TEMPERATURE AT 1.5M'
+TEMPERATURE AT 1.5M / (K)           (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                             x               -
+        longitude                            -               x
+    Scalar coordinates:
+        ht                          -1.0 m
+        t                           2002-01-17 00:00:00, bound=(2001-12-04 00:00:00, 2002-02-30 00:00:00)
+    Cell methods:
+        mean                        t
+        mean                        t
+    Attributes:
+        Conventions                 'CF-1.7'
+        date                        '01/12/01'
+        name                        'temp_1'
+        source                      'Unified Model Output (Vn 6.6):'
+        time                        '00:00'
+        title                       'TEMPERATURE AT 1.5M'
+[[-0.720227062702179 -0.720227062702179 -0.720227062702179 ...
+  -0.720227062702179 -0.720227062702179 -0.720227062702179]
+ [-0.8970297574996948 -0.9081743359565735 -0.9199739098548889 ...
+  -0.8657205104827881 -0.8759394288063049 -0.8870717883110046]
+ [-0.9058008790016174 -0.9131686091423035 -0.9242662787437439 ...
+  -0.872484564781189 -0.8870416879653931 -0.8968023657798767]
+ ...
+ [-0.8054063320159912 -0.781139075756073 -0.7562558054924011 ...
+  -0.87718266248703 -0.8526858687400818 -0.8277254700660706]
+ [-0.8231194615364075 -0.817404568195343 -0.8095710277557373 ...
+  -0.8373048901557922 -0.8331125378608704 -0.8291946649551392]
+ [-0.8196690082550049 -0.8196690082550049 -0.8196690082550049 ...
+  -0.8196690082550049 -0.8196690082550049 -0.8196690082550049]]
+-5.0 5.0 1.0
+[-5. -4. -3. -2. -1.  0.  1.  2.  3.  4.  5.]
+precip
+/nfs/hera1/earjcti/um/xpupd/average/xpupd_precip_djf_mean_2299_2301.nc
+Precipitation / (mm day-1)          (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                             x               -
+        longitude                            -               x
+    Scalar coordinates:
+        surface                     0.0
+        t                           2001-12-06 00:00:00, bound=(2001-12-04 00:00:00, 2001-12-09 00:00:00)
+    Cell methods:
+        mean                        t
+        mean                        t
+    Attributes:
+        Conventions                 'CF-1.7'
+        date                        '01/12/01'
+        name                        'precip_1'
+        source                      'Unified Model Output (Vn 6.6):'
+        time                        '00:00'
+        title                       'TOTAL PRECIPITATION RATE     KG/M2/S'
+Precipitation / (mm day-1)          (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                             x               -
+        longitude                            -               x
+    Scalar coordinates:
+        surface                     0.0
+        t                           2002-01-17 00:00:00, bound=(2001-12-04 00:00:00, 2002-02-30 00:00:00)
+    Cell methods:
+        mean                        t
+        mean                        t
+    Attributes:
+        Conventions                 'CF-1.7'
+        date                        '01/12/01'
+        name                        'precip_1'
+        source                      'Unified Model Output (Vn 6.6):'
+        time                        '00:00'
+        title                       'TOTAL PRECIPITATION RATE     KG/M2/S'
+[[0.9560710191726685 0.9560710191726685 0.9560710191726685 ...
+  0.9560710191726685 0.9560710191726685 0.9560710191726685]
+ [0.1413659304380417 0.0883583277463913 0.06219259276986122 ...
+  0.014103183522820473 0.02408166043460369 0.005997578613460064]
+ [-0.2823161780834198 -0.0012371662305667996 0.03573932871222496 ...
+  -0.30854156613349915 -0.2840774357318878 -0.2814711630344391]
+ ...
+ [1.4263159036636353 1.471996545791626 1.5458886623382568 ...
+  1.1804022789001465 1.2850717306137085 1.3503313064575195]
+ [1.2879821062088013 1.3495169878005981 1.3977223634719849 ...
+  1.165824055671692 1.21333646774292 1.2574819326400757]
+ [1.3041701316833496 1.3041701316833496 1.3041701316833496 ...
+  1.3041701316833496 1.3041701316833496 1.3041701316833496]]
+-10.0 10.0 2.0
+[-10.  -8.  -6.  -4.  -2.   0.   2.   4.   6.   8.  10.]
+cloud_cover
+/nfs/hera1/earjcti/um/xpupd/average/xpupd_cloud_cover_djf_mean_2299_2301.nc
+TOTAL CLOUD AMOUNT - RANDOM OVERLAP / (unknown) (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                                         x               -
+        longitude                                        -               x
+    Scalar coordinates:
+        t                                       2001-12-06 00:00:00, bound=(2001-12-04 00:00:00, 2001-12-09 00:00:00)
+        unspecified                             -1.0
+    Cell methods:
+        mean                                    t
+        mean                                    t
+    Attributes:
+        Conventions                             'CF-1.7'
+        date                                    '01/12/01'
+        invalid_units                           '0-1'
+        name                                    'field30'
+        source                                  'Unified Model Output (Vn 6.6):'
+        time                                    '00:00'
+        title                                   'TOTAL CLOUD AMOUNT - RANDOM OVERLAP'
+TOTAL CLOUD AMOUNT - RANDOM OVERLAP / (unknown) (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                                         x               -
+        longitude                                        -               x
+    Scalar coordinates:
+        t                                       2002-01-17 00:00:00, bound=(2001-12-04 00:00:00, 2002-02-30 00:00:00)
+        unspecified                             -1.0
+    Cell methods:
+        mean                                    t
+        mean                                    t
+    Attributes:
+        Conventions                             'CF-1.7'
+        date                                    '01/12/01'
+        invalid_units                           '0-1'
+        name                                    'field30'
+        source                                  'Unified Model Output (Vn 6.6):'
+        time                                    '00:00'
+        title                                   'TOTAL CLOUD AMOUNT - RANDOM OVERLAP'
+[[-0.39022567868232727 -0.39022567868232727 -0.39022567868232727 ...
+  -0.39022567868232727 -0.39022567868232727 -0.39022567868232727]
+ [-0.956885814666748 -0.9448446035385132 -0.8930472731590271 ...
+  -0.9224666953086853 -0.9351963996887207 -0.9960966110229492]
+ [-0.5356377959251404 -0.5321429371833801 -0.5722773671150208 ...
+  -0.5182375907897949 -0.6058463454246521 -0.6057085394859314]
+ ...
+ [1.1380535364151 1.1119427680969238 1.095976710319519 ...
+  0.994966983795166 1.0747311115264893 1.1173814535140991]
+ [0.7868112921714783 0.8332312107086182 0.8620896339416504 ...
+  0.6772146224975586 0.7102534770965576 0.747948944568634]
+ [0.6236838102340698 0.6236838102340698 0.6236838102340698 ...
+  0.6236838102340698 0.6236838102340698 0.6236838102340698]]
+-0.2 0.2 0.04
+[-2.00000000e-01 -1.60000000e-01 -1.20000000e-01 -8.00000000e-02
+ -4.00000000e-02  2.77555756e-17  4.00000000e-02  8.00000000e-02
+  1.20000000e-01  1.60000000e-01  2.00000000e-01  2.40000000e-01]
+mslp
+/nfs/hera1/earjcti/um/xpupd/average/xpupd_mslp_djf_mean_2299_2301.nc
+PRESSURE AT MEAN SEA LEVEL / (Pa)   (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                             x               -
+        longitude                            -               x
+    Scalar coordinates:
+        msl                         0.0
+        t                           2001-12-06 00:00:00, bound=(2001-12-04 00:00:00, 2001-12-09 00:00:00)
+    Cell methods:
+        mean                        t
+        mean                        t
+    Attributes:
+        Conventions                 'CF-1.7'
+        date                        '01/12/01'
+        name                        'p'
+        source                      'Unified Model Output (Vn 6.6):'
+        time                        '00:00'
+        title                       'PRESSURE AT MEAN SEA LEVEL'
+PRESSURE AT MEAN SEA LEVEL / (Pa)   (latitude: 145; longitude: 192)
+    Dimension coordinates:
+        latitude                             x               -
+        longitude                            -               x
+    Scalar coordinates:
+        msl                         0.0
+        t                           2002-01-17 00:00:00, bound=(2001-12-04 00:00:00, 2002-02-30 00:00:00)
+    Cell methods:
+        mean                        t
+        mean                        t
+    Attributes:
+        Conventions                 'CF-1.7'
+        date                        '01/12/01'
+        name                        'p'
+        source                      'Unified Model Output (Vn 6.6):'
+        time                        '00:00'
+        title                       'PRESSURE AT MEAN SEA LEVEL'
+[[-0.5386223793029785 -0.5386223793029785 -0.5386223793029785 ...
+  -0.5386223793029785 -0.5386223793029785 -0.5386223793029785]
+ [-0.4164625406265259 -0.4135981500148773 -0.41189974546432495 ...
+  -0.42403459548950195 -0.4207299053668976 -0.41879037022590637]
+ [-0.42825233936309814 -0.42602649331092834 -0.4240446984767914 ...
+  -0.4323999285697937 -0.4300283193588257 -0.42856565117836]
+ ...
+ [-0.0732615739107132 -0.08180143684148788 -0.08966014534235 ...
+  -0.04997266083955765 -0.05694456398487091 -0.06502910703420639]
+ [-0.22445368766784668 -0.22690601646900177 -0.23041483759880066 ...
+  -0.21630313992500305 -0.21910041570663452 -0.22218090295791626]
+ [-0.37158381938934326 -0.37158381938934326 -0.37158381938934326 ...
+  -0.37158381938934326 -0.37158381938934326 -0.37158381938934326]]
+-450.0 450.0 90.0
+[-450. -360. -270. -180.  -90.    0.   90.  180.  270.  360.  450.]
+seaiceconc
+/nfs/hera1/earjcti/um/xpupd/average/xpupd_seaiceconc_djf_mean_2299_2301.nc
+Traceback (most recent call last):
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 337, in load_cube
+    cube = cubes.merge_cube()
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/cube.py", line 386, in merge_cube
+    raise ValueError("can't merge an empty CubeList")
+ValueError: can't merge an empty CubeList
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/benchmarking/benchmarking_HadGEM2.py", line 476, in <module>
+    obj.main_benchmark_field() # benchmarks this field
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/benchmarking/benchmarking_HadGEM2.py", line 219, in main_benchmark_field
+    cube_exptmean = iris.load_cube(self.meanfile, self.fieldname)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 341, in load_cube
+    raise iris.exceptions.ConstraintMismatchError("no cubes found")
+iris.exceptions.ConstraintMismatchError: no cubes found

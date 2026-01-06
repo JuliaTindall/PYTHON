@@ -1,0 +1,101 @@
+#NAME
+#    plot_d18op_from_pd.py
+#PURPOSE 
+#
+#  This program will plot d18op from pd files
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+expt='xqetc'
+startyear=5949
+endyear=5950
+filestart = '/nfs/hera1/earjcti/um/' + expt + '/pd/' + expt + 'a#pd00000'
+
+
+# annual average
+# read in 18o and 16o
+months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+first='y'
+for year in startyear,endyear:
+    for mon in months:
+        filename = filestart + str(year) + mon + '+.nc'
+        cube = iris.load_cube(filename,'Stash code = 338')
+        if first == 'y':
+            sc338_cube = cube
+            first='n'
+        else:
+            sc338_cube.data = sc338_cube.data + cube.data
+
+print(sc338_cube)
+cube_16o=sc338_cube[0,0,:,:]+sc338_cube[0,3,:,:] + sc338_cube[0,6,:,:]+sc338_cube[0,9,:,:]
+cube_18o=sc338_cube[0,1,:,:]+sc338_cube[0,4,:,:] + sc338_cube[0,7,:,:]+sc338_cube[0,10,:,:]
+
+d18o_cube = cube_16o.copy(data=(((cube_18o.data / cube_16o.data) - 2005.2E-6)/2005.2E-9))
+
+V=np.arange(-75,75,15)
+qplt.contourf(d18o_cube,levels=V)
+plt.gca().coastlines()
+
+plt.show()
+
+
+sys.exit(0)
+        
+        
+
+fileann16o = (filestart + 'd18op_16o_'+expt + '_Annual_Average_' + str(startyear) + '_' + str(endyear) + '.nc')
+fileann18o = (filestart + 'd18op_18o_'+expt + '_Annual_Average_' + str(startyear) + '_' + str(endyear) + '.nc')
+
+cubeann16o = iris.load_cube(fileann16o)
+cubeann18o = iris.load_cube(fileann18o)
+
+# calculate d18o and convert 16o to mm/day
+cubeannd18o = ((cubeann18o / cubeann16o) - 2005.2E-6) / 2005.2E-9
+cubeannd18o.long_name = 'd18o_p'
+cubeann16omn = cubeann16o * 60. * 60. *24.
+cubeann16omn.long_name = 'Precipitation (mm/day)'
+
+outfile_ann= (filestart + '/d18op_precip_'+expt + '_Annual_Average_' + str(startyear) + '_' + str(endyear) + '.nc')
+
+iris.save([cubeannd18o,cubeann16omn], outfile_ann, netcdf_format='NETCDF3_CLASSIC',fill_value=1.0E20)
+       
+
+# monthly average
+# read in 18o and 16o
+
+fileann16o = (filestart + 'd18op_16o_'+expt + '_Monthly_Average_' + str(startyear) + '_' + str(endyear) + '.nc')
+fileann18o = (filestart + 'd18op_18o_'+expt + '_Monthly_Average_' + str(startyear) + '_' + str(endyear) + '.nc')
+
+cubeann16o = iris.load_cube(fileann16o)
+cubeann18o = iris.load_cube(fileann18o)
+
+# calculate d18o and convert 16o to mm/day
+cubeannd18o = ((cubeann18o / cubeann16o) - 2005.2E-6) / 2005.2E-9
+cubeannd18o.long_name = 'd18o_p'
+cubeann16omn = cubeann16o * 60. * 60. *24.
+cubeann16omn.long_name = 'Precipitation (mm/day)'
+
+outfile_ann= (filestart + '/d18op_precip_'+expt + '_Monthly_Average_' + str(startyear) + '_' + str(endyear) + '.nc')
+
+iris.save([cubeannd18o,cubeann16omn], outfile_ann, netcdf_format='NETCDF3_CLASSIC',fill_value=1.0E20)
+       
+

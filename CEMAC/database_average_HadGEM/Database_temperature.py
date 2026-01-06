@@ -1,0 +1,224 @@
+#NAME
+#    Database_temperature.py
+#PURPOSE 
+#    Alan wants us to be able to run Biome 4 for the HadGEM jobs.  
+#    The biome4 script currently seems to work okay but needs the files in the
+#    database format.
+#    Unfortunately the HadGEM files don't go on the database properly because 
+#    of the variable naming. 
+#
+#    This program will create some files in Database format that can be run 
+#    run with the BIOME4 scripts
+#
+#  The program will also get 
+#         ?????_Monthly_Average_January_a@pd_TotalPrecipitationRate.nc
+#         ?????_Monthly_Average_January_a@pd_TotalCloud.nc
+#
+#
+# Julia 8.2.2017
+
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import sys
+from netCDF4 import Dataset, MFDataset
+from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+
+
+
+#=====================================================
+def get_monthly_data(expt,startyear,nyears,field):
+
+# this function will extract the data and write out to a file
+
+    if HadCM3 == 'y':
+        outdir='/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Monthly_Average_'
+#        infile='/nfs/hera1/earjcti/um/'+expt+'/netcdf/'+expt+'a@pd'
+        infile='/nfs/hera1/earxh/'+expt+'/' + expt + '-netcdf/'+expt+'a@pd'
+       
+    else:
+        outdir='/nfs/hera1/earjcti/um/HadGEM_data/'+expt+'/database_averages/'+expt+'_Monthly_Average_'
+        infile='/nfs/hera1/earjcti/um/HadGEM_data/'+expt+'/netcdf/'+expt+'a@pd'
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    for month in range(0,len(monthnames)):
+        
+        # get long monthname for filenames
+        choices = {'ja': 'January', 'fb': 'February', 'mr': 'March', 
+                   'ar': 'April', 'my': 'May', 'jn': 'June', 'jl': 'July', 
+                   'ag': 'August', 'sp': 'September', 'ot': 'October', 
+                   'nv': 'November', 'dc': 'December'}
+
+        longmonthname=choices.get(monthnames[month],month)
+
+        # loop over all years
+        for year in range(startyear,startyear+nyears):
+            century=np.floor(year/100.)
+            choices = {10 : 'a', 11: 'b',  12: 'c',  13: 'd', 14: 'e', 
+                       15: 'f', 16: 'g', 17: 'h', 18: 'i', 19: 'j',  
+                       20: 'k', 21: 'l', 22: 'm', 23: 'n', 24: 'o',
+                       25: 'p', 26: 'q', 27: 'r', 28: 's', 29: 't',
+                       30: 'u', 31: 'v', 32: 'w', 33: 'x', 34: 'y', 35:'z'} 
+
+            extra=choices.get(century, np.str(np.int(century))) 
+            yearuse=np.int(year-(century * 100))
+    
+            if yearuse < 10:
+                filename=infile+extra+'0' + np.str(yearuse)+monthnames[month]+'.nc'
+            else:
+               filename=infile+extra+np.str(yearuse)+monthnames[month]+'.nc'
+            print(filename)
+          
+ 
+            f=Dataset(filename,mode='r')
+            if year == startyear:
+                latin = f.variables['latitude'][:]
+                latsize=len(latin)
+                lonin = f.variables['longitude'][:]
+                lonsize=len(lonin)
+        
+                print(nyears,latsize,lonsize)
+                allvar=np.zeros((nyears,latsize,lonsize))
+
+            
+            varreq=f.variables[field][:] 
+        
+            allvar[year-startyear,:,:]=varreq
+            avgvar=np.mean(allvar,axis=0)
+            f.close()
+
+        # write average variable out to a netcdf file
+
+        # set up filename
+
+        fout=outdir+longmonthname+'_a@pd_'+field+'.nc'
+        if field == 'temp_1' or field == 'temp':
+            fout=outdir+longmonthname+'_a@pd_Temperature.nc'
+        if field == 'precip_1' or field == 'precip':
+            fout=outdir+longmonthname+'_a@pd_TotalPrecipitationRate.nc'
+        if field == 'field30':
+            fout=outdir+longmonthname+'_a@pd_TotalCloud.nc'
+        print(fout)
+ 
+        f2=Dataset(fout,mode='w',format='NETCDF3_CLASSIC')
+        # create dimensions
+        lon=f2.createDimension('longitude',lonsize)
+        lat=f2.createDimension('latitude',latsize)
+        level=f2.createDimension('ht',1)
+        time=f2.createDimension('time',1)
+        # create variables
+        lons=f2.createVariable('longitude',np.float32,('longitude',))
+        lats=f2.createVariable('latitude',np.float32,('latitude',))
+        levels=f2.createVariable('ht',np.float32,('ht',))
+        times=f2.createVariable('time',np.float32,('time',))
+        if field == 'temp_1' or field == 'temp':
+            varfield=f2.createVariable('temp',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"TEMPERATURE AT 1.5M"
+            unitsname=u"K"
+        if field == 'precip_1' or field =='precip':
+            varfield=f2.createVariable('precip',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"TOTAL PRECIPITATION RATE KG/M2/S"
+            unitsname=u"kg m-2"
+        if field == 'field30':
+            varfield=f2.createVariable('field30',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"TOTAL CLOUD AMOUNT - RANDOM OVERLAP"
+            unitsname=u"0-1"
+        if field == 'field201':
+            varfield=f2.createVariable('field201',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"OUTGOING SW RAD FLUX (TOA)"
+            unitsname=u"W m-2"
+        if field == 'field200':
+            varfield=f2.createVariable('field200',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"INCOMING SW RAD FLUX (TOA): ALL TSS"
+            unitsname=u"W m-2"
+        if field == 'field207':
+            varfield=f2.createVariable('field207',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"CLEAR-SKY (II) UPWARD SW FLUX (TOA)"
+            unitsname=u"W m-2"
+        if field == 'ilr':
+            varfield=f2.createVariable('ilr',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"DOWNWARD LW RAD FLUX: SURFACE"
+            unitsname=u"W m-2"
+        if field == 'olr':
+            varfield=f2.createVariable('olr',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"OUTGOING LW RAD FLUX (TOA)"
+            unitsname=u"W m-2"
+        if field == 'csolr':
+            varfield=f2.createVariable('field207',np.float32,
+                              ('time','ht','latitude','longitude'))
+            longname=u"CLEAR-SKY (II) UPWARD LW FLUX (TOA)"
+            unitsname=u"W m-2"
+
+
+        # create variable attributes
+        lons.setncatts({'units':u"degrees_east"}) 
+        lats.setncatts({'units':u"degrees_north"})
+        levels.setncatts({'units':u"m"})
+        times.setncatts({'units':u"days since 0000-01-01 00.00",\
+                         'calendar':"360_day"})
+        varfield.setncatts({'long_name': longname,\
+                            'units':unitsname})
+        # assign data to variables
+        lons[:]=lonin
+        lats[:]=latin
+        levels[:]=-1.0
+        times[:]=0.0
+        varfield[0,0,:,:]=avgvar
+        
+        f2.close()
+        
+
+
+
+    return 
+
+
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+expt='xoorb'
+startyear=2949
+nyears=50
+HadCM3 = 'y'
+
+if HadCM3 == 'y':
+    field = 'temp'
+else:
+    field='temp_1'
+get_monthly_data(expt,startyear,nyears,field)
+
+#if HadCM3 == 'y':
+#    field = 'precip'
+#else:
+#    field='precip_1'
+
+#get_monthly_data(expt,startyear,nyears,field)
+
+field='field30'
+get_monthly_data(expt,startyear,nyears,field)
+
+field='ilr'
+get_monthly_data(expt,startyear,nyears,field)
+field='olr'
+get_monthly_data(expt,startyear,nyears,field)
+field='csolr'
+get_monthly_data(expt,startyear,nyears,field)
+
+    
+
+sys.exit()

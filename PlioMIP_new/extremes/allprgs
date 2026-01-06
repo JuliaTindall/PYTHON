@@ -1,0 +1,2496 @@
+::::::::::::::
+ETCCDI_10_13.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will deal with indices 10-13 these are
+
+10.  percentage of days when TN < 10th percentile for preindustrial (TN=daily minimum temperature)
+11. percentage of days when TX < 10th percentile for preindustrial (TX=daily maximum temperature)
+12. percentage of days when TN > 90th percentile
+13. percentage of days when TX > 90th percentile
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+from iris.coords import DimCoord
+import matplotlib.pyplot as plt
+import sys
+from iris.experimental.equalise_cubes import equalise_attributes
+from os.path import exists
+
+
+
+#######################################################################
+#  STEP 1 WRITE ALL THE PERCENTILES TO A FILE   
+def get_months_days(day):
+    """
+    To find percentiles we find all the temperatres for the 100 years which 
+    are within 2 days. 
+    So for 15th May, we would include temperatures 
+    from 13th 14th 15th 16th 17th May
+    """
+
+    # find central month
+    monthreq = np.int(np.floor(day / 30))
+    dayreq = day - monthreq * 30
+
+    # find day before
+    daym1 = dayreq -1 
+    monthm1 = monthreq
+    if daym1 < 0:
+        monthm1 = monthreq - 1
+        if monthm1 < 0: monthm1 = monthm1 + 12
+        daym1 = daym1 + 30
+
+
+    # find two days before
+    daym2 = dayreq -2 
+    monthm2 = monthreq
+    if daym2 < 0:
+        monthm2 = monthreq - 1
+        if monthm2 < 0: monthm2 = monthm2 + 12
+        daym2 = daym2 + 30
+    
+
+    # find day after
+    dayp1 = dayreq +1 
+    monthp1 = monthreq
+    if dayp1 >= 30:
+        monthp1 = monthreq + 1
+        if monthp1 >= 12: monthp1 = monthp1 - 12
+        dayp1 = dayp1 - 30
+
+    # find two days after
+    dayp2 = dayreq +2 
+    monthp2 = monthreq
+    if dayp2 >= 30:
+        monthp2 = monthreq + 1
+        if monthp2 >= 12: monthp2 = monthp2 - 12
+        dayp2 = dayp2 - 30
+
+    monthsreq = [monthm2, monthm1, monthreq, monthp1, monthp2]
+    daysreq = [daym2, daym1, dayreq, dayp1, dayp2]
+    return [monthsreq, daysreq]
+
+def get_temperatures(monthreq,daysreq):
+    """
+    get the temperatures that are appropriate for finding the percentiles
+    for the day of interest
+    """
+    monthnames = {0:'ja',1:'fb',2:'mr',3:'ar',4:'my',5:'jn',6:'jl',
+                  7:'ag',8:'sp',9:'ot',10:'nv',11:'dc'}
+    if MIN_MAX == 'min':
+         # this is minimum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+    if MIN_MAX == 'max':
+         # this is maximum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+    if MIN_MAX == 'mean':
+         # this is maximum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+
+    temperature_cubes = iris.cube.CubeList([])
+  
+    for i, month in enumerate(monthreq):
+        day = daysreq[i]
+        for year in range(0,100):
+            filename = (FILESTART + np.str(year).zfill(2) 
+                            + monthnames.get(month) + '.nc')
+            if exists(filename):
+
+                cubelist = iris.load(filename, constraints=variable_constraint)
+                cube = cubelist[0]
+                monthprev = month
+        
+                tempinit = cube[day, :, :, :]
+                temperature = iris.util.squeeze(tempinit)
+                temperature_cubes.append(temperature)
+            
+
+    equalise_attributes(temperature_cubes)
+    print(temperature_cubes)
+    temperatures = temperature_cubes.merge_cube()
+    print(daysreq,'merged')
+   
+    return temperatures
+    
+def percentiles(nperc, temperatures_cube):
+    """
+    get the percentiles
+    in nperc ; the percentiles we want
+       temperatures cube;  the temperatures for that day for which we
+                           need to find the percentiles, 
+                           DIMENSIONS: t latitude, longitude
+    """
+    data = temperatures_cube.data
+    # cube shape for putting the new data
+    cube_shape = temperatures_cube.collapsed('t', iris.analysis.MEAN)  
+    percentile_array = np.zeros((len(nperc), 73, 96))
+    for lat in range(0, 73):
+        for lon in range(0, 96):
+            # find the sorted temperature
+            temperature = np.sort(data[:, lat, lon])
+            ntemp = len(temperature)
+            for i, perc in enumerate(nperc):
+                index = np.int(np.rint(perc * ntemp / 100))
+                percentile_array[i, lat, lon] = temperature[index]
+                
+    # put the percentiles into the cube  
+    percentile_cubelist = iris.cube.CubeList([])
+    for i in range(0, len(nperc)):
+        cube = cube_shape.copy(data=percentile_array[i, :, :])
+        if MIN_MAX == 'min':
+            cube.long_name = np.str(nperc[i]) + 'th percentile of minimum temperatures'
+        if MIN_MAX == 'max':
+            cube.long_name = np.str(nperc[i]) + 'th percentile of maximum temperatures'
+        if MIN_MAX == 'mean':
+            cube.long_name = np.str(nperc[i]) + 'th percentile of maximum temperatures'
+        cube.var_name = np.str(nperc[i]) + 'th_percentile'
+        percentile_cubelist.append(cube)
+
+    return percentile_cubelist
+    
+
+def get_HadCM3_percentiles(expt, extra):
+    """
+    gets the diagnostics percentiles for writing to a file
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+  
+    # THIS PART OF THE PROGRAM WILL CALCULATE THE PERCENTILES FOR EACH DAY   
+    for day in range(0, 360):
+        # find days that we need to get temperature.  This is the day required
+        # two days before and two days afterwards
+        monthsreq, daysreq = get_months_days(day)
+
+        # get all the minimum/ maximum temperatures that fall on one of the 
+        # correct days
+        temperatures_cube = get_temperatures(monthsreq,daysreq)
+
+        # we should have 500 temperatures so we can find the percentiles
+        percentiles_cubelist = percentiles([5, 10, 90, 95],temperatures_cube) 
+      
+        # write the percentiles to a file for that day.  
+        print(np.str(day))
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                    EXPT + '/diag_10_13/daily_percentiles/' + 
+                    MIN_MAX + '_temperature_' + np.str(day) + '.nc')
+
+        iris.save(percentiles_cubelist, filename, 
+                  netcdf_format="NETCDF3_CLASSIC")
+###########################################################################
+#  STEP 2 
+#  READ ALL THE PERCENTILES FROM THE FILE (OBTAINED IN STEP 1) AND
+#  SEE HOW MANY DAYS ARE MORE EXTREME  
+def get_month_temperatures(month):      
+    """
+    get the temperatures over 100 years for this month
+    """
+    monthnames = {0:'ja',1:'fb',2:'mr',3:'ar',4:'my',5:'jn',6:'jl',
+                  7:'ag',8:'sp',9:'ot',10:'nv',11:'dc'}
+    if MIN_MAX == 'min':
+         # this is minimum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+    if MIN_MAX == 'max':
+         # this is maximum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+    if MIN_MAX == 'mean':
+         # this is maximum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+
+    temperature_cubes = iris.cube.CubeList([])
+  
+    for year in range(0,NYEARS):
+        filename = (FILESTART + np.str(year).zfill(2) 
+                            + monthnames.get(month) + '.nc')
+        if exists(filename):
+
+            cubelist = iris.load(filename, constraints=variable_constraint)
+            cube = cubelist[0]
+            # put year in ht field for concatenation
+            cube.coord('ht').points = year
+            cube.coord('t').points = np.arange(0,30,1)
+            temperature_cubes.append(cube)
+            
+
+    equalise_attributes(temperature_cubes)
+    print(temperature_cubes)
+    temperatures = temperature_cubes.concatenate_cube()
+    return temperatures
+
+def percentiles_from_file(day):
+    """
+    reads in the percentiles that we have obtained in step 1
+    and returns
+    """
+    maxminind = {'min': 'minimum', 'max':'maximum'}
+   
+    filename = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   CNTL + '/diag_10_13/daily_percentiles/' + 
+                   MIN_MAX + '_temperature_' + np.str(day) + '.nc')
+    perc5_cube = iris.load_cube(filename, '5th percentile of ' + 
+                               maxminind.get(MIN_MAX) + ' temperatures')
+    perc10_cube = iris.load_cube(filename, '10th percentile of ' + 
+                               maxminind.get(MIN_MAX) + ' temperatures')
+    perc90_cube = iris.load_cube(filename, '90th percentile of ' + 
+                               maxminind.get(MIN_MAX) + ' temperatures')
+    perc95_cube = iris.load_cube(filename, '95th percentile of ' + 
+                               maxminind.get(MIN_MAX) + ' temperatures')
+
+    return perc5_cube, perc10_cube, perc90_cube, perc95_cube
+
+def nextr(temperatures_cube, percentile_cube, lt_gt, percentile, day):
+    """
+    here we find the number of temperatures that is more extreme than the
+    percentile
+    """      
+    if lt_gt == 'less than':
+        extreme_data = np.where(temperatures_cube.data <= percentile_cube.data, 
+                                1.0, 0.0)
+    if lt_gt == 'more than':
+        extreme_data = np.where(temperatures_cube.data >= percentile_cube.data, 
+                                1.0, 0.0)
+    
+    extreme_allyears = ((np.sum(extreme_data, axis=0) * 100)  /
+                        np.size(extreme_data,axis=0))
+    extreme_cube = percentile_cube.copy(data=extreme_allyears)
+    name = ('pcent of years ' + lt_gt + ' ' + CNTL + 
+            ' ' + np.str(percentile) + 'th percentile')
+    extreme_cube.long_name = name
+    extreme_cube.cell_methods = None
+    extreme_cube.remove_coord('t')
+    extreme_cube.attributes = None
+    extreme_cube.var_name = 'pcent_extreme'
+    time = DimCoord(day,standard_name = 'time', long_name = 't', 
+                              var_name = None, units = 'day')
+    print(extreme_cube)
+    extreme_cube.add_aux_coord(time)
+    ext3d_cube = iris.util.new_axis(extreme_cube, time)
+   
+    return ext3d_cube
+       
+def find_nextremes():
+    """
+    this will find the number of days which are more extreme than the
+    percentiles (5th, 10th, 90th, 95th) in the control  (normally preindustrial)
+    """  
+    extreme5_cubelist = iris.cube.CubeList([])
+    extreme10_cubelist =iris.cube.CubeList([])
+    extreme90_cubelist = iris.cube.CubeList([])
+    extreme95_cubelist = iris.cube.CubeList([])
+
+    for month in range(0,12):
+        month_temp_cube = get_month_temperatures(month)
+        for day in range(0, 30):
+            # get percentile cubes for day
+            dayperc = (month *30) + day
+            print('dayperc is',dayperc)
+            (perc5_cube, perc10_cube, 
+             perc90_cube, perc95_cube) = percentiles_from_file(dayperc)
+      
+             # get temperatures for this day in the year in expt
+            Tcube = month_temp_cube[day, :, :, :]
+           
+            # find how many temperatures are more extreme than percentiles
+            extreme5_cube = nextr(Tcube, perc5_cube, 'less than', 5, day)
+            extreme10_cube = nextr(Tcube, perc10_cube, 'less than', 10, day)
+            extreme90_cube = nextr(Tcube, perc90_cube, 'more than', 90, day)
+            extreme95_cube = nextr(Tcube, perc95_cube, 'more than', 95, day)
+
+            # put days in 0-360 format
+            extreme5_cube.coord('time').points=[dayperc]
+            extreme10_cube.coord('time').points=[dayperc]
+            extreme90_cube.coord('time').points=[dayperc]
+            extreme95_cube.coord('time').points=[dayperc]
+
+            extreme5_cubelist.append(extreme5_cube)
+            extreme10_cubelist.append(extreme10_cube)
+            extreme90_cubelist.append(extreme90_cube)
+            extreme95_cubelist.append(extreme95_cube)
+
+    equalise_attributes(extreme5_cubelist)
+    equalise_attributes(extreme10_cubelist)
+    equalise_attributes(extreme90_cubelist)
+    equalise_attributes(extreme95_cubelist)
+   
+  
+    extreme5_year_cube = extreme5_cubelist.concatenate_cube()
+    extreme10_year_cube = extreme10_cubelist.concatenate_cube()
+    extreme95_year_cube = extreme95_cubelist.concatenate_cube()
+    extreme90_year_cube = extreme90_cubelist.concatenate_cube()
+   
+    filename = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + EXPT + '/diag_10_13/percentage_more_extreme_than_T'+ MIN_MAX + '_' + CNTL + '_5th_percentile.nc'
+    iris.save(extreme5_year_cube, filename ,netcdf_format="NETCDF3_CLASSIC")
+  
+    filename = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + EXPT + '/diag_10_13/percentage_more_extreme_than_T'+ MIN_MAX + '_'+  CNTL + '_10th_percentile.nc'
+    iris.save(extreme10_year_cube, filename ,netcdf_format="NETCDF3_CLASSIC")
+   
+    filename = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + EXPT + '/diag_10_13/percentage_more_extreme_than_T'+ MIN_MAX + '_' + CNTL + '_90th_percentile.nc'
+    iris.save(extreme90_year_cube, filename ,netcdf_format="NETCDF3_CLASSIC")
+   
+    filename = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + EXPT + '/diag_10_13/percentage_more_extreme_than_T'+ MIN_MAX + '_' + CNTL + '_95th_percentile.nc'
+    iris.save(extreme95_year_cube, filename ,netcdf_format="NETCDF3_CLASSIC")
+   
+#########################################################
+#STEP 3 plot information about extremes
+def get_percentile(percentile):
+    """
+    gets the control temperature of percentile
+    """
+    maxminind = {'min': 'minimum', 'max':'maximum'}
+   
+    cubelist = iris.cube.CubeList([])
+    for day in range(0, 360):
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                    CNTL + '/diag_10_13/daily_percentiles/' + 
+                    MIN_MAX + '_temperature_' + np.str(day) + '.nc')
+        perc_cube = iris.load_cube(filename, np.str(percentile) + 
+                                    'th percentile of ' + 
+                                    maxminind.get(MIN_MAX) + ' temperatures')
+        perc_cube.coord('t').points=day
+        perc_cube.coord('t').attributes=None
+        perc_cube.coord('t').bounds=None
+        cubelist.append(perc_cube)
+
+    equalise_attributes(cubelist)
+    percentiles_cube = cubelist.merge_cube()
+    mean_percentile = percentiles_cube.collapsed('t',iris.analysis.MEAN)
+    mean_percentile.convert_units('celsius')
+   
+    return mean_percentile
+
+    
+def plot_extremes_exceeded_annual(percentile, ocn_mask):
+    """
+    reads in the files showing when the extremes have been exceeded and find
+    an annual averages them and plots (land only)
+    """
+    gtlt = {10 : ' < ', 5 : ' < ' ,90 : ' > ', 95  : ' > '}
+    filename = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + EXPT 
+                + '/diag_10_13/percentage_more_extreme_than_T' + MIN_MAX 
+                + '_' + CNTL + '_' + np.str(percentile) 
+                + 'th_percentile.nc')
+    cube = iris.load_cube(filename)
+   
+    if ocn_mask == 'y':
+        if EXPT == 'tenvj':
+            filelsm = '/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_qrparm.mask.nc'
+            cube = iris.load(filelsm)
+            print(cube)
+            exptlsmcube=iris.load_cube(filelsm,'LAND MASK (LOGICAL: LAND=TRUE)')
+            cube_ann_avg.data.mask = (exptlsmcube.data - 1.0) * (-1.0)
+    
+    if percentile==10:
+        valmin=0
+        valmax=16
+        valrange=2
+    if percentile==90 or percentile==95:
+        valmin=0
+        valmax=55
+        valrange=5
+
+    cube_ann_avg.units = None
+   # qplt.pcolormesh(cube_ann_avg,vmin=minval, vmax=maxval)
+    qplt.contourf(cube_ann_avg,levels=np.arange(valmin,valmax,valrange),
+                  extend='max')
+    plt.gca().coastlines()
+    plt.title('% days: T' + MIN_MAX + gtlt.get(percentile) + 
+              TIME.get(CNTL) + ' ' + np.str(percentile)  + 
+              ' percentile',fontsize=8)
+   
+def plot_temp(temp_cube, ocn_mask, title, vals):
+    """
+    plots a cube of temperatures 
+    """   
+  
+    if ocn_mask == 'y':
+        if EXPT == 'tenvj':
+            filelsm = '/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_qrparm.mask.nc'
+            cube = iris.load(filelsm)
+            print(cube)
+            exptlsmcube=iris.load_cube(filelsm,'LAND MASK (LOGICAL: LAND=TRUE)')
+            temp_cube.data.mask = (exptlsmcube.data - 1.0) * (-1.0)
+        
+    qplt.contourf(temp_cube, levels=vals, extend='both')
+    plt.gca().coastlines()
+    plt.title(title,fontsize=8)
+   
+    
+  
+def plot_extremes(perc_low, perc_high):
+    """
+    we will do a 4 column plot.
+    1. cntl 90th percentile
+    2. average difference between highest and lowest percentiles
+       (to get an idea of natural variability) 
+percencentage of days in pliocene which exceed perc_high for pi
+    3. difference between perc_high and perc low (to get an idea of 
+       natural variability    
+    4. percentage of days in pliocene which are lower than perc_low for pi
+    """
+    temp_percentile_low = get_percentile(perc_low)
+    temp_percentile_high = get_percentile(perc_high)
+    temp_perc_diff = temp_percentile_high - temp_percentile_low
+    
+    plt.subplot(2,2,1)
+    title = ('ann_avg ' + np.str(perc_low) + 'percentile of T' + 
+             MIN_MAX +  ' for' + TIME.get(CNTL))
+    vals = np.arange(-45,45,15)
+    plot_temp(temp_percentile_low,'y',title, vals )
+    
+    plt.subplot(2,2,2)
+    title = (TIME.get(CNTL) + ' T' + MIN_MAX + ': ' + np.str(perc_high) + 'th -'
+             + np.str(perc_low) + 'th percentile')
+    vals = np.arange(0,21,3)
+    plot_temp(temp_perc_diff,'y',title, vals)
+
+    plt.subplot(2,2,3)
+    plot_extremes_exceeded_annual(perc_low, 'y')
+   
+    plt.subplot(2,2,4)
+    plot_extremes_exceeded_annual(perc_high, 'y')
+    
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/diag10-13/' +
+               EXPT + '_' + CNTL + np.str(perc_low) + '_' + np.str(perc_high) + 
+               '_percentiles_annual_' + 'T' + MIN_MAX)
+    plt.savefig(fileout + '.eps')
+    plt.savefig(fileout + '.png')
+    plt.close()
+   
+   
+   
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+MIN_MAX = 'max'
+NYEARS = 100
+TIME = {'xozza': 'PI', 'tenvj' : 'plio'}
+  
+
+# this is for obtaining the percentiles used in climate change indices   
+# STEP1
+#EXPT= 'tenvj'
+EXPT = 'tenvj'  # this is the experiments we are checking
+CNTL = 'xozza'  # we are seeing how many of the days  in the experiment
+                    # have temperatures more extreme than those in the control 
+FILESTART = '/nfs/hera1/earjcti/um/'+EXPT+'/pb/'+EXPT+'a@pbo'
+#get_HadCM3_percentiles(EXPT,'o')
+#get_HadCM3_percentiles(CNTL,'o')
+
+# STEP 2
+# count the number of days with the temperature greater than all the percentiles
+#find_nextremes()
+
+# STEP3
+# plot information from the extremes.  Will need to use the files derived in step 2
+plot_extremes(5,95)  # number in brackets is the percentile
+::::::::::::::
+ETCCDI_14_15.py
+::::::::::::::
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will deal with indices 14-15 these are warm spell and cold spell duration index
+
+14 WSDI, Warm spell duration index: Annual count of days with at least 6 consecutive days when TX > 90th percentile
+
+Let TXij be the daily maximum temperature on day i in period j and let TXin90 be the calendar day 90th percentile centred on a 5-day window for the base period 1961-1990. Then the number of days per period is summed where, in intervals of at least 6 consecutive days:
+
+TXij > TXin90
+
+15 CSDI, Cold spell duration index: Annual count of days with at least 6 consecutive days when TN < 10th percentile
+
+Let TNij be the daily maximum temperature on day i in period j and let TNin10 be the calendar day 10th percentile centred on a 5-day window for the base period 1961-1990. Then the number of days per period is summed where, in intervals of at least 6 consecutive days:
+
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+from iris.coords import DimCoord
+import matplotlib.pyplot as plt
+import sys
+from iris.experimental.equalise_cubes import equalise_attributes
+from os.path import exists
+
+
+def percentiles_from_file():
+    """
+    reads in the percentiles that we have obtained in step 1
+    and returns 12 cubes one for each month
+    """
+    if MIN_MAX == 'min':
+        fieldname = '10th percentile of minimum temperatures'
+    if MIN_MAX == 'max':
+        fieldname = '90th percentile of maximum temperatures'
+    
+   
+    perc_cube_allmonths = iris.cube.CubeList([])
+
+    for month in range(0,12):
+        cubelist = iris.cube.CubeList([])
+        daystart = month * 30
+        dayend = daystart + 30
+
+        for day in range(daystart,dayend):
+            filename = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                        CNTLNAME + '/diag_10_13/daily_percentiles/' + 
+                        MIN_MAX + '_temperature_' + np.str(day) + '.nc')
+            perc_cube = iris.load_cube(filename, fieldname)
+            # stuff to make sure they can concatenate
+            perc_cube.cell_methods = None
+            perc_cube.remove_coord('t')
+            perc_cube.attributes = None
+            perc_cube.var_name = 'pcent_extreme'
+            time = DimCoord(day,standard_name = 'time', long_name = 't', 
+                              var_name = None, units = 'day')
+            perc_cube.add_aux_coord(time)
+            perc_cube_3d = iris.util.new_axis(perc_cube, time)
+
+            cubelist.append(perc_cube_3d)
+
+    
+        percentile_month_cube = cubelist.concatenate_cube()
+        perc_cube_allmonths.append(percentile_month_cube)
+
+    return perc_cube_allmonths
+
+       
+    
+def calculate_extreme_spell():
+    """
+    this function will calculate the number of days which belong to an
+    extreme spell for each gridbox in the 100 year period
+    """
+
+    # read in percentiles file.  we need one of these per month
+    # the cubelist will contain one cube per month
+    perc_cubelist = percentiles_from_file()
+    data_cube = perc_cubelist[0][0,:,:] # shape reqd for putting warm spell data
+    warm = {'min' : 'cold', 'max' : 'warm'}
+    warm_cold = {'min' : 'coldspell', 'max' : 'warmspell'}
+   
+    # get_temperature data and find where it is extreme
+    if MIN_MAX == 'min':
+        # this is minimum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+    if MIN_MAX == 'max':
+        # this is maximum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+    if MIN_MAX == 'mean':
+         # this is maximum temperature
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+
+    # find where the data is extreme
+    extreme_data = np.zeros((NYEARS * 12,30, 73, 96))
+    filestart = ('/nfs/hera1/earjcti/um/' + EXPTNAME + '/pb/' + EXPTNAME
+                 + 'a@pb' + EXTRA )
+    
+    for year in range(0,0 + NYEARS):
+        print(year)
+        cubelist_ann = iris.cube.CubeList([])
+        for month in range(0,12):
+            monix = (year * 12) + month
+            percentile_cube = perc_cubelist[month]
+            filename = (filestart + np.str(year).zfill(2) 
+                        + MONTHNAMES.get(month) + '.nc')
+            if exists(filename):
+                print(filename)
+            else:
+                print('replacing',filename)
+                filename = (filestart + np.str(year-1).zfill(2) 
+                        + MONTHNAMES.get(month) + '.nc')
+                print('with',filename)
+
+            
+            cubes = iris.load(filename, constraints=variable_constraint)
+            cube = iris.util.squeeze(cubes[0])
+            print(np.shape(cube.data))
+            print(np.shape(percentile_cube.data))
+         
+            if MIN_MAX == 'min':
+                extreme_data[monix,:,:] = np.where(cube.data 
+                                                   <= percentile_cube.data, 
+                                                   1.0, 0.0)
+            if MIN_MAX == 'max':
+                extreme_data[monix,:,:] = np.where(cube.data 
+                                                   >= percentile_cube.data, 
+                                                   1.0, 0.0)
+         
+    #use the extreme data array to find out how many wam/cold spells there
+    #are 
+    spell_array = np.zeros((73,96))
+    for lat in range(0,73):
+        print('lat is',lat)
+        for lon in range(0,96):
+            poss_warm_spell = 0.0
+            for day in range(0,360*NYEARS):
+                monix=np.int(np.floor(day/30))
+                dayix = day - monix * 30
+                # check extremes
+                if extreme_data[monix,dayix,lat,lon] == 1.0:
+                    poss_warm_spell = poss_warm_spell+1.0
+                # if not an extreme reset start of warm spell
+                if (extreme_data[monix,dayix,lat,lon]==0.0 
+                    and poss_warm_spell > 0.0):
+                    if poss_warm_spell >=6: 
+                        spell_array[lat,lon] = (spell_array[lat,lon] + 
+                                                poss_warm_spell)
+                    poss_warm_spell=0.0
+          
+    spell_array = (spell_array *100.) / (360. * NYEARS)
+    spell_cube = data_cube.copy(data=spell_array)
+    spell_cube.units=None
+    spell_cube.long_name = 'percentage of ' + warm.get(MIN_MAX) + ' spell days'
+    outfile = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   EXPTNAME + '/diag14_15/' + EXTRA + '_' + CNTLNAME + '_' + 
+                   warm_cold.get(MIN_MAX) + 
+                   '_diag14-15.nc') 
+    iris.save(spell_cube, outfile, netcdf_format="NETCDF3_CLASSIC")
+    qplt.contourf(spell_cube)
+    plt.show()
+#########################################################
+def plot_nextreme_spell(ocn_mask):
+    """
+    plots the number of days in a warm spll or a cold spell
+    """
+    warm_cold = {'min' : 'coldspell', 'max' : 'warmspell'}
+    period = {'tenvj':'mPWP', 'xozza':'PI', 'xozzb':'mPWP'}
+   
+    gtlt = {10 : ' < ', 5 : ' < ' ,90 : ' > ', 95  : ' > '}
+    filename = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   EXPTNAME + '/diag14_15/' + EXTRA + '_' + CNTLNAME + '_' + 
+                   warm_cold.get(MIN_MAX) + 
+                   '_diag14-15.nc')
+
+    cube = iris.load_cube(filename)
+    print(cube)
+ 
+    if ocn_mask == 'y':
+        if EXPTNAME == 'tenvj':
+            filelsm = '/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_qrparm.mask.nc'
+            exptlsmcube=iris.load_cube(filelsm,'LAND MASK (LOGICAL: LAND=TRUE)')
+            cube.data.mask = (exptlsmcube.data - 1.0) * (-1.0)
+        if EXPTNAME == 'xozza':
+            filelsm = '/nfs/hera1/earjcti/ancil/preind2/qrparm.mask.nc'
+            exptlsmcube=iris.load_cube(filelsm,'LAND MASK (LOGICAL: LAND=TRUE)')
+            cube.data.mask = (exptlsmcube.data - 1.0) * (-1.0)
+    
+   
+  
+    if MIN_MAX == 'max' and EXPTNAME == 'tenvj' and CNTLNAME == 'xozza':
+        valmin=0.
+        valmax=55.
+        valdiff=5.
+    else:
+        valmin=0.
+        valmax=6.
+        valdiff=1.
+
+
+    cube.units = '%'
+   # qplt.pcolormesh(cube_ann_avg,vmin=minval, vmax=maxval)
+    qplt.contourf(cube,levels=np.arange(valmin,valmax,valdiff),
+                  extend='max')
+    plt.gca().coastlines()
+    plt.title(('percentage of ' + period.get(EXPTNAME) + ' days that are ' 
+              + warm_cold.get(MIN_MAX) + ' days in '+ period.get(CNTLNAME)),
+              fontsize=10)
+    filestart = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/' +
+                 'diag14_15/' + EXTRA + '_' + EXPTNAME + '_' + CNTLNAME + 
+                 '_percentage_' + 
+                   warm_cold.get(MIN_MAX))
+    plt.savefig(filestart + '.eps')
+    plt.savefig(filestart + '.png')
+   
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+MIN_MAX = 'max' # max is warm spell duration index
+                # min is cold spell duration index
+
+NYEARS = 100
+MONTHNAMES = {0:'ja',1:'fb',2:'mr',3:'ar',4:'my',5:'jn',6:'jl',
+                  7:'ag',8:'sp',9:'ot',10:'nv',11:'dc'}
+  
+EXPTNAME = 'xozzb'
+CNTLNAME = 'xozza'
+EXTRA='o'
+
+
+
+nextreme_spell = calculate_extreme_spell()
+
+plot_nextreme_spell('y')
+::::::::::::::
+ETCCDI_1_4.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will write
+indices 1-4 to a file.  These are:
+
+1. FD: Number of frost days:  Annual count of days when TN (daily minimum temperature) < 0degC
+2. SU: Number of summer days:  Annual count of days when TX (daily maimum temperature) > 25degC
+3. ID: Icing days:  Annual count of days when TX (daily maximum temperature) < 0degC
+4. TR, Number of tropical nights.  Annual count of days when TN (daily minimum temperature) > 20degC
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def get_HCM3_year_data(filestart,year):
+    """
+    reads in the maximum  and minimum temperature for the year and puts it in 
+    a single cube
+    """
+    maxTcubelist = iris.cube.CubeList([])
+    minTcubelist = iris.cube.CubeList([])
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    for month in months:
+        filename = filestart + np.str(year).zfill(2) + month + '.nc'
+        # load in data
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        maxTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        minTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        meanTcube = cube[0]
+
+        # check you have got maxT, meanT and minT in correct order        
+        if np.max(maxTcube.data) < np.max(meanTcube.data):
+            print('cubes not in right order')
+            sys.exit(0)
+
+        if np.max(meanTcube.data) < np.max(minTcube.data):
+            print('cubes not in right order2')
+            sys.exit(0)
+
+        maxTcubelist.append(maxTcube-273.15)
+        minTcubelist.append(minTcube-273.15)
+
+    equalise_attributes(maxTcubelist)
+    equalise_attributes(minTcubelist)
+    maxTyearcube = maxTcubelist.concatenate_cube(maxTcubelist)
+    minTyearcube = minTcubelist.concatenate_cube(minTcubelist)
+  
+    return maxTyearcube, minTyearcube
+   
+
+def get_HadCM3_diagnostics(expt, extra):
+    """
+    gets the diagnostics (frost days, summer days, icing days tropical nights
+    from HadCM3)
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+  
+    for year in range(99, 100):
+        yearuse = np.str(year).zfill(2)
+        maxTcube, minTcube  = get_HCM3_year_data(filestart, year)
+
+        # frost where daily min T is less than 0
+        frost = np.where(minTcube.data < 0, 1.0, 0)
+        frostcube = minTcube.copy(data = frost)
+        frostdays = frostcube.collapsed('t',iris.analysis.SUM)
+        frostdayscube = iris.util.squeeze(frostdays)
+        frostdayscube.long_name = 'number of frost days'
+        frostdayscube.units = None
+
+        # summer where daily maximum T is greater than 25
+        summer = np.where(maxTcube.data > 25, 1.0, 0)
+        summercube = maxTcube.copy(data = summer)
+        summerdays = summercube.collapsed('t',iris.analysis.SUM)
+        summerdayscube = iris.util.squeeze(summerdays)
+        summerdayscube.long_name = 'number of summer days'
+        frostdayscube.units = None
+        
+        # Icing days: when daily maximum temperature < 0degC
+        icing = np.where(maxTcube.data < 0, 1.0, 0)
+        icingcube = maxTcube.copy(data = icing)
+        icingdays = icingcube.collapsed('t',iris.analysis.SUM)
+        icingdayscube = iris.util.squeeze(icingdays)
+        icingdayscube.long_name = 'number of icing days'
+        icingdayscube.units = None
+
+        # Number of tropical nights where daily minimum temperature) > 20degC
+        aladin = np.where(minTcube.data > 20., 1.0, 0)
+        aladincube = minTcube.copy(data = aladin)
+        aladin_nights = aladincube.collapsed('t',iris.analysis.SUM)
+        aladin_nights_cube = iris.util.squeeze(aladin_nights)
+        aladin_nights_cube.long_name = 'number of tropical nights'
+        aladin_nights_cube.units = None
+
+
+        cubelist = [frostdayscube, summerdayscube, icingdayscube,
+                    aladin_nights_cube]
+
+        outfile = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   expt + '/' + extra + '_' + 
+                   'diag1-4_' + np.str(year) + '.nc')
+        iris.save(cubelist, outfile, netcdf_format="NETCDF3_CLASSIC")
+
+##########################################################
+def read_data(expt,extra,startyear,endyear):
+    """
+    reads in the data for each year, finds the sum and returns
+    """
+    filestart = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/'
+
+    frostcubelist = iris.cube.CubeList([])
+    summercubelist = iris.cube.CubeList([])
+    icingcubelist = iris.cube.CubeList([])
+    tropcubelist = iris.cube.CubeList([])
+ 
+    for year in range(startyear,endyear):
+        filename = (filestart + expt + '/diag1-4/' + extra + 
+                    '_diag1-4_'+ np.str(year) + '.nc')
+
+        frostcubelist.append(iris.load_cube(filename,'number of frost days'))
+        summercubelist.append(iris.load_cube(filename,'number of summer days'))
+        icingcubelist.append(iris.load_cube(filename,'number of icing days'))
+        tropcubelist.append(iris.load_cube(filename,
+                                           'number of tropical nights'))
+
+    equalise_attributes(frostcubelist)
+    allfrostcube = frostcubelist.merge_cube()
+    meanfrostcube = allfrostcube.collapsed('t',iris.analysis.MEAN)
+   
+    equalise_attributes(summercubelist)
+    allsummercube = summercubelist.merge_cube()
+    meansummercube = allsummercube.collapsed('t',iris.analysis.MEAN)
+    meansummercube.units = None
+  
+    equalise_attributes(icingcubelist)
+    allicingcube = icingcubelist.merge_cube()
+    meanicingcube = allicingcube.collapsed('t',iris.analysis.MEAN)
+   
+    equalise_attributes(tropcubelist)
+    alltropcube = tropcubelist.merge_cube()
+    meantropcube = alltropcube.collapsed('t',iris.analysis.MEAN)
+
+    return (meanfrostcube, meansummercube, meanicingcube,meantropcube)
+  
+def plot_anom(cube,field,ocn_mask, expt, cntl, cube_cntl, cube_expt):
+    """
+    this will plot the anomaly cube between the pliocene and the pi
+    """
+    fieldname = {'frost' : 'number of frost days',
+                 'summer': 'number of summer days',
+                 'icing': 'number of icing days',
+                 'tropical_nights' : 'number of tropical nights'}
+
+    if ocn_mask == 'y':
+       maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+      
+       cube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       cube_cntl.data.mask = (maskcube.data - 1.0) * (-1.0)
+       cube_expt.data.mask = (maskcube.data - 1.0) * (-1.0)
+      
+    plt.subplot(2,2,1)
+    qplt.contourf(cube_cntl, levels=np.arange(0,300,20), extend='max')
+    plt.gca().coastlines()
+    plt.title(fieldname.get(field) + ':' +  TIME.get(cntl))
+
+    plt.subplot(2,2,2)
+    qplt.contourf(cube_expt, levels=np.arange(0,300,20), extend='max')
+    plt.gca().coastlines()
+    plt.title(fieldname.get(field) + ':' +  TIME.get(expt))
+
+    plt.subplot(2,2,3)
+    if field == 'frost' or field == 'icing':
+        cmapname = 'Blues_r'
+        vals = np.arange(-40,5,5)
+    else:
+        cmapname = 'Reds'
+        vals = np.arange(0,65,5)
+    qplt.contourf(cube,cmap=cmapname, levels=vals,extend='both')
+    plt.gca().coastlines()
+    plt.title(fieldname.get(field) + ': ' + TIME.get(expt) + '-' +TIME.get(cntl))
+    plt.subplot(2,2,4)
+    qplt.contourf((cube / cube_cntl) * 100.,cmap=cmapname, 
+                  levels=vals,extend='both')
+    plt.gca().coastlines()
+    plt.title('percentage change: ' + TIME.get(expt) + '-' +TIME.get(cntl))
+
+
+    plt.tight_layout()
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/diag1-4/' + 
+               field + '_' + expt + '-' + cntl)
+    plt.savefig(fileout + '.eps')
+    plt.savefig(fileout + '.png')
+    plt.close()
+    
+    
+def plot_n_extremes(expt, cntl, nyears):
+    """
+    plots the number of days that are: 1. frost days, 2. summer days,
+    3. icing days, 4. tropical nights and how it changes between plio and cntl
+    """
+    (frost_expt_cube, summerday_expt_cube, 
+    icing_expt_cube, tropnight_expt_cube) = read_data(expt,'o',0, nyears)
+
+    (frost_cntl_cube, summerday_cntl_cube, 
+    icing_cntl_cube, tropnight_cntl_cube) = read_data(cntl,'o',0, nyears)
+
+    frost_anom_cube = frost_expt_cube - frost_cntl_cube
+    plot_anom(frost_anom_cube,'frost','y', expt,cntl,
+              frost_cntl_cube, frost_expt_cube)
+  
+    summer_anom_cube = summerday_expt_cube - summerday_cntl_cube
+    plot_anom(summer_anom_cube,'summer','y', expt,cntl,
+              summerday_cntl_cube, summerday_expt_cube)
+  
+    icing_anom_cube = icing_expt_cube - icing_cntl_cube
+    plot_anom(icing_anom_cube,'icing','y', expt,cntl,
+              icing_cntl_cube, icing_expt_cube)
+  
+    trop_anom_cube = tropnight_expt_cube - tropnight_cntl_cube
+    plot_anom(trop_anom_cube,'tropical_nights','y', expt,cntl,
+              tropnight_cntl_cube, tropnight_expt_cube)
+  
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+
+TIME = {'tenvj' : 'mPlio', 'xozza' : 'PI', 'xozzb' : 'Plio','tenvs':'E560'}
+# this is for if you actually want to get the diagnostics.
+# ie write them to the file /nfs/hera1/earjcti/PLIOMIP2/..ETCCDI....diags 1-4  
+if MODELNAME == 'HadCM3':
+    (FD__cube, SU_cube, ID_cube, TR_cube) = get_HadCM3_diagnostics('tenvs','o')
+
+# plot map of number of days that are 'extreme' according to the ETCCDI 1-4
+# criteria
+# plot anomaly from plio and pi
+
+plot_n_extremes('tenvs','xozza',100)  # tenvj plio, xozza control, xozzb control
+ 
+
+::::::::::::::
+ETCCDI_16.py
+::::::::::::::
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will deal with indices 16 this is monthly average daily temperature range
+
+DTR, Daily temperature range: Monthly mean difference between TX and TN
+
+Let TXij and TNij be the daily maximum and minimum temperature respectively on day i in month j. If I represents the number of days in j, then:
+
+DTR j = SIGMA(TXij - TN) / 30.  
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+from iris.coords import DimCoord
+import matplotlib.pyplot as plt
+import sys
+from iris.experimental.equalise_cubes import equalise_attributes
+from os.path import exists
+
+
+def get_HCM3_year_data(filestart,year):
+    """
+    reads in the maximum  and minimum temperature for the year and puts it in 
+    a single cube
+    """
+    DTRcubelist = iris.cube.CubeList([])
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    for monthno, month in enumerate(months):
+        filename = filestart + np.str(year).zfill(2) + month + '.nc'
+        # load in data
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        maxTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        minTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        meanTcube = cube[0]
+
+        # check you have got maxT, meanT and minT in correct order        
+        if np.max(maxTcube.data) < np.max(meanTcube.data):
+            print('cubes not in right order')
+            sys.exit(0)
+
+        if np.max(meanTcube.data) < np.max(minTcube.data):
+            print('cubes not in right order2')
+            sys.exit(0)
+
+        dtrdailycube = maxTcube - minTcube
+        dtrmonthcube = dtrdailycube.collapsed('t', iris.analysis.MEAN)
+        dtrmonthcube.coord('t').points = monthno + 1
+        DTRcubelist.append(dtrmonthcube)
+       
+    equalise_attributes(DTRcubelist)
+    iris.util.unify_time_units(DTRcubelist)
+    DTRcube = DTRcubelist.merge_cube()
+    DTRcube.coord('ht').rename('year')
+    DTRcube.coord('year').points = year
+    DTRcube.coord('t').rename('month')
+    DTRcube.coord('month').attributes=None
+    DTRcube.coord('month').units=None
+    DTRcube.coord('month').bounds=None
+    DTRcube.cell_methods = None
+   
+    return DTRcube
+   
+def calculate_daily_temperature_range():
+    """
+    for each year and for each month calculates the average daily
+    temperature range Tmax - Tmin
+    """
+    filestart = ('/nfs/hera1/earjcti/um/' + EXPTNAME + '/pb/' + 
+                 EXPTNAME + 'a@pb' + EXTRA)
+  
+    DTR_year_cubes = iris.cube.CubeList([])
+    for year in range(0, 100):
+        yearuse = np.str(year).zfill(2)
+        DTRcube  = get_HCM3_year_data(filestart, year)
+        DTR_year_cubes.append(DTRcube)
+
+    equalise_attributes(DTR_year_cubes)
+    iris.util.unify_time_units(DTR_year_cubes)
+   
+
+    allDTR_cube = DTR_year_cubes.concatenate_cube()
+    allDTR_cube.long_name = 'Diurnal Temperature Range'
+    allDTR_cube.units='Celsius'
+
+    fileout = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+               EXPTNAME + '/diag16/DTR.nc')
+    iris.save(allDTR_cube,fileout)
+
+#########################################################
+def plot_daily_temperature_range(ocn_mask):
+    """
+    plots the daily temperature range in EXPTNAME and also the 
+    difference between the experiment and the control
+    """ 
+    TIME = {'tenvj' : 'mPWP',
+            'xozza' : 'PI'}
+    filestart = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/'
+
+    # read in control data (normally pi)
+    cube_cntl = iris.load_cube(filestart + CNTLNAME + '/diag16/DTR.nc')
+    cube_cntl_avg = cube_cntl.collapsed('year',iris.analysis.MEAN)
+    # read in experiment data (normally pliocene)
+    cube_expt = iris.load_cube(filestart + EXPTNAME + '/diag16/DTR.nc')
+    cube_expt_avg = cube_expt.collapsed('year',iris.analysis.MEAN)
+    # read in masks in case they are needed
+    maskplio=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+    maskpi=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/e280/qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+       
+      
+   
+    for mon in range(1,13):
+        cube_cntl_mon = cube_cntl_avg.extract(iris.Constraint(month=mon))
+        cube_expt_mon = cube_expt_avg.extract(iris.Constraint(month=mon))
+       
+        if ocn_mask == 'y':
+            if TIME.get(EXPTNAME) == 'mPWP':
+                cube_expt_mon.data.mask = (maskplio.data - 1.0) * (-1.0)
+            if TIME.get(CNTLNAME) == 'PI':
+                cube_cntl_mon.data.mask = (maskpi.data - 1.0) * (-1.0)
+      
+        plt.subplot(2,2,1)
+        qplt.contourf(cube_expt_mon, levels=np.arange(0,22,2), extend='both')
+        plt.gca().coastlines()
+        plt.title(MONTHNAMES.get(mon-1) + 
+                  ': Tmax - Tmin:' +  TIME.get(EXPTNAME))
+
+        plt.subplot(2,2,2)
+        qplt.contourf(cube_cntl_mon, levels=np.arange(0,22,2), extend='both')
+        plt.gca().coastlines()
+        plt.title('Tmax - Tmin:' +  TIME.get(CNTLNAME))
+
+        plt.subplot(2,2,3)
+        print(cube_expt_mon)
+        print(cube_cntl_mon)
+        diffcube = cube_expt_mon - cube_cntl_mon
+        qplt.contourf(diffcube,levels=np.arange(-3,3.5,0.5), extend='both',
+                      cmap='RdBu_r')
+        plt.gca().coastlines()
+        plt.title('Tmax - Tmin:' + TIME.get(EXPTNAME) + '-'+ TIME.get(CNTLNAME))
+        
+
+        plt.tight_layout()
+        fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/' + 
+                    'diag16/' + EXPTNAME + '_' + CNTLNAME + '_' + 
+                   MONTHNAMES.get(mon-1))
+        plt.savefig(fileout + '.eps')
+        plt.savefig(fileout + '.png')
+        plt.close()
+    
+   
+   
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+NYEARS = 100
+MONTHNAMES = {0:'January',1:'February',2:'March',3:'April',4:'May',5:'June',
+              6:'July', 7:'August',8:'September',9:'October',10:'November',
+              11:'December'}
+  
+######################################
+#  step 1.  Calculate daily temperature range
+EXPTNAME = 'xozzb'
+EXTRA='o'
+
+#calculate_daily_temperature_range() # and write to a file
+
+#####################################
+# step 2.  Plot daily temperature range
+# can only do this after we have done step 1
+
+EXPTNAME = 'xozzb'
+CNTLNAME = 'xozza'
+EXTRA = 'o'
+plot_daily_temperature_range('y') # pass 'y' for mask ocean, 'n' for no ocn mask
+::::::::::::::
+ETCCDI_17_18.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will write
+indices 17 and 18 to a file:
+
+17: Rx1day: Monthly maximum 1-day precipitation
+Let RRij be the daily precipitation amount on day i in month j.  The maximum 1-day value for month j is:
+Rx1dayj = max(RRij)
+
+18: Rx5day: Monthly maximum consecutive 5-day precipitation
+Let RRkj be the precipitation amount for the 5 day interval ending k in period j.  The maximum 5-day values for the period j are
+Rx5dayj = max(RRkj)
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def get_Hcm3_max(filename,month,year):
+    """
+    reads in all the precipitation fields
+    figures out which precipitation field is the mean
+    # diagnostic 17
+    finds the maximum precipitation in the file
+    converts to mm/day
+    # diagnostic 18
+    finds the 5 day precipitation
+    finds the maximum of the 5 day precipitation
+    sends back
+    """
+
+    # read in the precipitation fields and figure out which is the mean
+    cubes = iris.load(filename)
+    for cube in cubes:
+        if cube.var_name == 'precip':
+            precipcube = cube
+            maxp = np.max(precipcube.data)
+        if cube.var_name == 'precip_1':
+            precip1cube = cube
+            maxp1 = np.max(precip1cube.data)
+        if cube.var_name == 'precip_2':
+            precip2cube = cube
+            maxp2 = np.max(precip2cube.data)
+
+    maxps = np.max([maxp, maxp1, maxp2])
+    minps = np.min([maxp, maxp1, maxp2])
+    found = 'n'
+    if minps < maxp < maxps:
+        meanp = maxp
+        meanprecipcube = precipcube
+        found = 'y'
+
+    if minps < maxp2 < maxps:
+        if found == 'y':
+            print('error')
+            sys.exit(0)
+        else:
+            meanp = maxp2
+            meanprecipcube = precip2cube
+            found = 'y'
+
+    if minps < maxp1 < maxps:
+        if found == 'y':
+            print('error')
+            sys.exit(0)
+        else:
+            meanp = maxp1
+            meanprecipcube = precip1cube
+            found = 'y'
+
+
+    # get diagnostic 17
+    maxprecipcube = meanprecipcube.collapsed('t',iris.analysis.MAX)
+    maxprecipcube = iris.util.squeeze(maxprecipcube)
+
+    # convert to mm/day.  Also add a dimension for year and month
+    yearcoord = iris.coords.DimCoord(2,long_name='year')
+    maxprecipcube.add_aux_coord(yearcoord,data_dims=None)
+    moncoord = iris.coords.DimCoord(3,long_name='month')
+    maxprecipcube.add_aux_coord(moncoord,data_dims =None)
+    maxprecipcube = iris.util.new_axis(maxprecipcube,'year')
+    maxprecipcube = iris.util.new_axis(maxprecipcube,'month')
+    maxprecipcube.coord('year').points = year
+    maxprecipcube.coord('month').points = month
+    maxprecipcube = maxprecipcube * 60. *60. *24.
+    maxprecipcube.units = 'mm/day'
+    maxprecipcube.remove_coord('t')
+    maxprecipcube.remove_coord('surface')
+
+    # get diagnostic 18
+    # get 5 day precipipitation
+    meandata = meanprecipcube.data
+    precip5day = np.zeros(np.shape(meandata))
+    print(np.shape(meanprecipcube.data))
+    for i in range(0,25):
+        precip5day[i,:,:,:] = (meandata[i,:,:,:] + meandata[i+1, :,:,:] + 
+                               meandata[i+2,:,:,:] + meandata[i+3, :,:,:] + 
+                               meandata[i+4, :,:,:])
+    precip5cube = meanprecipcube.copy(data = precip5day)
+    max5precipcube = precip5cube.collapsed('t',iris.analysis.MAX)
+    max5precipcube = iris.util.squeeze(max5precipcube)
+    max5precipcube.add_aux_coord(yearcoord, data_dims=None)
+    max5precipcube.add_aux_coord(moncoord,data_dims=None)
+    max5precipcube = iris.util.new_axis(max5precipcube,'year')
+    max5precipcube = iris.util.new_axis(max5precipcube,'month')
+    max5precipcube.coord('year').points = year
+    max5precipcube.coord('month').points = month
+    max5precipcube = max5precipcube * 60. * 60. * 24.
+    max5precipcube.units = 'mm/5days'
+    max5precipcube.remove_coord('t')
+    max5precipcube.remove_coord('surface')
+        
+        
+
+    return maxprecipcube, max5precipcube
+   
+
+def get_HadCM3_diagnostics(expt, extra):
+    """
+    gets the diagnostics (frost days, summer days, icing days tropical nights
+    from HadCM3)
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+    monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    cubes = iris.cube.CubeList([])
+    cubes_5 = iris.cube.CubeList([])
+    for year in range(0, 100):
+        yearuse = np.str(year).zfill(2)
+        for month in range(0,12):
+            filename = ('/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 
+                        'a@pb' + extra + yearuse + monthnames[month] + '.nc')
+            (maxprecip_cube,
+             max5precip_cube)= get_Hcm3_max(filename, month, year)
+            cubes.append(maxprecip_cube)
+            cubes_5.append(max5precip_cube)
+
+    equalise_attributes(cubes)
+    maxprecip = cubes.concatenate_cube()
+    maxprecip.long_name = 'maximum precip for a day in this month'
+    maxprecip.var_name = 'precip'
+  
+
+    equalise_attributes(cubes_5)
+    max5precip = cubes_5.concatenate_cube()
+    max5precip.long_name = 'maximum precip for a 5 day period in this month'
+    maxprecip.var_name = 'precip'
+    outfile = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   expt + '/diag17_18/' + extra + '_' + 'diag17_18.nc')
+    iris.save([maxprecip, max5precip], outfile, netcdf_format="NETCDF3_CLASSIC")
+
+  
+  
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+
+TIME = {'tenvj' : 'mPlio', 'xozza' : 'PI', 'xozzb' : 'Plio','tenvs':'E560'}
+# this is for if you actually want to get the diagnostics.
+# ie write them to the file /nfs/hera1/earjcti/PLIOMIP2/..ETCCDI....diags 17 
+if MODELNAME == 'HadCM3':
+    max1dayprecip = get_HadCM3_diagnostics('tenvj','o')
+
+ 
+
+::::::::::::::
+ETCCDI_5_growing_season_length.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will write
+indices 5 (growing season length to a file.  This is:
+
+GSL, Growing season length: Annual (1st Jan to 31st Dec in Northern Hemisphere (NH), 1st July to 30th June in Southern Hemisphere (SH)) count between first span of at least 6 days with daily mean temperature TG>5oC and first span after July 1st (Jan 1st in SH) of 6 days with TG<5oC.
+
+Let TGij be daily mean temperature on day i in year j. Count the number of days between the first occurrence of at least 6 consecutive days with:
+
+TGij > 5oC.
+
+and the first occurrence after 1st July (1st Jan. in SH) of at least 6 consecutive days with:
+
+TGij < 5oC. 
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def get_HCM3_year_data_NH(filestart,year):
+    """
+    reads in the mean daily temperature for the year and puts it in 
+    a single cube
+    """
+    meanTcubelist = iris.cube.CubeList([])
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    for month in months:
+        filename = filestart + np.str(year).zfill(2) + month + '.nc'
+        # load in data
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        maxTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        minTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        meanTcube = cube[0]
+
+        # check you have got maxT, meanT and minT in correct order        
+        if np.max(maxTcube.data) < np.max(meanTcube.data):
+            print('cubes not in right order')
+            sys.exit(0)
+
+        if np.max(meanTcube.data) < np.max(minTcube.data):
+            print('cubes not in right order2')
+            sys.exit(0)
+
+        meanTcubelist.append(meanTcube-273.15)
+
+    equalise_attributes(meanTcubelist)
+    temporarycube = meanTcubelist.concatenate_cube()
+    meanTyearcube = iris.util.squeeze(temporarycube)
+  
+    return meanTyearcube
+   
+def get_HCM3_year_data_SH(filestart,year):
+    """
+    reads in the mean daily temperature for the year and puts it in 
+    a single cube
+    However for the SH a year will go from July to june
+    """
+    meanTcubelist = iris.cube.CubeList([])
+    months = ['jl','ag','sp','ot','nv','dc','ja','fb','mr','ar','my','jn',]
+    for monthno, month in enumerate(months):
+        if monthno <=5:  
+            filename = filestart + np.str(year).zfill(2) + month + '.nc'
+        else:
+            filename = filestart + np.str(year+1).zfill(2) + month + '.nc'
+        print(filename)
+        # load in data
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        maxTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        minTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        meanTcube = cube[0]
+
+        # check you have got maxT, meanT and minT in correct order        
+        if np.max(maxTcube.data) < np.max(meanTcube.data):
+            print('cubes not in right order')
+            sys.exit(0)
+
+        if np.max(meanTcube.data) < np.max(minTcube.data):
+            print('cubes not in right order2')
+            sys.exit(0)
+
+        meanTcubelist.append(meanTcube-273.15)
+
+    equalise_attributes(meanTcubelist)
+    temporarycube = meanTcubelist.concatenate_cube()
+    meanTyearcube = iris.util.squeeze(temporarycube)
+  
+    return meanTyearcube
+   
+
+
+
+def calc_grow_seas(meanTcube,nhshind):
+    """
+    note nhshind = 1.0 for nh and -1.0 for sh
+
+    input is a cube of yearly temperature data.  We want to find the growing
+    season length.  Do this as follows:
+
+    1. find the first span of at least 6 days with temperature > 5degC
+    2. find the first span after this with 6 days with temperature < 5degC
+    """
+
+    temporary_cube = meanTcube.collapsed('t',iris.analysis.SUM)
+    growing_seas_arr = np.zeros(np.shape(temporary_cube.data))
+
+    for j, lat in enumerate(meanTcube.coord('latitude').points):
+        if lat * nhshind >= 0:
+            for i, lon in enumerate(meanTcube.coord('longitude').points):
+                timeseries = meanTcube[:, j, i].data
+
+                growstart = -99
+                growend = -99
+
+                for day, temp in enumerate(timeseries):
+                    if growstart < 0 and temp > 5.0 and day < 355 :
+                       # print(day)
+                        # is this start of growing seas
+                        if (timeseries[day+1] > 5.0 and 
+                            timeseries[day+2] > 5.0 and
+                            timeseries[day+3] > 5.0 and 
+                            timeseries[day+4] > 5.0 and
+                            timeseries[day+5] > 5.0):
+                            growstart = day
+                            growend = 360
+                        
+                    if (growstart>=0 and growend == 360 
+                        and temp < 5.0 and 180 < day < 355):
+                        # is this the end of the growing season
+                        # only check if end of growing season has not already
+                        # been found
+                     #    print('j',day, len(timeseries))
+                         if (timeseries[day+1] < 5.0 and 
+                            timeseries[day+2] < 5.0 and
+                            timeseries[day+3] < 5.0 and 
+                            timeseries[day+4] < 5.0 and
+                            timeseries[day+5] < 5.0):
+                            growend = day
+                growing_seas_arr[j,i] = growend - growstart
+
+    growing_seas_cube = temporary_cube.copy(data=growing_seas_arr)
+
+    return growing_seas_cube
+
+def get_HadCM3_diagnostics(expt, extra):
+    """
+    gets the diagnostics (frost days, summer days, icing days tropical nights
+    from HadCM3)
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+  
+    for year in range(99, 100):
+        meanTcube  = get_HCM3_year_data_NH(filestart, year)
+        NH_growing_seas_len_cube = calc_grow_seas(meanTcube, 1.0)
+
+        meanTcube  = get_HCM3_year_data_SH(filestart, year)
+        SH_growing_seas_len_cube = calc_grow_seas(meanTcube, -1.0)
+
+        growing_seas_cube = NH_growing_seas_len_cube.copy(np.maximum(NH_growing_seas_len_cube.data, SH_growing_seas_len_cube.data))
+
+        growing_seas_cube.long_name = 'length of growing season (days)'
+        growing_seas_cube.units = None
+        
+        outfile = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   expt + '/' + extra + '_' + 
+                   'diag5_' + np.str(year) + '.nc')
+        iris.save(growing_seas_cube, outfile, netcdf_format="NETCDF3_CLASSIC")
+
+
+##########################################################
+def read_data(expt,extra,startyear,endyear):
+    """
+    reads in the data for each year, finds the sum and returns
+    """
+    filestart = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/'
+
+    growcubelist = iris.cube.CubeList([])
+   
+    for year in range(startyear,endyear):
+        filename = (filestart + expt + '/diag5/' + extra + 
+                    '_diag5_'+ np.str(year) + '.nc')
+
+        growcubelist.append(iris.load_cube(filename,'length of growing season (days)'))
+        
+    equalise_attributes(growcubelist)
+    allgrowcube = growcubelist.merge_cube()
+    meangrowcube = allgrowcube.collapsed('t',iris.analysis.MEAN)
+   
+  
+    return meangrowcube
+
+
+def plot_anom(cube,ocn_mask, expt, cntl, cube_cntl, cube_expt):
+    """
+    this will plot the anomaly cube between the pliocene and the pi
+    """
+
+    fieldname = 'len growing seas  '
+    if ocn_mask == 'y':
+       maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+      
+       cube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       cube_cntl.data.mask = (maskcube.data - 1.0) * (-1.0)
+       cube_expt.data.mask = (maskcube.data - 1.0) * (-1.0)
+      
+    plt.subplot(2,2,1)
+    qplt.contourf(cube_cntl, levels=np.arange(100,320,20), extend='both')
+    plt.gca().coastlines()
+    plt.title(fieldname + ':' +  TIME.get(cntl))
+
+    plt.subplot(2,2,2)
+    qplt.contourf(cube_expt, levels=np.arange(100,320,20), extend='both')
+    plt.gca().coastlines()
+    plt.title(fieldname + ':' +  TIME.get(expt))
+
+    plt.subplot(2,2,3)
+    cmapname = 'Reds'
+    vals = np.arange(0,30,5)
+    qplt.contourf(cube,cmap=cmapname, levels=vals,extend='both')
+    plt.gca().coastlines()
+    plt.title(fieldname + ': ' + TIME.get(expt) + '-' +TIME.get(cntl))
+
+    plt.subplot(2,2,4)
+    qplt.contourf((cube / cube_cntl) * 100.,cmap=cmapname, 
+                  levels=vals,extend='both')
+    plt.gca().coastlines()
+    plt.title('percentage change: ' + TIME.get(expt) + '-' +TIME.get(cntl))
+
+
+    plt.tight_layout()
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/diag5/' + 
+               'grow_seas_len_' + expt + '-' + cntl)
+    plt.savefig(fileout + '.eps')
+    plt.savefig(fileout + '.png')
+    plt.close()
+
+       
+def plot_growing_season(expt, cntl, nyears):
+    """
+    plots the growing season for plio and pi and difference between them
+    """
+    grow_expt_cube = read_data(expt,'o',0, nyears)
+
+    grow_cntl_cube = read_data(cntl,'o',0, nyears)
+
+    grow_anom_cube = grow_expt_cube - grow_cntl_cube
+    plot_anom(grow_anom_cube,'y', expt,cntl,
+              grow_cntl_cube, grow_expt_cube)
+  
+  
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+TIME = {'tenvj' : 'mPlio', 'xozza' : 'PI', 'xozzb' : 'Plio'}
+
+
+# this is for if you actually want to get the diagnostics.
+# ie write them to the file /nfs/hera1/earjcti/PLIOMIP2/..ETCCDI....diags 5  
+#if MODELNAME == 'HadCM3':
+#    get_HadCM3_diagnostics('xozza','o')
+ 
+
+# plot info about growing season.  a) growing season_pi, growing_season_plio
+# and diff between them
+
+plot_growing_season('tenvj','xozza',99)  # tenvj plio, xozza control, xozzb control
+::::::::::::::
+ETCCDI_6_9.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will write
+indices 6-9 to a file.  These are:
+
+6  TXx, Monthly maximum value of daily maximum temperature:
+
+Let TXx be the daily maximum temperatures in month k, period j. The maximum daily maximum temperature each month is then:
+
+TXxkj=max(TXxkj)
+
+7.  TNx, Monthly maximum value of daily minimum temperature:
+
+Let TNx be the daily minimum temperatures in month k, period j. The maximum daily minimum temperature each month is then:
+
+TNxkj=max(TNxkj)
+
+8.TXn, Monthly minimum value of daily maximum temperature:
+
+Let TXn be the daily maximum temperatures in month k, period j. The minimum daily maximum temperature each month is then:
+
+9. TXnkj=min(TXnkj)
+
+TNn, Monthly minimum value of daily minimum temperature:
+
+Let TNn be the daily minimum temperatures in month k, period j. The minimum daily minimum temperature each month is then:
+
+TNnkj=min(TNnkj) 
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import iris.plot as iplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def get_HCM3_year_data(filestart,year):
+    """
+    reads in the maximum  and minimum temperature for the year and puts it in 
+    a single cube
+    """
+    maxmon_maxT_cubelist = iris.cube.CubeList([])
+    minmon_maxT_cubelist = iris.cube.CubeList([])
+    maxmon_minT_cubelist = iris.cube.CubeList([])
+    minmon_minT_cubelist = iris.cube.CubeList([])
+
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    for month in months:
+        filename = filestart + np.str(year).zfill(2) + month + '.nc'
+        # load in data
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        maxTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        minTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        meanTcube = cube[0]
+
+        # check you have got maxT, meanT and minT in correct order        
+        if np.max(maxTcube.data) < np.max(meanTcube.data):
+            print('cubes not in right order')
+            sys.exit(0)
+
+        if np.max(meanTcube.data) < np.max(minTcube.data):
+            print('cubes not in right order2')
+            sys.exit(0)
+
+        maxmon_of_maxT_cube = maxTcube.collapsed('t', iris.analysis.MAX)
+        minmon_of_maxT_cube = maxTcube.collapsed('t', iris.analysis.MIN)
+        maxmon_of_minT_cube = minTcube.collapsed('t', iris.analysis.MAX)
+        minmon_of_minT_cube = minTcube.collapsed('t', iris.analysis.MIN)
+
+        maxmon_maxT_cubelist.append(iris.util.squeeze(maxmon_of_maxT_cube))
+        minmon_maxT_cubelist.append(iris.util.squeeze(minmon_of_maxT_cube))
+        maxmon_minT_cubelist.append(iris.util.squeeze(maxmon_of_minT_cube))
+        minmon_minT_cubelist.append(iris.util.squeeze(minmon_of_minT_cube))
+        
+    equalise_attributes(maxmon_maxT_cubelist)
+    equalise_attributes(minmon_maxT_cubelist)
+    equalise_attributes(maxmon_minT_cubelist)
+    equalise_attributes(minmon_minT_cubelist)
+
+    for cube in maxmon_maxT_cubelist:
+        print(cube.coord('t'))
+    max_maxdayTcube = maxmon_maxT_cubelist.merge_cube()
+    min_maxdayTcube = minmon_maxT_cubelist.merge_cube()
+    max_mindayTcube = maxmon_minT_cubelist.merge_cube()
+    min_mindayTcube = minmon_minT_cubelist.merge_cube()
+  
+    return max_maxdayTcube, min_maxdayTcube, max_mindayTcube, min_mindayTcube 
+   
+
+def get_HadCM3_diagnostics(expt, extra):
+    """
+    gets the diagnostics (frost days, summer days, icing days tropical nights
+    from HadCM3)
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+  
+    for year in range(0, 100):
+        yearuse = np.str(year).zfill(2)
+        (max_Tmax_cube, min_Tmax_cube, 
+         max_Tmin_cube, min_Tmin_cube)= get_HCM3_year_data(filestart, year)
+
+        # rename
+        max_Tmax_cube.long_name = 'Monthly maximum value of daily maximum temperature'
+        max_Tmin_cube.long_name = 'Monthly maximum value of daily minimum temperature'
+        min_Tmax_cube.long_name = 'Monthly minimum value of daily maximum temperature'
+        min_Tmin_cube.long_name = 'Monthly minimum value of daily minimum temperature'
+
+        cubelist = [max_Tmax_cube, max_Tmin_cube,min_Tmax_cube,
+                    min_Tmin_cube]
+
+        outfile = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   expt + '/' + extra + '_' + 
+                   'diag6-9_' + np.str(year) + '.nc')
+        iris.save(cubelist, outfile, netcdf_format="NETCDF3_CLASSIC")
+
+
+#########################################################################
+def read_data(expt,extra,startyear,endyear):
+    """
+    reads in the data for each year, finds the sum and returns
+    """
+    filestart = '/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/'
+
+    maxTmaxcubelist = iris.cube.CubeList([])
+    maxTmincubelist = iris.cube.CubeList([])
+    minTmaxcubelist = iris.cube.CubeList([])
+    minTmincubelist = iris.cube.CubeList([])
+ 
+    for year in range(startyear,endyear):
+        filename = (filestart + expt + '/diag6-9/' + extra + 
+                    '_diag6-9_'+ np.str(year) + '.nc')
+        cube = iris.load_cube(filename,
+                        'Monthly maximum value of daily maximum temperature')
+        maxTmaxcubelist.append(cube[MONTH_REQ, :,:])
+            
+        cube = iris.load_cube(filename,
+                        'Monthly maximum value of daily minimum temperature')
+        maxTmincubelist.append(cube[MONTH_REQ,:,:])
+
+        cube = iris.load_cube(filename,
+                        'Monthly minimum value of daily maximum temperature')
+        minTmaxcubelist.append(cube[MONTH_REQ, :, :])
+
+        cube = iris.load_cube(filename,
+                        'Monthly minimum value of daily minimum temperature')
+        minTmincubelist.append(cube[MONTH_REQ, :, :])
+
+    equalise_attributes(maxTmaxcubelist)
+    all_maxTmax_cube = maxTmaxcubelist.merge_cube()
+    max_maxTmax_cube = all_maxTmax_cube.collapsed('t',iris.analysis.MAX)
+    mean_maxTmax_cube = all_maxTmax_cube.collapsed('t',iris.analysis.MEAN)
+  
+    equalise_attributes(minTmaxcubelist)
+    all_minTmax_cube = minTmaxcubelist.merge_cube()
+    mean_minTmax_cube = all_minTmax_cube.collapsed('t',iris.analysis.MEAN)
+  
+    equalise_attributes(maxTmincubelist)
+    all_maxTmin_cube = maxTmincubelist.merge_cube()
+    max_maxTmin_cube = all_maxTmin_cube.collapsed('t',iris.analysis.MAX)
+    mean_maxTmin_cube = all_maxTmin_cube.collapsed('t',iris.analysis.MEAN)
+  
+    equalise_attributes(minTmincubelist)
+    all_minTmin_cube = minTmincubelist.merge_cube()
+    min_minTmin_cube = all_minTmin_cube.collapsed('t',iris.analysis.MIN)
+    mean_minTmin_cube = all_minTmin_cube.collapsed('t',iris.analysis.MEAN)
+  
+  
+    return (mean_maxTmax_cube, mean_minTmax_cube, mean_maxTmin_cube,
+            mean_minTmin_cube, max_maxTmax_cube, min_minTmin_cube)
+  
+##########################################################   
+def plot_extreme_extremes(meanpliocube, meanpicube,meananomcube, extrpliocube,
+                          extrpicube,
+                          extranomcube, plottype, ocn_mask, expt,cntl):
+    """
+    this will do a four panel plot
+    a) pliocene_annmean extreme temperature  b) pliocene-pi anomaly of a
+    c) plioceene most extreme temp in 100 yrs d) plio - pi anomaly of c
+    """
+    
+    months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+ 
+
+    if ocn_mask == 'y':
+       maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+      
+       meanpliocube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       meanpicube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       meananomcube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       extrpliocube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       extranomcube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       extrpicube.data.mask = (maskcube.data - 1.0) * (-1.0)
+      
+    plt.subplot(2,2,1)
+    if plottype == 'max':
+        vals = np.arange(30,55,5)
+        pivals = [40]
+        picolor='white'
+        cmapname = 'gist_stern_r'
+    if plottype == 'min':
+        vals = np.arange(-50,0,10)
+        pivals = [-30]
+        picolor='black'
+        cmapname='gist_ncar'
+    meanpliocube.convert_units('celsius')
+    meanpicube.convert_units('celsius')
+    meanpliocube.long_name = 'Pliocene: Mean ' + plottype + ' of T' + plottype
+   
+    iplt.contourf(meanpliocube, extend='both',levels=vals,cmap=cmapname)
+    iplt.contour(meanpicube, levels=pivals, linestyles='solid',
+                 colors=picolor,linewidths=1)
+    plt.gca().coastlines()
+    print(np.str(pivals[0]))
+    plt.title('Plio mean ' + plottype + ' ' + months[MONTH_REQ] + ' T'+
+              plottype +  '(contour: pi='+ np.str(pivals[0])+'degC)',fontsize=8)
+
+    plt.subplot(2,2,2)
+    vals_a = np.arange(-12,14,2)
+    meananomcube.long_name = 'Plio - PI: Mean ' + plottype + ' of T' + plottype  
+    iplt.contourf(meananomcube, extend='both',levels=vals_a,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('Plio-PI ann mean ' + plottype + ' ' + months[MONTH_REQ] + ' T',
+              fontsize=8)
+
+    plt.subplot(2,2,3)
+    extrpliocube.convert_units('celsius')
+    extrpicube.convert_units('celsius')
+    extrpliocube.long_name = ('Plio ' + plottype + ' ' + months[MONTH_REQ] + 
+                              ' T' + plottype + ' in ' + np.str(NYEARS) + 
+                              'years')
+    qplt.contourf(extrpliocube, extend='both',levels=vals,cmap=cmapname)
+    iplt.contour(extrpicube, levels=pivals, linestyles='solid',
+                 colors=picolor,linewidths=1)
+  
+    plt.gca().coastlines()
+    plt.title('Plio ' + plottype + ' ' + months[MONTH_REQ] + ' T in '
+              + np.str(NYEARS) + 'years',fontsize=8)
+
+    plt.subplot(2,2,4)
+    extranomcube.long_name = (plottype + ' ' + months[MONTH_REQ] + 
+                              ' T' + plottype + ' in ' + np.str(NYEARS) + 
+                              'years : plio-pi')
+  
+    qplt.contourf(extranomcube, extend='both',levels=vals_a,cmap='RdBu_r')
+  
+    plt.gca().coastlines()
+    plt.title(plottype + ' ' + months[MONTH_REQ] + ' T in '
+              +np.str(NYEARS) + 'years: Plio-PI anom',fontsize=8)
+
+    
+    plt.tight_layout()
+   
+   
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/diag6-9/' +
+               expt + '_' + cntl + '_' + 
+               plottype + 'T' + plottype + '_' + months[MONTH_REQ])
+    plt.savefig(fileout + '.eps')
+    plt.savefig(fileout + '.png')
+    plt.close()
+    # save data to a netcdffile
+   
+    meanpliocube.data.mask = None
+    meananomcube.data.mask = None
+    extrpliocube.data.mask = None
+    extranomcube.data.mask = None
+  
+    cubelist = [meanpliocube, meananomcube, extrpliocube, extranomcube]
+    iris.save(cubelist, fileout + '.nc', netcdf_format="NETCDF3_CLASSIC")
+
+##########################################################              
+def  plot_minTmax_maxTmin(mean_minTmax_pliocube, mean_minTmax_anomcube,
+                  mean_maxTmin_pliocube,mean_maxTmin_anomcube,ocn_mask,
+                  expt,cntl):
+    """
+    this will do a four panel plot
+    a) mean_minTmax_plio, b) mean_minTmax_anom
+    c) mean_maxTmin_plio, d) mean_maxTmin_anom
+    """
+    
+    months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+ 
+    mean_minTmax_pliocube.convert_units('celsius')
+    mean_maxTmin_pliocube.convert_units('celsius')
+    if ocn_mask == 'y':
+       maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+      
+       mean_minTmax_pliocube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       mean_minTmax_anomcube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       mean_maxTmin_pliocube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       mean_maxTmin_anomcube.data.mask = (maskcube.data - 1.0) * (-1.0)
+       
+    plt.subplot(2,2,1)
+    vals = np.arange(-50,45,5)
+    name = 'Plio minTmax:' + months[MONTH_REQ]
+    mean_minTmax_pliocube.long_name = name
+    qplt.contourf(mean_minTmax_pliocube, extend='both',levels=vals)
+    plt.gca().coastlines()
+    plt.title(name)
+
+    plt.subplot(2,2,2)
+    vals_a = np.arange(-12,14,2)
+    name = 'Plio - PI: minTmax '+ months[MONTH_REQ]
+    mean_minTmax_anomcube.long_name = name
+    qplt.contourf(mean_minTmax_anomcube, extend='both',
+                  levels=vals_a,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title(name)
+    
+    plt.subplot(2,2,3)
+    name = 'Plio maxTmin:' + months[MONTH_REQ]
+    mean_maxTmin_pliocube.long_name = name
+    qplt.contourf(mean_maxTmin_pliocube, extend='both',levels=vals)
+    plt.gca().coastlines()
+    plt.title(name)
+
+    plt.subplot(2,2,4)
+    name = 'Plio - PI: maxTmin '+ months[MONTH_REQ]
+    mean_maxTmin_anomcube.long_name = name
+    qplt.contourf(mean_maxTmin_anomcube, extend='both',
+                  levels=vals_a,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title(name)
+
+    
+    plt.tight_layout()
+   
+   
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/diag6-9/'+ 
+               expt + '_' + cntl + '_maxTmin_minTmax' + months[MONTH_REQ])
+    plt.savefig(fileout + '.eps')
+    plt.savefig(fileout + '.png')
+    plt.close()
+    # save data to a netcdffile
+   
+    mean_maxTmin_pliocube.data.mask = None
+    mean_maxTmin_anomcube.data.mask = None
+    mean_minTmax_pliocube.data.mask = None
+    mean_minTmax_anomcube.data.mask = None
+   
+    cubelist = [mean_maxTmin_pliocube, mean_maxTmin_anomcube, 
+                mean_minTmax_pliocube, mean_minTmax_anomcube]
+    iris.save(cubelist, fileout + '.nc', netcdf_format="NETCDF3_CLASSIC")
+
+
+def plot_textremes_toplevel(expt,cntl):
+    """
+    this will plot the extreme temperatures (maximum of Tmax, minimum of Tmax,
+    maximum of Tmin, minimum of Tmin) by month and show how these 
+    have changed between the PI and the Pliocene
+    """
+
+    (mean_maxTmax_pliocube, mean_minTmax_pliocube, 
+     mean_maxTmin_pliocube, mean_minTmin_pliocube, max_maxTmax_pliocube, 
+     min_minTmin_pliocube) = read_data(expt,'o',0, 0+NYEARS)
+
+    (mean_maxTmax_picube, mean_minTmax_picube, 
+     mean_maxTmin_picube, mean_minTmin_picube, 
+     max_maxTmax_picube, min_minTmin_picube)= read_data(cntl,'o',0, 0+ NYEARS)
+
+    # plot maximum temperature of the Tmax for this month
+    plot_extreme_extremes(mean_maxTmax_pliocube, mean_maxTmax_picube,
+                  mean_maxTmax_pliocube - mean_maxTmax_picube,
+                  max_maxTmax_pliocube, max_maxTmax_picube,
+                  max_maxTmax_pliocube - max_maxTmax_picube,'max','y',expt,cntl)
+
+    # plot minimum temperature of Tmin for this month
+    plot_extreme_extremes(mean_minTmin_pliocube, mean_minTmin_picube,
+                  mean_minTmin_pliocube - mean_minTmin_picube,
+                  min_minTmin_pliocube, min_minTmin_picube,
+                  min_minTmin_pliocube - min_minTmin_picube,'min','y',expt,cntl)
+
+    # plot minimum temperature of Tmax and maximum temperature of Tmin
+    # for this month
+    plot_minTmax_maxTmin(mean_minTmax_pliocube,
+                  mean_minTmax_pliocube - mean_minTmax_picube,
+                  mean_maxTmin_pliocube,
+                  mean_maxTmin_pliocube - mean_maxTmin_picube,
+                 'y',expt,cntl)
+
+#########################################################
+def plot_all_months(field, expt, cntl, ocn_mask):
+    """
+    this is for plotting the anomalies in the diagnostics for all months
+    on one page
+    ie max_Tmax_plio - max_Tmax_pi (mean value) for all months
+    field : maxTmax, maxTmin, minTmax, minTmin
+    """ 
+
+    fig = plt.figure(figsize=(11.75, 13.0))
+    # get all the stuff (names/ files etc) we might need
+    filestart = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/' + 
+                 'diag6-9/' + expt + '_' + cntl + '_')
+    months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+    fieldname = {"maxTmax": "Plio - PI: Mean max of Tmax",
+                 "minTmin": "Plio - PI: Mean min of Tmin",
+                 "minTmax": "Plio - PI: minTmax ",
+                 "maxTmin": "Plio - PI: maxTmin "}
+    filemid = {"maxTmax": "maxTmax_", "minTmin": "minTmin_",
+               "minTmax": "maxTmin_minTmax",
+               "maxTmin": "maxTmin_minTmax"}
+    maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+    fieldstart = fieldname.get(field)
+    vals = np.arange(-12,14,2)
+   
+    # process and plot
+    for mon in range(0,12):
+        filename = filestart + filemid.get(field) + months[mon] + '.nc'
+        if field == "minTmax" or field == "maxTmin":
+            fielduse = fieldstart + months[mon]
+        else:
+            fielduse = fieldstart 
+        test = iris.load(filename)
+        cube = iris.load_cube(filename,fielduse)
+        if ocn_mask == 'y':
+           cube.data.mask = (maskcube.data - 1.0) * (-1.0)
+      
+        plt.subplot(4,3,mon+1)
+        cs = iplt.contourf(cube, levels=vals, cmap='RdBu_r', extend='both')
+        plt.gca().coastlines()
+        plt.title(months[mon] + ': Plio-Pi ' + field) 
+    
+    # tidy up plot and add colorbar
+    plt.subplots_adjust(left=0.05, bottom=0.1, right=0.95, top=0.95,
+                                wspace=0.1, hspace=0.0)
+
+    cb_ax = fig.add_axes([0.35, 0.05, 0.30, 0.02])
+           
+    cbar = fig.colorbar(cs, cax=cb_ax, orientation='horizontal')
+    cbar.set_label('degC', fontsize=10)
+         
+    cbar.ax.tick_params(labelsize=10)
+  
+
+    # save to file
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/diag6-9/allmonths_'+  expt + '_' + cntl + '_' + field)
+    plt.savefig(fileout + '.eps')
+    plt.savefig(fileout + '.png')
+    plt.close()
+  
+        
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+
+###################################################
+# this is for if you actually want to get the diagnostics.
+# ie write them to the file /nfs/hera1/earjcti/PLIOMIP2/..ETCCDI....diags 1-4  
+#if MODELNAME == 'HadCM3':
+#    (FD__cube, SU_cube, ID_cube, TR_cube) = get_HadCM3_diagnostics('xozzb','o')
+
+##################################################################
+###  this is for plotting the extremes on a month by month basis
+NYEARS = 100
+for MONTH_REQ in range(0,12):
+    plot_textremes_toplevel('tenvj','xozza')
+ 
+
+###############################################################
+### this is for plotting the anomalies in the diagnostics for all months
+### on one page
+### ie max_Tmax_plio - max_Tmax_pi (mean value) for all months
+#field='minTmax' # values maxTmax,  maxTmin, maxTmin, minTmax
+#plot_all_months(field, 'xozzb', 'xozza','y')  
+::::::::::::::
+standard_dev_ratio.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.09.2019 by Julia
+
+As a first test for looking at the climate extremes we will plot 
+ standard deviation EOI400
+ =========================
+ standard deviation E280
+
+firstly for temperature. 
+
+If the ratio is approximately 1.0 then the standard deviation is the same.  If it is >1 then there is more interannual variability in the Pliocene (which could be worrying).  If it is less than 1 there is less interannual variability in the Pliocene.
+
+
+"""
+
+import os
+import sys
+import numpy as np
+#import matplotlib as mp
+import matplotlib.pyplot as plt
+#from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+#import netCDF4
+#from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import iris.analysis.cartography
+import iris.coord_categorisation
+
+#os.environ['PROJ_LIB'] = 'C:/Users/julia/Miniconda3/envs/py3/Library/share'
+os.environ['PROJ_LIB'] = '/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/share/proj'
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+
+
+def getmodelfield(modelname, period):
+    """
+    get the mean values from the model data
+    inputs: modelname (ie HadCM3)
+            period (likely EOI400 or E280)
+    returns:  a cube contatining the mean data from the model
+
+    """
+
+    modfile = (FILESTART + 'regridded100/' + modelname + '/' +
+               period + '.' + FIELDNAME + '.sd_month.nc')
+
+    tempcube = iris.load(modfile)
+    cube2 = tempcube[0]
+    cube2.units = UNITS
+    print(cube2)
+    print(cube2.coord('time'))
+    
+    cube = cube2[MONTH_REQ, :, :]
+   
+    #this will make all the dimensions of all the cubes match.
+
+
+    for coord in cube.coords():
+        name = coord.standard_name
+        if name not in ['latitude', 'longitude']:
+            if name is None:
+                if coord.long_name is None:
+                    cube.remove_coord(coord.var_name)
+                else:
+                    cube.remove_coord(coord.long_name)
+            else:
+                cube.remove_coord(name)
+
+    for coord in cube.coords():   # now this will be longitude or latitude
+        coord.points = coord.points.astype('float32')
+        coord.var_name = coord.standard_name
+        coord.long_name = coord.standard_name
+
+    return cube
+
+
+class Plotalldata:
+    """
+    This will plot the data from the timeperiod (ie mpwp or pi)
+    """
+    def __init__(self, timeperiod, anom_cubes):
+        self.nmodels = len(MODELNAMES)
+        self.filestart = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/'+ 
+                          'extremes/sd_ratio/' + timeperiod + '_' + 
+                          FIELDNAME + '_' + MONTHNAMES.get(MONTH_REQ))
+        self.timeperiod = timeperiod
+        self.anom_cubes = anom_cubes
+
+        if timeperiod == 'Ratio':
+            self.valmin = 0.5
+            self.valmax = 1.6
+            self.diff = 0.1
+            self.colormap = 'RdBu_r'
+            self.cbarlabel = 'ratio'
+        else:            
+            self.valmin = 0.0
+            self.valmax = 2.0
+            self.diff = 0.2
+            self.colormap = 'RdBu_r'
+            self.cbarlabel = 'sdev'
+
+
+    def plotdata(self):
+        """
+        this will plot all the cubes to a .eps or .png file
+        input anom_cubes : a list of cubes containing the anomalies from the mean
+        """
+
+
+        fig = plt.figure(figsize=(5.5, 4.25))
+        for i in range(0, self.nmodels):
+
+            cubedata = self.anom_cubes[i].data
+            latitudes = self.anom_cubes[i].coord('latitude').points
+            lon = self.anom_cubes[i].coord('longitude').points
+            datatoplot, longitudes = (shiftgrid(180., cubedata,
+                                                lon, start=False))
+            #if (np.mod(i, 8) + 1) == 1:
+            #    title_ = (MODELNAMES[i] + ':' +
+            #              self.timeperiod + ' (model - MMM)')
+            #else:
+            #    title_ = (MODELNAMES[i])
+
+            title_ = (MODELNAMES[i])
+            self.plotmap(i, title_,
+                         datatoplot, longitudes, latitudes, fig)
+
+
+        return
+
+    def plotmap(self, i, titlename, datatoplot, longitudes, latitudes, fig):
+        """
+        will plot the data in a map format
+
+        """
+
+        xplot = 4
+        yplot = 4
+
+
+        plotpos = np.mod(i, xplot * yplot) + 1
+        plt.subplot(xplot, yplot, plotpos)
+        lons, lats = np.meshgrid(longitudes, latitudes)
+
+        map = Basemap(llcrnrlon=-180.0, urcrnrlon=180.0,
+                      llcrnrlat=-90.0, urcrnrlat=90.0,
+                      projection='cyl', resolution='l')
+
+        #map.drawmapboundary
+        x, y = map(lons, lats)
+        map.drawcoastlines(linewidth=0.5)
+
+        V = np.arange(self.valmin, self.valmax, self.diff)
+        cs = map.contourf(x, y, datatoplot, V, cmap=self.colormap,
+                          extend='both')
+        plt.title(titlename,fontsize=8)
+
+
+        if plotpos == (xplot * yplot) or (i + 1) == self.nmodels:
+             # Shrink current axis by 20% and put a legend to the right
+            plt.subplots_adjust(left=0.05, bottom=0.1, right=0.82, top=0.9,
+                                wspace=0.1, hspace=0.0)
+
+            cb_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
+           
+            cbar = fig.colorbar(cs, cax=cb_ax, orientation='vertical')
+            #cbar = plt.colorbar(fig, orientation='horizontal')
+            #fig.colorbar(fix, ax=axs[:, col], shrink=0.6)
+            cbar.ax.tick_params(labelsize=8)
+            print('plotted colorbar')
+            #plt.show()
+            #plt.tight_layout()
+            fileout = (self.filestart + np.str(np.int(np.ceil(i/8)))
+                       + '.eps')
+            plt.savefig(fileout, bbox_inches='tight')
+
+            fileout = (self.filestart + np.str(np.int(np.ceil(i/8)))
+                       + '.pdf')
+
+            plt.savefig(fileout, bbox_inches='tight')
+            plt.close()
+
+def plot_mmm(mean_ratio, mean_pi, mean_plio, ocn_mask):
+    """
+    plots the multimodel mean we will mask out the ocean if necessary
+    """
+    land_ocn = {'y' : '_land', 'n': '_globe'}
+
+    if ocn_mask == 'y':
+       tempcube=iris.load_cube('/nfs/hera1/earjcti/regridded/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc')
+       cubegrid=iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+       exptlsmcube=tempcube.regrid(cubegrid,iris.analysis.Linear())
+      
+       tempcube=iris.load_cube(FILESTART+'regridded/PlioMIP2_Boundary_conds/Modern_std/Modern_std/Modern_std_LSM_v1.0.nc')
+       cntllsmcube=tempcube.regrid(cubegrid,iris.analysis.Linear())
+
+       mean_ratio.data.mask = (exptlsmcube.data - 1.0) * (-1.0)
+       mean_pi.data.mask = (cntllsmcube.data - 1.0) * (-1.0)
+       mean_plio.data.mask = (exptlsmcube.data - 1.0) * (-1.0)
+    
+
+    qplt.contourf(mean_ratio, levels=np.arange(0.5, 1.6, 0.1), 
+                  cmap='RdBu_r',extend='both')
+    plt.title(MONTHNAMES.get(MONTH_REQ) + 'Ratio:  Plio /  PI st_dev : ' + FIELDNAME)
+    plt.gca().coastlines()
+    plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/sd_ratio/ratio_MMM_' + FIELDNAME + land_ocn.get(ocn_mask) + '_' + MONTHNAMES.get(MONTH_REQ) + '.eps', bbox_inches='tight')
+    plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/sd_ratio/ratio_MMM_' + FIELDNAME + land_ocn.get(ocn_mask) + '_' + MONTHNAMES.get(MONTH_REQ) + '.png', bbox_inches='tight')
+    plt.close()
+
+  
+    qplt.contourf(mean_pi, levels=np.arange(0.0, 2.1, 0.1), 
+                  cmap='RdBu_r',extend='max')
+    plt.title(MONTHNAMES.get(MONTH_REQ) + 'PI st_dev : ' + FIELDNAME)
+    plt.gca().coastlines()
+    plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/sd_ratio/pi_sdev_MMM_' + FIELDNAME + land_ocn.get(ocn_mask) + '_' + MONTHNAMES.get(MONTH_REQ) + '.eps', bbox_inches='tight')
+    plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/sd_ratio/pi_sdev_MMM_' + FIELDNAME + land_ocn.get(ocn_mask) + '_' + MONTHNAMES.get(MONTH_REQ) + '.png', bbox_inches='tight')
+    plt.close()
+
+    qplt.contourf(mean_plio, levels=np.arange(0.0, 2.1, 0.1), 
+                  cmap='RdBu_r',extend='max')
+    plt.title(MONTHNAMES.get(MONTH_REQ) + 'Plio st_dev : ' + FIELDNAME)
+    plt.gca().coastlines()
+    plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/sd_ratio/plio_sdev_MMM_' + FIELDNAME + land_ocn.get(ocn_mask) + '_' + MONTHNAMES.get(MONTH_REQ) + '.eps', bbox_inches='tight')
+    plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/extremes/sd_ratio/plio_sdev_MMM_' + FIELDNAME + land_ocn.get(ocn_mask) + '_' + MONTHNAMES.get(MONTH_REQ) + '.png', bbox_inches='tight')
+    plt.close()
+
+  
+   
+     
+
+def get_mean(pi_sdev_cubes, plio_sdev_cubes):
+    """
+    this will get the mean standard deviation from all the models and
+    find the ratio between them.
+    Note to find the mean standard deviation we want to add up all the variances    and then squareroot
+    """
+    count=0
+    for i, cube in enumerate(pi_sdev_cubes):
+        if i == 0:
+            pi_var_cube = cube * cube
+            count=count+1
+        else:
+            print(pi_var_cube)
+            print(cube)
+            pi_var_cube = pi_var_cube + (cube * cube)
+            count=count+1
+    pi_var_cube = pi_var_cube / count
+    mean_pi_sd = pi_var_cube.copy(data=np.sqrt(pi_var_cube.data))
+   
+
+    count=0
+    for i, cube in enumerate(plio_sdev_cubes):
+        if i == 0:
+            plio_var_cube = cube * cube
+            count=count+1
+        else:
+            plio_var_cube = plio_var_cube + (cube * cube)
+            count=count+1
+    plio_var_cube = plio_var_cube / count
+    mean_plio_sd = plio_var_cube.copy(data=np.sqrt(plio_var_cube.data))
+   
+  
+    return mean_plio_sd / mean_pi_sd, mean_pi_sd, mean_plio_sd 
+##########################################################
+# main program
+# set up variable information
+FIELDNAME = 'NearSurfaceTemperature'
+UNITS = 'Celsius'
+#FIELDNAME = 'SST'
+#UNITS = 'Celsius'
+#FIELDNAME = 'TotalPrecipitation'
+#UNITS = 'mm/day'
+#FIELDNAME = 'SST'
+LINUX_WIN = 'l'
+
+MONTHNAMES = {0:'Jan',1:'Feb',2:'Mar',3:'Apr',4:'May',5:'Jun',6:'Jul',7:'Aug',8:'Sep',9:'Oct',10:'Nov',11:'Dec',}
+MONTH_REQ = 6
+
+if LINUX_WIN == 'l':
+    FILESTART = '/nfs/hera1/earjcti/'
+else:
+    FILESTART = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+MODELNAMES = ['CESM2', 'IPSLCM6A', 'COSMOS', 
+            'EC-Earth3.3', 'CESM1.2', 'IPSLCM5A',
+            'MIROC4m', 'IPSLCM5A2', 'HadCM3',
+            'GISS2.1G', 'CCSM4', 
+            'CCSM4-Utr', 'CCSM4-UoT', 
+            'NorESM-L', 'MRI2.3', 'NorESM1-F'
+             ]
+
+#MODELNAMES = ['NorESM-L']
+
+
+
+# set up cubelists to store data
+mpwp_sdev_cubes = iris.cube.CubeList([])
+pi_sdev_cubes = iris.cube.CubeList([])
+ratio_sdev_cubes = iris.cube.CubeList([])
+
+#################################################
+# get standard deviation data
+
+for model, modelname in enumerate(MODELNAMES):
+    model_plio_cube = getmodelfield(modelname, 'EOI400')
+    model_pi_cube = getmodelfield(modelname, 'E280')
+  
+    if modelname == 'EC-Earth3.1' and FIELDNAME == 'SST':
+       model_pi_cube.coord('latitude').bounds = None
+       model_pi_cube.coord('longitude').bounds = None
+
+    model_anom_cube = model_plio_cube - model_pi_cube
+
+    mpwp_sdev_cubes.append(model_plio_cube)
+    pi_sdev_cubes.append(model_pi_cube)
+    ratio_sdev_cubes.append(model_plio_cube / model_pi_cube)
+
+##################################################
+# plot the cubes for the model anomalies relative to the mean
+
+#obj = Plotalldata('mPWP', mpwp_sdev_cubes)
+#obj.plotdata()
+
+#obj = Plotalldata('PI', pi_sdev_cubes)
+#obj.plotdata()
+
+#obj = Plotalldata('ratio', ratio_sdev_cubes)
+#obj.plotdata()
+
+
+################################################################
+# get mean ratios 
+# note that the mean standard deviation is the square root of the sum
+# of the variances
+
+mean_ratio, mean_pi_sd, mean_plio_sd = get_mean(pi_sdev_cubes, mpwp_sdev_cubes)
+plot_mmm(mean_ratio, mean_pi_sd, mean_plio_sd,'y')
+plot_mmm(mean_ratio, mean_pi_sd, mean_plio_sd,'n')
+
+
+#

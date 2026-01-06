@@ -1,0 +1,352 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_SALINITY
+#PURPOSE
+#    This program will do all the plots to do with salinity
+#    we will begin by plotting salinity by depth across the Atlantic
+#    However we will move on to other things to do with satlinity
+# search for 'main program' to find end of functions
+# Julia 19/1/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                print(np.shape(plotdata))
+                cs = map.contourf(x,y,plotdata,V)
+                cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+ 
+#end def plotdata
+
+#  to check if a character is numeric
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+#============================
+def Atlantic_salinity_depth_plot(expt_name):
+
+
+
+#  get data from files
+
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+expt_name+'/pg2/'+expt_name+'o@pg*.nc')
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    salin=f.variables['salinity'][:]
+    salin=np.squeeze(salin)
+    f.close()
+
+    ntimes,nz,nlat,nlon=np.shape(salin)
+    print(ntimes,nz,nlat,nlon)
+
+    mean_salin=np.mean(salin,axis=0)
+
+
+    print(np.shape(mean_salin))
+
+#  get mask of Oceans
+    filemask='/nfs/see-fs-02_users/earjcti/MOC/merid/basin_hadgom_216'
+    f1=open(filemask,'r')
+    # discard 3 title lines
+    textline=f1.readline()
+    textline=f1.readline()
+    textline=f1.readline()
+    # next line is details from basin
+    nrows=nlat
+    Indian_d=np.zeros((nrows,4))
+    Pacific_d=np.zeros((nrows,4))
+    Atlantic_d=np.zeros((nrows,4))
+    Combined_d=np.zeros((nrows,4))
+    for line in f1:
+        linesplit=line.split()  # split line by space
+        if is_number(linesplit[0]):
+            rowno=int(linesplit[0])
+            Indian_d[rowno-1,:]=int(linesplit[1]),int(linesplit[2]),\
+                int(linesplit[3]),int(linesplit[4])
+            Pacific_d[rowno-1,:]=int(linesplit[5]),int(linesplit[6]),\
+                int(linesplit[7]),int(linesplit[8])
+            Atlantic_d[rowno-1,:]=int(linesplit[9]),int(linesplit[10]),\
+                int(linesplit[11]),int(linesplit[12])
+            Combined_d[rowno-1,:]=int(linesplit[13]),int(linesplit[14]),\
+                int(linesplit[15]),int(linesplit[16])
+
+    f1.close()
+
+    Indian_mask=np.zeros((nlat,nlon),dtype=bool)
+    Pacific_mask=np.zeros((nlat,nlon),dtype=bool)
+    for j in range(0,nrows):
+        Indian_mask[j,Indian_d[j,0]:Indian_d[j,1]]=1
+        Indian_mask[j,Indian_d[j,2]:Indian_d[j,3]]=1
+        Pacific_mask[j,Pacific_d[j,0]:Pacific_d[j,1]]=1
+        Pacific_mask[j,Pacific_d[j,2]:Pacific_d[j,3]]=1
+
+
+
+    # get mean salinity over indian ocean
+    Indian_salin=np.ma.masked_array(mean_salin[0,:,:],mask=Indian_mask)
+    Pacific_salin=np.ma.masked_array(mean_salin[0,:,:],mask=Pacific_mask)
+
+    lontemp=lon
+    Indian_salin,lon = shiftgrid(180.,Indian_salin,lon,start=False)
+    lon=lontemp
+    Pacific_salin,lon = shiftgrid(180.,Pacific_salin,lon,start=False)
+
+
+    plotdata(Indian_salin*1000.,0,lon,lat,'test Ind',-4,4,0.5,0.0,'n','psu')
+    plotdata(Pacific_salin*1000.,1,lon,lat,'test Pac',-4,4,0.5,0.0,'n','psu')
+    plt.show()
+
+    sys.exit()
+    
+#average across the time dimension
+    pi_temp_ann=np.mean(atemp,axis=0)
+    print('new shape',np.shape(pi_temp_ann))
+    
+    
+    plt.figure(0)
+    degC=u'\N{DEGREE SIGN}'+'C'
+    lontemp=lon
+    
+
+
+     #==============
+     # Pliocene
+
+
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/temp_data/xkvjba@pdm[7-9]*.nc')
+    atemp=f.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    ntimes,ny,nx=np.shape(atemp)
+    print(ntimes,ny,nx)
+
+    plio_temp_ann=np.mean(atemp,axis=0)
+    print('new shape plio',np.shape(plio_temp_ann))
+
+    lon=lontemp
+    plio_temp_ann,lon = shiftgrid(180.,plio_temp_ann,lon,start=False)
+
+
+
+     #==============
+     # Pliocene+2
+
+
+     # read in data from multiple files
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/temp_data/xkvjca@pdm[7-9]*.nc')
+    atemp=f.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    ntimes,ny,nx=np.shape(atemp)
+    print(ntimes,ny,nx)
+    
+    #average across the time dimension
+    plio_tempp2_ann=np.mean(atemp,axis=0)
+    print('new shape plio',np.shape(plio_tempp2_ann))
+    lon=lontemp
+    plio_tempp2_ann,lon = shiftgrid(180.,plio_tempp2_ann,lon,start=False)
+
+
+
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_temp_ann-pi_temp_ann
+
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    plotdata(plio_anom,2,lon,lat,'Plio - PI Tanom_HG2',-50,50,5.0,V,'la',degC)
+    
+    # Pliocene+2 - preindustrial
+
+    pliop2_anom=plio_tempp2_ann-pi_temp_ann
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Tanom_HG2',-50,50,5.0,V,'la',degC)
+
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_anom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+#end def annmean
+
+
+def seasmean(m1,m2,m3,figureno,seasname):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # preindustrial
+
+   
+    # read in data from multiple files
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvja/temp_data/xkvjaa@pdm[7-9]*'+m1+'_temp.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvja/temp_data/xkvjaa@pdm[7-9]*'+m2+'_temp.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvja/temp_data/xkvjaa@pdm[7-9]*'+m3+'_temp.nc')
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    atemp=fa.variables['temp_1'][:]
+    btemp=fb.variables['temp_1'][:]
+    ctemp=fc.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    ntimes,ny,nx=np.shape(atemp)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    pi_atemp_avg=np.mean(atemp,axis=0)
+    pi_btemp_avg=np.mean(btemp,axis=0)
+    pi_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    pi_seastemp=np.mean((pi_atemp_avg,pi_btemp_avg,pi_ctemp_avg),axis=0)
+    print('seastemp',np.shape(pi_seastemp))
+    
+    
+    degC=u'\N{DEGREE SIGN}'+'C'
+    
+    lontemp=lon
+    pi_seastemp,lon = shiftgrid(180.,pi_seastemp,lon,start=False)
+    
+    plotdata(pi_seastemp-273.15,0,lon,lat,'PI HadGEM2: '+seasname,-50,50,5.0,0.0,'n',degC)
+    
+     #==============
+     # Pliocene
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/temp_data/xkvjba@pdm[7-9]*'+m1+'_temp.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/temp_data/xkvjba@pdm[7-9]*'+m2+'_temp.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/temp_data/xkvjba@pdm[7-9]*'+m3+'_temp.nc')
+    atemp=fa.variables['temp_1'][:]
+    btemp=fb.variables['temp_1'][:]
+    ctemp=fc.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+
+    # average across the time dimension    
+    plio_atemp_avg=np.mean(atemp,axis=0)
+    plio_btemp_avg=np.mean(btemp,axis=0)
+    plio_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    plio_seastemp=np.mean((plio_atemp_avg,plio_btemp_avg,plio_ctemp_avg),axis=0)
+    print('seastemp',np.shape(plio_seastemp))
+
+    lon=lontemp
+    plio_seastemp,lon = shiftgrid(180.,plio_seastemp,lon,start=False)
+    
+    
+    plotdata(plio_seastemp-273.15,1,lon,lat,'PI HadGEM2: '+seasname,-50,50,5.0,0.0,'n',degC)
+
+
+
+     #==============
+     # Pliocene+2
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/temp_data/xkvjca@pdm[7-9]*'+m1+'_temp.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/temp_data/xkvjca@pdm[7-9]*'+m2+'_temp.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/temp_data/xkvjca@pdm[7-9]*'+m3+'_temp.nc')
+    atemp=fa.variables['temp_1'][:]
+    btemp=fb.variables['temp_1'][:]
+    ctemp=fc.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    
+    pliop2_atemp_avg=np.mean(atemp,axis=0)
+    pliop2_btemp_avg=np.mean(btemp,axis=0)
+    pliop2_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    pliop2_seastemp=np.mean((pliop2_atemp_avg,pliop2_btemp_avg,pliop2_ctemp_avg),axis=0)
+    print('seastemp',np.shape(pliop2_seastemp))
+
+    lon=lontemp
+    pliop2_seastemp,lon = shiftgrid(180.,pliop2_seastemp,lon,start=False)
+    
+ 
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_seastemp-pi_seastemp
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    plotdata(plio_anom,2,lon,lat,'Plio - PI Tanom_HG2',-50,50,5.0,V,'la',degC)
+    
+    # Pliocene+2 - preindustrial
+
+    pliop2_anom=pliop2_seastemp-pi_seastemp
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Tanom_HG2',-50,50,5.0,V,'la',degC)
+
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_'+seasname+'anom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+    plt.figure(1)
+
+#end def annmean
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+plt.figure(figureno)
+Atlantic_salinity_depth_plot('xkvjg')
+
+
+sys.exit(0)
+
+####
+

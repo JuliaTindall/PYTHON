@@ -1,0 +1,132 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will write
+indices 17 to a file:
+
+17: Rx1day: Monthly maximum 1-day precipitation
+Let RRij be the daily precipitation amount on day i in month j.  The maximum 1-day value for month j is:
+Rx1dayj = max(RRij)
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def get_Hcm3_max(filename,month,year):
+    """
+    reads in all the precipitation fields
+    figures out which precipitation field is the mean
+    finds the maximum precipitation in the file
+    converts to mm/day
+    sends back
+    """
+
+    # read in the precipitation fields and figure out which is the mean
+    cubes = iris.load(filename)
+    for cube in cubes:
+        if cube.var_name == 'precip':
+            precipcube = cube
+            maxp = np.max(precipcube.data)
+        if cube.var_name == 'precip_1':
+            precip1cube = cube
+            maxp1 = np.max(precip1cube.data)
+        if cube.var_name == 'precip_2':
+            precip2cube = cube
+            maxp2 = np.max(precip2cube.data)
+
+    maxps = np.max([maxp, maxp1, maxp2])
+    minps = np.min([maxp, maxp1, maxp2])
+    found = 'n'
+    if minps < maxp < maxps:
+        meanp = maxp
+        meanprecipcube = precipcube
+        found = 'y'
+
+    if minps < maxp2 < maxps:
+        if found == 'y':
+            print('error')
+            sys.exit(0)
+        else:
+            meanp = maxp2
+            meanprecipcube = precip2cube
+            found = 'y'
+
+    if minps < maxp1 < maxps:
+        if found == 'y':
+            print('error')
+            sys.exit(0)
+        else:
+            meanp = maxp1
+            meanprecipcube = precip1cube
+            found = 'y'
+
+    maxprecipcube = meanprecipcube.collapsed('t',iris.analysis.MAX)
+    maxprecipcube = iris.util.squeeze(maxprecipcube)
+
+    # convert to mm/day.  Also add a dimension for year and month
+    yearcoord = iris.coords.DimCoord(2,long_name='year')
+    maxprecipcube.add_aux_coord(yearcoord,data_dims=None)
+    moncoord = iris.coords.DimCoord(3,long_name='month')
+    maxprecipcube.add_aux_coord(moncoord,data_dims =None)
+    maxprecipcube = iris.util.new_axis(maxprecipcube,'year')
+    maxprecipcube = iris.util.new_axis(maxprecipcube,'month')
+    maxprecipcube.coord('year').points = year
+    maxprecipcube.coord('month').points = month
+    maxprecipcube = maxprecipcube * 60. *60. *24.
+    maxprecipcube.units = 'mm/day'
+    maxprecipcube.remove_coord('t')
+    maxprecipcube.remove_coord('surface')
+    
+    return maxprecipcube
+   
+
+def get_HadCM3_diagnostics(expt, extra):
+    """
+    gets the diagnostics (frost days, summer days, icing days tropical nights
+    from HadCM3)
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+    monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    cubes = iris.cube.CubeList([])
+    for year in range(0, 100):
+        yearuse = np.str(year).zfill(2)
+        for month in range(0,12):
+            filename = ('/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 
+                        'a@pb' + extra + yearuse + monthnames[month] + '.nc')
+            maxprecip_cube = get_Hcm3_max(filename, month, year)
+            cubes.append(maxprecip_cube)
+
+    equalise_attributes(cubes)
+    maxprecip = cubes.concatenate_cube()
+    maxprecip.long_name = 'maximum precip for a day in this month'
+    maxprecip.var_name = 'precip'
+    outfile = ('/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/ETCCDI/' + 
+                   expt + '/diag17/' + extra + '_' + 'diag17.nc')
+    iris.save(maxprecip, outfile, netcdf_format="NETCDF3_CLASSIC")
+
+  
+  
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+
+TIME = {'tenvj' : 'mPlio', 'xozza' : 'PI', 'xozzb' : 'Plio','tenvs':'E560'}
+# this is for if you actually want to get the diagnostics.
+# ie write them to the file /nfs/hera1/earjcti/PLIOMIP2/..ETCCDI....diags 17 
+if MODELNAME == 'HadCM3':
+    max1dayprecip = get_HadCM3_diagnostics('tenvj','o')
+
+ 
+

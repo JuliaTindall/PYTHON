@@ -1,0 +1,368 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on September 2020
+# note this differs from DMC_for_IPCC in that it will overplot the
+# data for the land as well as the ocean  (DMC_for_IPCC only overplots ocean 
+# data)
+
+
+#@author: earjcti
+#
+# This program plot a figure for IPCC.  This includes
+# a) MPWP - PI SAT anomaly over land (MMM)
+# b) MPWP - PI SST anomaly over ocean (MMM)
+# c) data overplotted (land and ocean)
+# d) Pliocene LSM
+
+
+#import os
+import numpy as np
+import pandas as pd
+#import scipy as sp
+#import cf
+import iris
+#import iris.util
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+#import netCDF4
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#from netCDF4 import Dataset, MFDataset
+#import iris.analysis.cartography
+#import iris.coord_categorisation
+import iris.quickplot as qplt
+import iris.plot as iplt
+#import cf_units as unit
+#from iris.experimental.equalise_cubes import equalise_attributes
+import cartopy.crs as ccrs
+#import matplotlib.ticker as mticker
+#from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+#from mpl_toolkits.basemap import Basemap
+
+import sys
+
+def make_cmap(colors, position=None, bit=False):
+    '''
+    I didn't write this I found it on the web.
+    make_cmap takes a list of tuples which contain RGB values. The RGB
+    values may either be in 8-bit [0 to 255] (in which bit must be set to
+    True when called) or arithmetic [0 to 1] (default). make_cmap returns
+    a cmap with equally spaced colors.
+    Arrange your tuples so that the first color is the lowest value for the
+    colorbar and the last is the highest.
+    position contains values from 0 to 1 to dictate the location of each color.
+    '''
+    bit_rgb = np.linspace(0,1,256)
+    if position == None:
+        position = np.linspace(0,1,len(colors))
+    else:
+        if len(position) != len(colors):
+            sys.exit("position length must be the same as colors")
+        elif position[0] != 0 or position[-1] != 1:
+            sys.exit("position must start with 0 and end with 1")
+    if bit:
+        for i in range(len(colors)):
+            colors[i] = (bit_rgb[colors[i][0]],
+                         bit_rgb[colors[i][1]],
+                         bit_rgb[colors[i][2]])
+    cdict = {'red':[], 'green':[], 'blue':[]}
+    for pos, color in zip(position, colors):
+        cdict['red'].append((pos, color[0], color[0]))
+        cdict['green'].append((pos, color[1], color[1]))
+        cdict['blue'].append((pos, color[2], color[2]))
+
+    cmap = mpl.colors.LinearSegmentedColormap('my_colormap',cdict,256)
+    return cmap
+
+
+def customise_cmap():
+    """
+    customises colormap
+    """
+    colors = [(5, 48, 97),(6, 49, 98),(7, 51, 100),(8, 53, 102),
+               (9, 55, 104),(11, 57, 106),(12, 59, 108),(13, 61, 110),
+               (14, 63, 112),(15, 65, 114),(17, 67, 116),
+               (18, 69, 118),(19, 71, 120),(20, 73, 121),(22, 75, 123),
+               (23, 77, 125),(24, 79, 127),(25, 81, 129),(26, 82, 131),
+               (28, 84, 133),(29, 86, 135),(30, 88, 137),(31, 90, 139),
+               (32, 92, 141),(34, 94, 143),(35, 96, 145),
+               (36, 98, 146),(37, 100, 148),(39, 102, 150),(40, 104, 152),
+               (41, 106, 154),(42, 108, 156),(43, 110, 158),(45, 112, 160),
+               (46, 113, 162),(47, 115, 164),(48, 117, 166),(49, 119, 168),
+               (51, 121, 170),(52, 123, 171),(53, 125, 173),
+               (54, 127, 175),(56, 129, 177),(57, 131, 179),(58, 133, 181),
+               (59, 135, 183),(60, 137, 185),(62, 139, 187),(63, 141, 189),
+               (64, 143, 191),(65, 145, 193),(67, 147, 195),(69, 148, 195),
+               (71, 149, 196),(74, 150, 197),(76, 152, 197),
+               (78, 153, 198),(81, 155, 199),(83, 156, 199),(86, 157, 200),
+               (88, 159, 201),(90, 160, 202),(93, 161, 202),(95, 163, 203),
+               (97, 164, 204),(100, 165, 204),(102, 166, 205),(105, 168, 206),
+               (107, 169, 207),(109, 171, 207),(112, 172, 208),(114, 173, 209),
+               (116, 175, 209),(119, 176, 210),(121, 177, 211),(124, 179, 211),
+               (126, 180, 212),(128, 181, 213),(131, 183, 214),(133, 184, 214),
+               (135, 185, 215),(138, 187, 216),(140, 188, 216),(143, 189, 217),
+               (145, 191, 218),(147, 192, 219),(150, 193, 219),(152, 195, 220),
+               (155, 196, 221),(157, 197, 221),(159, 198, 222),(162, 200, 223),
+               (164, 201, 223),(166, 203, 224),(169, 204, 225),(171, 205, 226),
+               (174, 207, 226),(176, 208, 227),(178, 209, 228),(181, 211, 228),
+               (183, 212, 229),(185, 213, 230),(188, 214, 230),(190, 216, 231),
+               (193, 217, 232),(195, 219, 233),(197, 220, 233),(200, 221, 234),
+               (202, 223, 235),(204, 224, 235),(207, 225, 236),(209, 227, 237),
+               (212, 228, 238),(214, 229, 238),(216, 230, 239),(219, 232, 240),
+               (221, 233, 240),(224, 235, 241),(226, 236, 242),(228, 237, 243),
+               (231, 239, 243),(233, 240, 244),
+               (235, 241, 245),(238, 243, 245),(240, 244, 246),(243, 245, 247),
+               (245, 246, 247),(247, 248, 248),(248, 248, 247),(248, 246, 245),
+               (247, 243, 243),(247, 242, 241),(246, 240, 238),(246, 238, 236),
+               (246, 235, 234),(245, 234, 232),(245, 232, 229),(244, 230, 227),
+               (244, 227, 225),(243, 226, 223),(243, 224, 220),(242, 222, 218),
+               (242, 220, 216),(241, 218, 214),(241, 216, 211),(240, 214, 209),
+               (240, 211, 207),(240, 210, 205),(239, 208, 202),(239, 206, 200),
+               (238, 203, 198),(238, 202, 196),(237, 200, 193),(237, 198, 191),
+               (236, 195, 189),(236, 194, 187),(235, 192, 184),(235, 190, 182),
+               (235, 187, 108),(234, 186, 178),(234, 184, 175),(233, 181, 173),
+               (233, 179, 171),(232, 178, 169),(232, 176, 166),(231, 174, 164),
+               (231, 172, 162),(230, 170, 160),(230, 168, 157),(230, 166, 155),
+               (229, 163, 153),(229, 162, 151),(228, 160, 148),(228, 158, 146),
+               (227, 156, 144),(227, 154, 142),(226, 152, 139),(226, 149, 137),
+               (225, 147, 135),(225, 146, 133),(224, 144, 130),(224, 142, 128),
+               (224, 140, 126),(223, 138, 124),(223, 135, 121),(222, 134, 119),
+               (222, 132, 117),(221, 130, 115),(221, 128, 112),(220, 125, 110),
+               (220, 124, 108),(219, 121, 106),(219, 120, 103),(219, 118, 101),
+               (218, 115, 99),(218, 113, 97),(217, 112, 94),(217, 110, 92),
+               (216, 108, 90),(216, 105, 88),(215, 104, 85),(215, 102, 83),
+               (214, 100, 81),(214, 97, 79),(214, 96, 76),(211, 94, 76),
+               (209, 92, 75),(207, 90, 74),(205, 88, 73),(203, 86, 72),
+               (200, 84, 71),(198, 82, 70),(196, 80, 69),(194, 79, 68),
+               (192, 77, 67),(190, 75, 67),(187, 73, 66),(185, 71, 65),
+               (183, 69, 64),(181, 67, 63),(179, 65, 62),(177, 64, 61),
+               (174, 62, 60),(172, 60, 59),(170, 58, 58),(168, 56, 58),
+               (166, 54, 57),(163, 52, 56),(161, 50, 55),(159, 48, 54),
+               (157, 47, 53),(155, 45, 52),(153, 43, 51),(150, 41, 50),
+               (148, 39, 49),(146, 37, 49),(144, 35, 48),(142, 33, 47),
+               (140, 32, 46),(137, 30, 45),(135, 28, 44),(133, 26, 43),
+               (131, 24, 42),(129, 22, 41),(126, 20, 40),(124, 18, 40),
+               (122, 16, 39),(120, 15, 38),(118, 13, 37),(116, 11, 36),
+               (113, 9, 35),(111, 7, 34),(109, 5, 33),(107, 3, 32),
+               (105, 1, 31),(103, 0, 31)]
+    my_cmap = make_cmap(colors, bit=True)
+
+    return my_cmap
+
+def customise_cmap2():
+    """
+    as customise_cmap but 19 colors only + 2 white in middle added by Julia
+    """
+    colors = [(84, 48, 5), (113, 70, 16), (143, 93, 27), (173, 115, 38),
+              (195, 137, 60), (206, 160, 97), (216, 182, 135),
+              (227, 204, 173), (238, 226, 211), (248, 248, 247),
+              (212, 230, 229), (176, 212, 209), (140, 194, 190),
+              (103, 176, 170), (67, 158, 150), (44, 135, 127),
+              (29, 110, 100), (14, 85, 74), (0, 60, 48)]
+    my_cmap = make_cmap(colors, bit=True)
+    return my_cmap
+
+def get_lsm():
+    """
+    land sea mask is where the point is ocean in both pliocene and pi
+    """
+    lsm_pi_cube = iris.load_cube(LSM_PI_FILE)
+    lsm_plio_cube = iris.load_cube(LSM_PLIO_FILE)
+    lsm_cube_data = np.maximum(lsm_pi_cube.data, lsm_plio_cube.data)
+    lsm_cube_ = lsm_pi_cube.copy(data=lsm_cube_data)
+  
+    return lsm_cube_, lsm_plio_cube
+
+
+def get_model_data():
+    """
+    read in precipitation data and return
+    """
+
+    (lsm_cube, lsm_plio_cube) = get_lsm()
+
+    precip_cube = iris.load_cube(PRECIP_MMM_FILE, 
+                                 'TotalPrecipitationmean_anomaly')
+  
+   
+    return precip_cube, lsm_plio_cube
+
+ 
+def get_land_obs():
+    """
+    reads in the spredsheet from ulrich and returns precipitation
+    """
+
+    dfs = pd.read_excel(PRECIP_DATAFILE)
+    sites = []
+    lats = []
+    lons = []
+    precip = []
+   
+    row_locs = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12]
+    for rl in row_locs:
+        precip_file = dfs.iloc[rl,11]
+        if precip_file == '1000**':
+            precip_file = 1000.
+        print(rl, precip_file)
+        if np.isfinite(precip_file):
+           sites.append(dfs.iloc[rl, 0])
+           lats.append(dfs.iloc[rl, 2])
+           lons.append(dfs.iloc[rl, 3])
+           precip.append(precip_file / 365.) # mm/year to mm/day
+
+    return lats, lons, precip
+
+def get_cru_precip(lats, lons):
+    """
+    get's the cru precip at the given latitude and longitude
+    """
+    
+    crufile = ('/nfs/hera1/earjcti/regridded/CRUPRECIP/' + 
+               'E280.TotalPrecipitation.allmean.nc')
+    cube = iris.load_cube(crufile)
+    print(cube.coord('latitude').points)
+    
+    cru_precip = np.zeros(len(lats))
+    for i, lat in enumerate(lats):
+        lat_ix = (np.abs(cube.coord('latitude').points - lat)).argmin()
+        lon_ix = (np.abs(cube.coord('longitude').points - lons[i])).argmin()
+        
+        print(lat, cube.coord('latitude').points[lat_ix],
+              lons[i], cube.coord('longitude').points[lon_ix] )
+
+
+        cru_precip[i] = cube.data[lat_ix, lon_ix]
+        if np.isfinite(cru_precip[i]):
+            pass
+        else:
+            # get an average of surrounding ones
+            surround = [cube.data[lat_ix + 1, lon_ix],
+                        cube.data[lat_ix - 1, lon_ix],
+                        cube.data[lat_ix, lon_ix + 1],
+                        cube.data[lat_ix, lon_ix -1],
+                        ]
+            cru_precip[i] = np.nanmean(surround)
+
+        # convert from mm/month to mm/day
+        cru_precip[i] = cru_precip[i] * 12.0 / 365. 
+           
+    return cru_precip
+
+
+   
+def shift_lons(lons,lats,temp):
+    """ 
+    if two points are in the same location then shift longitude slightly so that both are 
+    visible
+    """
+
+    new_lons =  np.zeros(np.shape(lons))
+    new_lons[:] = lons[:]
+
+    for i, lon in enumerate(lons):
+        subscript_same = []
+        for j in range(i+1, len(lons)):
+            if (np.abs(lon - lons[j]) < 1.0 and np.abs(lats[i] - lats[j]) < 1.0):
+                subscript_same.append(j)
+                print(i,j)
+        for s, subscript in enumerate(subscript_same):
+            if lons[subscript] == new_lons[subscript]:
+                new_lons[i] = lons[i] - 2.0
+                print('here',i,new_lons[i],lons[i],lons[i]-0.5,s)
+                new_lons[subscript] = lons[subscript] + 2.0 + (4.0 *s)
+            
+    print(lons[0],new_lons[0], new_lons[14], new_lons[15])
+    return new_lons
+
+def plot(model_cube, mask_cube, lats, lons, data):
+
+    """
+    plots the model anomaly with the data anomaly on top
+    """
+
+   
+    # plot model
+    vmin = -1.4
+    vmax = 1.4
+    incr = 0.1
+    V = np.arange(vmin, vmax + incr, incr)
+    mycmap = customise_cmap2()
+
+    #brewer_cmap = cm.get_cmap('brewer_RdBu_11')
+    ax = plt.axes(projection=ccrs.Robinson(central_longitude=0))
+    cs = iplt.contourf(model_cube, levels=V,  extend='both',
+                       cmap=mycmap)
+    #cbar = plt.colorbar(cs,  orientation= 'horizontal',
+    #                    ticks=[-10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10])
+    cbar = plt.colorbar(cs,  orientation= 'horizontal')
+   
+    cbar.set_label('mm/day')
+    iplt.contour(mask_cube, colors='black', linewidths=0.1)
+    plt.title('3.205Ma - PI precipitation anomaly')
+    
+
+    # overplot data 
+  
+    #norm = colors.Normalize(vmin = vmin, vmax = vmax)
+    norm = colors.BoundaryNorm(boundaries=V, ncolors=mycmap.N)
+ 
+    plt.scatter(lons, lats, c='black',  
+                marker='o', s=90, transform=ccrs.Geodetic())
+
+    plt.scatter(lons, lats, c=data,  marker='o', s=45,
+                norm = norm , cmap=mycmap, transform=ccrs.Geodetic())
+  
+    plt.savefig('/nfs/hera1/earjcti/regridded/IPCC_Panom.png')
+    plt.savefig('/nfs/hera1/earjcti/regridded/IPCC_Panom_.eps')
+
+
+  
+def main():
+    """
+    calling structure
+    a) get's model data
+    b) get's proxy data
+    c) plots model data with proxy data on top
+    """
+
+    # get model data
+    model_anom_cube, lsm_cube = get_model_data()
+
+    # get land observations and cru precipitation at land points
+    
+    lats, lons, land_precip = get_land_obs()
+    cru_land_precip = get_cru_precip(lats, lons)
+
+    print('land precip obs',land_precip)
+    print('cru precip',cru_land_precip)
+   
+    data_panom = land_precip - cru_land_precip
+    print('precip anom',data_panom)
+    
+  
+    plot(model_anom_cube, lsm_cube, lats, lons, data_panom)
+
+##########################################################
+# main program
+
+
+LINUX_WIN = 'l'
+FILESTART = '/nfs/hera1/earjcti/'
+
+LSM_PLIO_FILE = (FILESTART + 'regridded/PlioMIP2_Boundary_conds/Plio_enh' 
+            + '/Plio_enh/Plio_enh_LSM_v1.0.nc')
+LSM_PI_FILE = (FILESTART + 'regridded/PlioMIP2_Boundary_conds/Modern_std' 
+            + '/Modern_std/Modern_std_LSM_v1.0.nc')
+
+PRECIP_MMM_FILE = FILESTART + 'regridded/TotalPrecipitation_multimodelmean.nc'  
+PRECIP_DATAFILE = ('/nfs/hera1/earjcti/PLIOMIP2/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+
+main()
+
+#sys.exit(0)

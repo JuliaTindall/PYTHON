@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+# He wondered whether this was a global signal or just a local signal.
+# This program is to see what the models show
+#
+#
+#
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import iris.plot as iplt
+import numpy as np
+import sys
+
+def get_MMM_cube(fileend):
+    """
+    gets the multimodel mean from fileend
+    """
+
+    filestart = '/nfs/hera1/earjcti/regridded/'
+    allcubes = CubeList([])
+
+    for i, model in enumerate(MMM_modelnames):
+        filename = filestart + model + fileend
+        cube = iris.load_cube(filename)
+        
+        # set up for concatenate
+        if model == 'HadCM3':
+            cube = cube * 100. # convert tp [ercemtage
+            
+        if i == 0:
+            nt, ny, nx = np.shape(cube.data)
+            alldata = np.zeros((len(MMM_modelnames), nt, ny ,nx))
+        alldata[i,:,:,:] = cube.data
+
+    alldatamean = np.mean(alldata, axis=0)
+    MMM_cube = cube.copy(data=alldatamean)
+    
+
+    return MMM_cube
+
+#################
+# MAIN PROGRAM
+################
+
+
+
+field = 'totcloud'
+model='MMM'
+
+MMM_modelnames = ['HadCM3','IPSLCM6A','MIROC4m'] # to be used in the MMM
+
+
+if model == 'MMM':
+    eoi400_cube = get_MMM_cube('/EOI400.' + field + '.mean_month.nc')
+    e280_cube = get_MMM_cube('/E280.' + field + '.mean_month.nc')
+else:
+    eoi400_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+model+'/EOI400.' + field + '.mean_month.nc')
+    e280_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/'+model+'/E280.' + field + '.mean_month.nc')
+
+
+if model == 'HadCM3':
+    eoi400_cube = eoi400_cube * 100.
+    e280_cube = e280_cube * 100.
+janpi_cube = e280_cube.extract(iris.Constraint(month=1))
+julpi_cube = e280_cube.extract(iris.Constraint(month=7))
+janplio_cube = eoi400_cube.extract(iris.Constraint(month=1))
+julplio_cube = eoi400_cube.extract(iris.Constraint(month=7))
+
+
+levels=np.arange(10., 100., 10.)
+ax=plt.subplot(3,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janplio_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('January (MP)')
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julplio_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('July (MP)')
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,3,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janpi_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('January (PI)')
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,4,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julpi_cube,levels=levels,extend='both')
+axplot.cmap.set_under('white')
+plt.title('July (pi)')
+plt.gca().coastlines()
+
+levels=np.arange(-22, 26, 4)
+ax=plt.subplot(3,2,5,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janplio_cube - janpi_cube,levels=levels,extend='both',cmap='RdBu_r')
+plt.title('January (mpwp-pi)')
+plt.gca().coastlines()
+
+ax=plt.subplot(3,2,6,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-90,20,20,70],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julplio_cube - julpi_cube,levels=levels,extend='both',cmap='RdBu_r')
+plt.title('July (mpwp-pi)')
+plt.gca().coastlines()
+
+plt.tight_layout()
+#plt.show()
+#sys.exit(0)
+plt.savefig('summer_and_winter_cloudfrac_' + model + '.png')
+plt.savefig('summer_and_winter_cloudfrac_' + model + '.eps')
+
+plt.close()
+### plot jul-jan plio - jul-jan pi
+anom_anom_cube = (julplio_cube - janplio_cube) - (julpi_cube - janpi_cube)
+levels=np.arange(-22, 26, 4)
+cs = iplt.contourf(anom_anom_cube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+
+
+plt.gca().coastlines()
+plt.title('cloud:'+model+' (mPWP_jul - MPWP_jan) - (PI_jul - PI_jan)')
+plt.savefig('anom_cloudfrac_'+ model + '.png')
+plt.savefig('anom_cloudfrac_'+ model + '.eps') 
+plt.close()
+
+### plot jul_plio-jul_pi  and jan_plio - jan_pi on one plot
+julcube = (julplio_cube - julpi_cube)
+jancube = (janplio_cube - janpi_cube)
+levels=np.arange(-22, 26, 4)
+plt.subplot(1,2,2)
+cs = iplt.contourf(julcube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+plt.title('jul cloud anom mpwp -pi')
+plt.gca().coastlines()
+plt.subplot(1,2,1)
+cs = iplt.contourf(jancube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+plt.title('jan cloud anom mpwp -pi')
+plt.gca().coastlines()
+
+plt.savefig('jul_jan_anomcloudfrac_'+ model + '.eps') 
+plt.savefig('jul_jan_anomcloudfrac_'+ model + '.png')
+
+plt.close()
+
+
+# plot over north atlantic only
+
+lat_constraint = iris.Constraint(latitude = lambda cell:  20 < cell < 70.0)  
+
+lon_slice  =  anom_anom_cube.intersection(longitude=(-90., 20.))       
+anom_anom_region_cube = lon_slice.extract(lat_constraint) 
+
+cs = iplt.contourf(anom_anom_region_cube,levels=levels,cmap='bwr',extend='both')
+cbar = plt.colorbar(cs,orientation='horizontal',label='%',ticks=levels)
+
+
+plt.gca().coastlines()
+plt.savefig('anom_anom_cloudfrac_'+ model + '_NA.png')
+plt.savefig('anom_anom_cloudfrac_'+ model + '_NA.eps') 

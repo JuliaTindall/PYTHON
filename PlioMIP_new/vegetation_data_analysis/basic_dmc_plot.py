@@ -1,0 +1,313 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created January 2021 by Julia
+
+This program will produce a lat /lon dmc plot from Ulrichs spreadsheet
+
+"""
+
+import numpy as np
+import pandas as pd
+import iris
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.quickplot as qplt
+import iris.plot as iplt
+import cartopy.crs as ccrs
+
+import sys
+
+
+
+def get_MMM_data(latreq, lonreq):
+    """
+    read in MMM data from the pliocene and the preindustrial 
+    return the temperature at the list of sites
+    """
+
+    plio_cube = iris.load_cube(NSAT_MMM_FILE,
+                              'NearSurfaceTemperaturemean_mPWP')
+    pi_cube = iris.load_cube(NSAT_MMM_FILE,
+                              'NearSurfaceTemperaturemean_pi')
+   
+    nsites = len(latreq)
+    plio_mmm_array = np.zeros(nsites)
+    pi_mmm_array = np.zeros(nsites)
+
+    for i in range(0,nsites):
+        # modellon is whole numbers from 0-360
+        # lat is half numbers from -89.5 to 89.5
+
+        modlon = np.around(lonreq[i])
+        if modlon < 0: modlon = modlon + 360.
+
+
+        lat_ix = ((np.abs(plio_cube.coord('latitude').points 
+                         - latreq[i])).argmin())
+        lon_ix = ((np.abs(plio_cube.coord('longitude').points 
+                         - modlon)).argmin())
+    
+        plio_mmm_array[i] = plio_cube.data[lat_ix, lon_ix]
+        pi_mmm_array[i] = pi_cube.data[lat_ix, lon_ix]
+   
+    return plio_mmm_array, pi_mmm_array
+
+
+def get_single_model(model, latreq, lonreq):
+    """
+    read in the pliocene data from 'model'  return the temperatures
+    at the list of sites
+    """
+
+    filename = ('/nfs/hera1/earjcti/regridded100/' + model +
+                '/EOI400.NearSurfaceTemperature.allmean.nc')
+  
+    print(filename)
+    plio_cube = iris.load_cube(filename)
+   
+    nsites = len(latreq)
+    plio_array = np.zeros(nsites)
+   
+    for i in range(0,nsites):
+        # modellon is whole numbers from 0-360
+        # lat is half numbers from -89.5 to 89.5
+
+        modlon = np.around(lonreq[i])
+        if modlon < 0: modlon = modlon + 360.
+
+        lat_ix = ((np.abs(plio_cube.coord('latitude').points 
+                         - latreq[i])).argmin())
+        lon_ix = ((np.abs(plio_cube.coord('longitude').points 
+                         - modlon)).argmin())
+    
+        plio_array[i] = plio_cube.data[lat_ix, lon_ix]
+   
+    return plio_array
+
+ 
+def get_land_obs():
+    """
+    reads in the spredsheet from ulrich and returns temperatures
+    """
+
+    dfs = pd.read_excel(LAND_DATAFILE)
+    sites = []
+    lats = []
+    lons = []
+    temps = []
+    temp_modern = []
+    temp_uncert = []
+
+    row_locs = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12]
+    for rl in row_locs:
+        # if temp ne nan then move to array
+        temp = dfs.iloc[rl, 9]
+        
+        print(temp,'julia')
+        if np.isfinite(temp):
+            sites.append(dfs.iloc[rl, 0])
+            lats.append(dfs.iloc[rl, 2])
+            lons.append(dfs.iloc[rl, 3])
+            temp_modern.append(dfs.iloc[rl, 4])
+            temp_uncert.append(dfs.iloc[rl,10])
+            temps.append(temp)
+
+    print(temp_uncert)
+    for i, temp in enumerate(temp_uncert):
+        if i > 0:
+            temp2 = temp[2:]
+        else:
+            temp2=0.0
+        print(temp, temp2)
+        temp_uncert[i]=np.float(temp2)
+     
+    labels = []
+    deg= u'\N{DEGREE SIGN}'
+    for i, site in enumerate(sites):
+        label = ''.join([c for c in site if c.isupper()])
+        if lats[i] < 0:
+            latstr = np.str(np.int(np.round(lats[i] * -1.0, 0))) + deg +  'S'
+        else:
+            latstr = np.str(np.int(np.around(lats[i], 0))) + deg + 'N'
+        if lons[i] < 0:
+            lonstr = np.str(np.int(np.round(lons[i] * -1.0, 0))) + deg +  'W'
+        else:
+            lonstr = np.str(np.int(np.around(lons[i], 0))) + deg + 'E'
+        
+        label = site + '\n (' +  latstr + ',' +  lonstr + ')'
+        labels.append(label)
+   
+    return lats, lons, temps, temp_modern, temp_uncert, labels
+
+def get_cru_temp(lats, lons):
+    """
+    get's the cru temperature at the given latitude and longitude
+    """
+    
+    crufile = ('/nfs/hera1/earjcti/regridded/CRUTEMP/' + 
+               'E280.NearSurfaceTemperature.allmean.nc')
+    cube = iris.load_cube(crufile)
+    print(cube.coord('latitude').points)
+    
+    cru_temp = np.zeros(len(lats))
+    for i, lat in enumerate(lats):
+        lat_ix = (np.abs(cube.coord('latitude').points - lat)).argmin()
+        lon_ix = (np.abs(cube.coord('longitude').points - lons[i])).argmin()
+        
+        print(lat, cube.coord('latitude').points[lat_ix],
+              lons[i], cube.coord('longitude').points[lon_ix] )
+
+
+        cru_temp[i] = cube.data[lat_ix, lon_ix]
+        if np.isfinite(cru_temp[i]):
+            pass
+        else:
+            # get an average of surrounding ones
+            surround = [cube.data[lat_ix + 1, lon_ix],
+                        cube.data[lat_ix - 1, lon_ix],
+                        cube.data[lat_ix, lon_ix + 1],
+                        cube.data[lat_ix, lon_ix -1],
+                        ]
+            cru_temp[i] = np.nanmean(surround)
+           
+    return cru_temp
+
+
+def plot_figure(plio_temp_obs, plio_temp_unc, pi_temp_obs, plio_mmm, pi_mmm,
+                crutemp, plio_ind_models, labels):
+    """
+    this subroutine tries to plot the figure for the paper which shows a nice
+    DMC 
+    """
+
+
+    fig1 = plt.figure(figsize=[6.0, 8.0])
+    ax1 = plt.axes(frameon=False)
+    #ax1.get_xaxis().tick_bottom()
+    ax1.axes.get_yaxis().set_visible(False)
+
+    yarray = np.arange(1, len(plio_temp_obs) + 1, 1)
+ 
+   # try plotting model data anomaly
+    plt.vlines(x=0, ymin=-0, ymax=9, linewidth=0.5)
+    plt.hlines(y=8.95, xmin=-25, xmax=7.5, linewidth=0.5)
+    plt.scatter(plio_mmm - plio_temp_obs, yarray-0.2, color='black', s=50)
+    plt.scatter(plio_mmm - plio_temp_obs, yarray-0.2, color='red', 
+                s=25, label='mPWP MMM')
+    plt.scatter(pi_mmm - pi_temp_obs, yarray, color='blue', label='PI MMM')
+
+   
+    # plot individual models for pliocene
+    model_anom = np.zeros(np.shape(plio_ind_models))
+    for i in range(0, len(MODELNAMES)):
+        model_anom[:, i] = plio_ind_models[:, i] - plio_temp_obs  
+        if i == 0:
+            plt.scatter(model_anom[:, i], yarray-0.2, color='red', marker = 'x',
+                    s=10, label='mPWP models')
+        else:
+            plt.scatter(model_anom[:, i], yarray-0.2, color='red', marker = 'x',
+                    s=10)
+    
+    # add uncertainty on modern due to difference with CRU and uncert on plio data
+    cruanom = crutemp - pi_temp_obs   
+    for j in range(0,len(pi_temp_obs)):
+    #    valmin = np.min([0, cruanom[j]])
+    #    valmax = np.max([0, cruanom[j]]) 
+        if j == 0:
+            #plt.hlines(y = j+1, xmin = valmin, xmax=valmax, linestyle='dotted',
+            #           color='blue', label='PI data \n uncertainty')
+            plt.hlines(y = j+0.9, xmin = plio_temp_unc[j] * -1.0, 
+                       xmax=plio_temp_unc[j], color='red', linestyle='dotted',
+                       label='mPWP data \n uncertainty') 
+        else:
+            #plt.hlines(y = j+1, xmin = valmin, xmax=valmax, linestyle='dotted',
+            #           color='blue')
+            plt.hlines(y = j+0.9, xmin = plio_temp_unc[j] * -1.0, 
+                   xmax=plio_temp_unc[j], color='red', linestyle='dotted') 
+       
+
+    # plot MMM again so it is on the top of the figure
+    plt.scatter(plio_mmm - plio_temp_obs, yarray-0.2, color='black', s=50)
+    plt.scatter(plio_mmm - plio_temp_obs, yarray-0.2, color='red', 
+                s=25)
+    plt.scatter(pi_mmm - pi_temp_obs, yarray, color='blue')
+    # plot cruanom
+    plt.scatter(cruanom,yarray+0.2,color='blue',marker='^',label='CRU 1901-1930')
+
+ 
+    # add site labels
+    plt.text(-5.0, yarray[7], labels[7], ha='right')
+    for j in range(0, 7):
+        plt.text(np.min(model_anom[j, :]) - 1.0,
+                 yarray[j], labels[j], ha='right')
+
+    plt.xlabel('Difference between modelled/reanalysis \n and observed/reconstructed temperatures (deg C)')
+    plt.legend(loc = 'lower left')
+  
+    plt.xlim(-25, 7.5)
+    plt.ylim(9, 0)
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/' + 
+               'vegetation/basic_dmc_plot.eps')
+    plt.savefig(fileout)
+  
+def main():
+    """
+    calling structure
+    a) get's model data
+    b) get's proxy data
+    c) plots model data with proxy data on top
+    """
+
+   
+    # get land observations and cru temperature at land points
+    
+    (land_lats, land_lons, land_temp, 
+     modern_temp, plio_unc, land_labels)= get_land_obs()
+    cru_land_temp = get_cru_temp(land_lats, land_lons)
+
+    
+    # get model data
+    MMM_plio, MMM_pi = get_MMM_data(land_lats, land_lons)
+
+    # get ind models data
+    all_models_plio = np.zeros((len(land_lons), len(MODELNAMES)))
+    for i, model in enumerate(MODELNAMES):
+        ind = get_single_model(model, land_lats, land_lons)
+        all_models_plio[:, i] = ind
+
+    # plot data
+    plot_figure(land_temp, plio_unc, modern_temp, MMM_plio,
+                MMM_pi, cru_land_temp, all_models_plio, land_labels) 
+
+
+##########################################################
+# main program
+
+
+LINUX_WIN = 'l'
+FILESTART = '/nfs/hera1/earjcti/'
+
+MODELNAMES = [
+              'CESM2', 'HadGEM3',
+              'IPSLCM6A', 
+              'COSMOS', 
+              'EC-Earth3.3', 'CESM1.2', 'IPSLCM5A',
+              'MIROC4m', 'IPSLCM5A2', 'HadCM3',
+              'GISS2.1G', 'CCSM4', 
+              'CCSM4-Utr', 'CCSM4-UoT', 
+              'NorESM-L',  'MRI2.3', 'NorESM1-F'
+              ]
+
+NSAT_MMM_FILE = (FILESTART + 
+                 'regridded100/NearSurfaceTemperature_multimodelmean.nc')
+
+LAND_DATAFILE = ('/nfs/hera1/earjcti/PLIOMIP2/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+
+main()
+
+#sys.exit(0)

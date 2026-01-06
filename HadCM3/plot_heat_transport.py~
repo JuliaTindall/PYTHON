@@ -1,0 +1,563 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_HEAT TRANSPORT
+#PURPOSE
+#    This program was originally written to find the heat transport 
+#    across the north Atlantic.
+#    I do not know whether I will be able to finish it so it may not
+#    really be an heat transport program
+#
+# search for 'main program' to find end of functions
+# Julia 20/02/2019
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def annmean_throughflow
+
+# functions start here
+def plotdata(region,plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,lonmin,lonmax,latreq):
+
+    if region == 'NP':
+        proj='npstere'
+        latbb=45.
+    if region == 'SP':
+        proj='spstere'
+        latbb=-45.
+    #proj='stere'
+
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+  
+    map=Basemap(projection=proj,resolution='c',lon_0=0,boundinglat=latbb,round=True,lat_0=90)
+  
+    #map.drawmapboundary(fill_color='green')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    mycmap=mp.cm.get_cmap('Reds',len(V+2))
+                    newcolors=mycmap(np.linspace(0,1,len(V+2)))
+                    white=([1,1,1,1])
+                    newcolors[0:2,:]=white
+                    mycmap=ListedColormap(newcolors)
+                    cs = map.contourf(x,y,plotdata,V,cmap=mycmap)
+                   # map.drawparallels(np.arange(-80.,81.,20.))
+                   # map.drawmeridians(np.arange(-180.,181.,20.))
+                    map.fillcontinents()
+                  
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                    # overplot in contours where control sea ice was over 50% (or 0.5)
+  
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=15)
+   
+    lon_transect=np.linspace(lonmin,lonmax)
+    lat_transect=np.linspace(latreq,latreq)
+    x1,y1=map(lon_transect,lat_transect)
+    map.plot(x1,y1,linewidth=1.5,color='yellow')
+        
+
+
+#end def plotdata
+
+def annmean_throughflow(expt_list,extra_list,endlist,names_list,latreq,lonmin,lonmax):
+
+
+    nexpts=len(expt_list)
+ 
+
+    for expt in range(0,nexpts):
+        f=MFDataset('/nfs/hera1/earjcti/um/'+expt_list[expt]+'/netcdf/'+expt_list[expt]+'o@pg'+extra_list[expt]+'[7-9]*'+endlist[expt]+'.nc')
+        # get velocity
+        lat = f.variables['latitude_1'][:]
+        lon = f.variables['longitude_1'][:]
+        dep = f.variables['depth_1'][:]
+        atemp=f.variables['field704'][:] # velocity in cm/s
+        atemp=np.squeeze(atemp)
+        ntimes,nz,ny,nx=np.shape(atemp)
+
+        # get potential temperature
+        lat_theta = f.variables['latitude'][:]
+        lon_theta = f.variables['longitude'][:]
+        btemp=f.variables['temp'][:] # degC
+
+
+        f.close()
+
+        velocity_arr=np.mean(atemp,axis=0)
+        theta_arr=np.mean(btemp,axis=0)+273.15  #(theta in kelvin)
+
+
+        velocity_arr,lon = shiftgrid(180.,velocity_arr,lon,start=False)
+
+            
+
+        #plotdata('NP',velocity_arr[0,:,:],99,lon,lat,'velocity_map (v)',-5.0,5.5,0.5,0,'a','cm/s',lonmin,lonmax,latreq)
+        #plt.show()
+        #plt.close()
+
+        # setup array for longitude height plot through transect
+        if expt ==0:
+            lon_req=np.where((lonmin<=lon) & (lonmax>=lon))
+            vel_trans=np.zeros((nexpts,nz,len(lon_req[0])))
+
+        # put the data into the transect array
+        lat_ix=np.where(lat==latreq)
+        lonmin_ix=lon_req[0][0]
+        lonmax_ix=lon_req[0][len(lon_req[0])-1]
+        
+        print(np.shape(vel_trans))
+        print(np.shape(velocity_arr))
+
+        vel_trans[expt,:,:]=np.squeeze(velocity_arr[:,lat_ix[0],lonmin_ix:lonmax_ix+1])
+        lon_trans=lon[lonmin_ix:lonmax_ix+1]
+
+        # find out where the theta grid of latitude crosses the
+        # velocity grid
+        print(lat_ix[0])
+        lat_theta_ix1=lat_ix[0]
+        lat_theta_ix2=lat_ix[0]+1
+
+        # check velocity lat is in middle of theta latitudes
+        if lat_ix[0] > lat_theta_ix2[0] or lat_ix[0] < lat_theta_ix1[0]:
+            print('your grid spacing is wrong')
+            sys.exit()
+
+
+        # start here start here
+        print(lat[lat_ix],lat_theta[lat_theta_ix1],lat_theta[lat_theta_ix2])
+        theta_diff=theta_arr[:,lat_theta_ix2,:]-theta_arr[:,lat_theta_ix1,:]
+        np.squeeze(theta_diff)
+        print(np.shape(theta_diff))
+        sys.exit()
+       
+    # plot velocity data
+
+    for expt in range(0,nexpts):
+        
+        plt.subplot(2,3,expt+1)
+        V=np.arange(-5.,5.5,0.5)
+        cs=plt.contourf(lon_trans,dep,vel_trans[expt,:,:],V,extend='both',cmap='RdBu_r')
+        plt.gca().invert_yaxis()
+        plt.title(names_list[expt])
+
+    plt.subplots_adjust(bottom=0.25)
+    cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+    plt.colorbar(cax=cax,orientation="horizontal")
+    plt.title('cm/s',fontsize=15)
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_heat_transport/flow_fram_strait.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+  
+    plt.close()
+
+    # plot anomalies from pi
+
+    for expt in range(1,nexpts):
+        vel_tran_anom=vel_trans[expt,:,:]-vel_trans[0,:,:]
+        plt.subplot(2,2,expt)
+        V=np.arange(-2.,2.2,0.2)
+        cs=plt.contourf(lon_trans,dep,vel_tran_anom,V,extend='both',cmap='RdBu_r')
+        plt.gca().invert_yaxis()
+        plt.title(names_list[expt]+'minus'+names_list[0])
+
+    plt.subplots_adjust(bottom=0.25)
+    cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+    plt.colorbar(cax=cax,orientation="horizontal")
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_heat_transport/flow_fram_strait_anom_pi.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+  
+    plt.close()
+
+
+    # plot anomalies from km5c
+
+    for expt in range(2,nexpts):
+        vel_tran_anom=vel_trans[expt,:,:]-vel_trans[1,:,:]
+        plt.subplot(2,2,expt)
+        V=np.arange(-1.,1.1,0.1)
+        cs=plt.contourf(lon_trans,dep,vel_tran_anom,V,extend='both',cmap='RdBu_r')
+        plt.gca().invert_yaxis()
+        plt.title(names_list[expt]+'minus'+names_list[1])
+
+    plt.subplots_adjust(bottom=0.25)
+    cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+    plt.colorbar(cax=cax,orientation="horizontal")
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_heat_transport/flow_fram_strait_anom_km5c.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+  
+    plt.close()
+
+
+    # calculate ocean heat transport across the frain straight this is 
+    # the integral over depth and longitude of
+    # density * velocity * specific heat capacity * potential temperature
+
+    # an alternative which looks more sensible is the integral of
+    # v * delta_theta * cp * density (This would give units of Watts)
+    # we are trying this
+
+
+    # cp specific heat capacity of water 4.186J/g/K = 4186J/kg/K
+    cp=4186.
+    # density of water (assume 1000kg/m3)
+    p0=1000.
+
+    
+
+
+
+    plt.close()
+
+    sys.exit()
+
+    #average across the time dimension
+    cntl_atemp_avg=np.mean(atemp,axis=0)
+    cntl_btemp_avg=np.mean(btemp,axis=0)
+    cntl_ctemp_avg=np.mean(ctemp,axis=0)
+
+    #stdev across the time dimension
+    cntl_atemp_stdev=np.std(atemp,axis=0)
+    cntl_btemp_stdev=np.std(btemp,axis=0)
+    cntl_ctemp_stdev=np.std(ctemp,axis=0)
+    
+    
+
+    cntl_seaice=np.mean((cntl_atemp_avg,cntl_btemp_avg,cntl_ctemp_avg),axis=0)
+   
+    
+    cntl_seaice=cntl_seaice * mask
+    
+    plotdata('NP',cntl_seaice,0,lon,lat,control_expt+seasname,0,1.1,0.1,0,'n','fraction','y',cntl_seaice)
+    plotdata('SP',cntl_seaice,1,lon,lat,control_expt+seasname,0,1.1,0.1,0,'n','fraction','y',cntl_seaice)
+ 
+   
+
+    fa.close()
+    fb.close()
+    fc.close()
+   
+    print('j1')
+
+     #==============
+     # New_Expt
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m3+'.nc')
+    atemp=fa.variables['iceconc'][:]
+    btemp=fb.variables['iceconc'][:]
+    ctemp=fc.variables['iceconc'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    
+    new_atemp_avg=np.mean(atemp,axis=0)
+    new_btemp_avg=np.mean(btemp,axis=0)
+    new_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    new_seaice=np.mean((new_atemp_avg,new_btemp_avg,new_ctemp_avg),axis=0)
+
+    
+    fa.close()
+    fb.close()
+    fc.close()
+   
+
+    print('j2')
+
+
+    # plot data
+    
+    #new_seaice=new_seaice * mask
+
+    plotdata('NP',new_seaice,2,lon,lat,new_expt+seasname,0,1.1,0.1,0,'n','fraction','n',cntl_seaice)
+    plotdata('SP',new_seaice,3,lon,lat,new_expt+seasname,0,1.1,0.1,0,'n','fraction','n',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+    
+
+    # New_Expt - control
+
+    perc_lost=((new_seaice-cntl_seaice)/cntl_seaice)*100.
+    titlename='Sea ice change '+new_time+'-'+control_time+':'+seasname
+    plotdata('NP',perc_lost,99,lon,lat,titlename,-100,105.,5.0,0,'a','%','y',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_NP_iceanom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+  
+
+    plotdata('SP',perc_lost,99,lon,lat,titlename,-100,105.,5.0,0,'a','%','y',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_SP_iceanom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+    
+    print('j4')
+    
+
+
+######################################################   
+def seascyc(expt_list,extra_list,names_list):
+
+# get seasonal cycle of sea ice
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    filestart='/nfs/hera1/earjcti/um/'
+    filemid='/netcdf/'
+  
+    # read in temperature from a single file in order to get land mask
+    # recommend putting control experiment (PI) in expt_list[0]
+    f=Dataset(filestart+expt_list[0]+filemid+expt_list[0]+'o@pf'+extra_list[0]+'76ja.nc')
+    temp=f.variables['temp'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+   
+    mask=np.ma.array(temp,mask=temp > 1E10)
+    mask=mask/mask
+
+    mask=np.squeeze(mask)
+    f.close()
+   
+   
+    # read in data from cntl and new_expt files
+    for expt in range(0,len(expt_list)):
+        exptname=expt_list[expt]
+        extra=extra_list[expt]
+        for mon in range(0,len(monthnames)):
+            fa=MFDataset(filestart+exptname+'/netcdf/'+exptname+'o@pf'+extra+'[7-9]*'+monthnames[mon]+'.nc')
+            lat = fa.variables['latitude'][:]
+            lon = fa.variables['longitude'][:]
+            atemp=fa.variables['iceconc'][:]
+            atemp=np.squeeze(atemp)
+            htemp=fa.variables['icedepth'][:]
+            htemp=np.squeeze(htemp)
+            fa.close()
+            atemp_avg=np.mean(atemp,axis=0)
+            htemp_avg=np.mean(htemp,axis=0)
+      
+            ny,nx=np.shape(atemp_avg)
+
+            if mon == 0 and expt ==0:
+                conc_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+                depth_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+               
+            conc_seaice[expt,mon,:,:]=atemp_avg
+            depth_seaice[expt,mon,:,:]=htemp_avg
+        
+   
+    #======================================================
+    # get average area of seaice
+
+    xres=lon[1]-lon[0]
+    yres=lat[1]-lat[0]
+    a=40075. # circumference of earth in km
+    onedeg=a/360.
+    gridbox_nonweight=xres * yres * onedeg * onedeg
+  
+    avg_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    avg_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    vol_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    vol_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    for expt in range(0,len(expt_list)):
+        for mon in range(0,len(monthnames)):
+            for j in range(0,ny):
+                coslat=np.cos(np.radians(lat[j]))
+                if lat[j] > 0 :
+                    for i in range(0,nx):
+                        avg_ice_nh[expt,mon]=(avg_ice_nh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_nh[expt,mon]=(vol_ice_nh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                if lat[j] < 0 :
+                    for i in range(0,nx):
+                  
+                        avg_ice_sh[expt,mon]=(avg_ice_sh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_sh[expt,mon]=(vol_ice_sh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                    
+       
+    # plot nh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_areal_extent.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+
+
+    # plot nh seasonal cycle vol
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_volume.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_volume.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+    retdata=[avg_ice_nh,avg_ice_sh,vol_ice_nh,vol_ice_sh]
+    return(retdata)
+
+# end def seascyc
+
+
+
+
+
+
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+
+expt_list=['xiboi','xjplc','xjpld','xjple','xjplf']
+extra_list=['y','6','6','6','6']
+end_list=['c1','11','11','11','11']
+names_list=['PI','KM5C','K1','G17','KM3']
+
+#djf mean
+season=['dc','ja','fb']
+seasonname='djf'
+
+# seasonmean throughflow will do a longitude depth plot of velocity at a 
+# given latitude
+
+#Fraim strait
+latreq=78.75   # fraim strait is between 77N and 81N
+lonmin=338.75 - 360. # this is Greenland
+lonmax=30.       # Svalbard is about 15E but I don't think it is in the UM
+
+annmean_throughflow(expt_list,extra_list,end_list,names_list,latreq,lonmin,lonmax)
+
+#mam mean
+#plt.figure(figureno)
+#seasmean('mr','ar','my',figureno,'mam',control_expt,new_expt,extra,control_time,new_time)
+figureno=figureno+1
+
+#jja mean
+#plt.figure(figureno)
+#seasmean('jn','jl','ag',figureno,'jja',control_expt,new_expt,extra,control_time,new_time)
+figureno=figureno+1
+
+#son mean
+#plt.figure(figureno)
+#seasmean('sp','ot','nv',figureno,'son',control_expt,new_expt,extra,control_time,new_time)
+#figureno=figureno+1
+
+#####################################
+# plot annual cycle of sea ice loss
+
+
+expt_list=['xiboi','xjplc','xjpld','xjple','xjplf']
+extra_list=['y','6','6','6','6']
+names_list=['PI','KM5C','K1','G17','KM3']
+
+retdata=seascyc(expt_list,extra_list,names_list)
+area_ice_nh_HadCM3=retdata[0]
+area_ice_sh_HadCM3=retdata[1]
+vol_nh_HadCM3=retdata[2]
+vol_sh_HadCM3=retdata[3]
+print('got HadCM3 data') 
+
+
+
+sys.exit(0)
+
+####
+

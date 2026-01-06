@@ -1,0 +1,581 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_SURFTEMP
+#PURPOSE
+#    This program will plot the temperature (annual and seasonal) and
+#    the temperature anomaly (annual and seasonal) for the final 30 years
+#    of the HadGEM2 simulations
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    cs = map.contourf(x,y,plotdata,V,extend='both',cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-60,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=18)
+   
+
+
+#end def plotdata
+
+def annmean(switch,preind_expt,plio_expt,pliop2_expt,extra):
+    # switch is a dummy variable to allow the program to be called
+    #==============
+    # preindustrial
+
+
+    # read in data from multiple files
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/temp_data/'+preind_expt+'a@pd'+extra+'[5-9]*.nc')
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    ntimes,ny,nx=np.shape(atemp)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    pi_temp_ann=np.mean(atemp,axis=0)
+    print('new shape',np.shape(pi_temp_ann))
+    
+    
+    plt.figure(0)
+    degC=u'\N{DEGREE SIGN}'+'C'
+    lontemp=lon
+    pi_temp_ann,lon = shiftgrid(180.,pi_temp_ann,lon,start=False)
+    
+    print('about to plot')
+
+    plotdata(pi_temp_ann-273.15,0,lon,lat,'PI-Ann_HadGEM2',-50,50,5.0,0.0,'n',degC)
+    print('plotted first')
+    f.close()
+
+
+     #==============
+     # Pliocene
+
+
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+plio_expt+'/temp_data/'+plio_expt+'a@pd'+extra+'[5-9]*.nc')
+    atemp=f.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    ntimes,ny,nx=np.shape(atemp)
+    print(ntimes,ny,nx)
+
+    plio_temp_ann=np.mean(atemp,axis=0)
+    print('new shape plio',np.shape(plio_temp_ann))
+
+    lon=lontemp
+    plio_temp_ann,lon = shiftgrid(180.,plio_temp_ann,lon,start=False)
+
+    plotdata(plio_temp_ann-273.15,1,lon,lat,'Plio-TAnn_HG2',-50,50,5.0,0.0,'n',degC)
+    f.close()
+
+
+     #==============
+     # Pliocene+2
+
+
+     # read in data from multiple files
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/temp_data/'+pliop2_expt+'a@pd'+extra+'[5-9]*.nc')
+    atemp=f.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    ntimes,ny,nx=np.shape(atemp)
+    print(ntimes,ny,nx)
+    
+    #average across the time dimension
+    plio_tempp2_ann=np.mean(atemp,axis=0)
+    print('new shape plio',np.shape(plio_tempp2_ann))
+    lon=lontemp
+    plio_tempp2_ann,lon = shiftgrid(180.,plio_tempp2_ann,lon,start=False)
+    f.close()
+
+
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_temp_ann-pi_temp_ann
+
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    V=0
+    plotdata(plio_anom,2,lon,lat,'Plio - PI Tanom_HG2',0,10,1.0,V,'n',degC)
+    
+    # Pliocene+2 - preindustrial
+
+    pliop2_anom=plio_tempp2_ann-pi_temp_ann
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    V=0
+    plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Tanom_HG2',0,10,1.0,V,'n',degC)
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_anom'+pliop2_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+    # plot anomaly plot for +2 on seperate page for paper
+    V=[0,1,2,3,4,6,8,10,12,14,16]
+    titlename='a) mPWP - PI  Temperature anomaly '
+    plotdata(pliop2_anom,99,lon,lat,titlename,0,10,1.0,V,'n',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_anom_only_'+pliop2_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_anom_only_'+pliop2_expt+'.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+    # get land mask and put on correct grid
+
+    fm=Dataset('/nfs/hera1/earjcti/um/HadGEM_ancils/qrparm.mask.nc')
+    lsmlon=fm.variables['longitude'][:]
+    lsmlat=fm.variables['latitude'][:]
+    lsm=fm.variables['lsm'][:]
+    lsm=np.squeeze(lsm)
+    lsm,lsmlon = shiftgrid(180.,lsm,lsmlon,start=False)
+    fm.close()
+
+   
+
+    if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+        anom_land=pliop2_anom / lsm
+        anom_sea=pliop2_anom / np.abs(lsm-1.0)
+    else:
+        print('error lon/lat of land sea mask dont match')
+        anom_land=pliop2_anom * lsm
+        plotdata(anom_land,99,lon,lat,'a) mPWP temperature anomaly',0,10,1.0,V,'i',degC)
+        plt.show()
+        sys.exit()
+
+
+    # create weighting array
+    weightarr=np.zeros(np.shape(anom_sea))
+    for i in range(0,len(lon)):
+        weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+    print('mean anom_sea',np.average(pliop2_anom,weights=weightarr * np.abs(lsm-1.0)))
+    print('mean anom_land',np.average(pliop2_anom,weights=weightarr*lsm))
+    print('allmean_2',np.average(pliop2_anom,weights=weightarr))
+
+
+
+    print('non plus 2')
+    print('mean anom_sea',np.average(plio_anom,weights=weightarr * np.abs(lsm-1.0)))
+    print('mean anom_land',np.average(plio_anom,weights=weightarr*lsm))
+    print('allmean',np.average(plio_anom,weights=weightarr))
+
+    # plot temperature change by latitude    
+
+    lat_avg_diff=np.average(pliop2_anom,axis=1)
+    print(lat_avg_diff)
+    print(np.shape(lat_avg_diff))
+    allavg=np.average(lat_avg_diff,weights=np.cos(np.deg2rad(lat)))
+    plt.plot(lat,lat_avg_diff)
+    plt.show()
+
+    # find temperature change poleward of 60deg
+    nhsum=0.
+    nhsum_weights=0.
+    shsum=0.
+    shsum_weights=0.
+    for j in range(0,len(lat)):
+        if lat[j] >= 60:
+            print(lat[j],lat_avg_diff[j])
+            nhsum=nhsum+(lat_avg_diff[j] * np.cos(np.deg2rad(lat[j])))
+            nhsum_weights=nhsum_weights+(np.cos(np.deg2rad(lat[j])))
+        if lat[j] <= -60:
+            shsum=shsum+(lat_avg_diff[j] * np.cos(np.deg2rad(lat[j])))
+            shsum_weights=shsum_weights+(np.cos(np.deg2rad(lat[j])))
+    print('nh t change poleward 60N=',nhsum/nhsum_weights)
+    print('sh t change poleward 60S=',shsum/shsum_weights)
+
+ # find temperature change poleward of 75deg
+    nhsum=0.
+    nhsum_weights=0.
+    shsum=0.
+    shsum_weights=0.
+    for j in range(0,len(lat)):
+        if lat[j] >= 75:
+            print(lat[j],lat_avg_diff[j])
+            nhsum=nhsum+(lat_avg_diff[j] * np.cos(np.deg2rad(lat[j])))
+            nhsum_weights=nhsum_weights+(np.cos(np.deg2rad(lat[j])))
+        if lat[j] <= -75:
+            shsum=shsum+(lat_avg_diff[j] * np.cos(np.deg2rad(lat[j])))
+            shsum_weights=shsum_weights+(np.cos(np.deg2rad(lat[j])))
+    print('nh t change poleward 75N=',nhsum/nhsum_weights)
+    print('sh t change poleward 75S=',shsum/shsum_weights)
+    
+    
+ 
+
+#end def annmean
+
+
+def seasmean(m1,m2,m3,figureno,seasname,preind_expt,plio_expt,pliop2_expt,extra):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # preindustrial
+
+   
+    # read in data from multiple files
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/temp_data/'+preind_expt+'a@pd'+extra+'*'+m1+'_temp.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/temp_data/'+preind_expt+'a@pd'+extra+'*'+m2+'_temp.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/temp_data/'+preind_expt+'a@pd'+extra+'*'+m3+'_temp.nc')
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    atemp=fa.variables['temp_1'][:]
+    btemp=fb.variables['temp_1'][:]
+    ctemp=fc.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    ntimes,ny,nx=np.shape(atemp)
+    
+    #average across the time dimension
+    pi_atemp_avg=np.mean(atemp,axis=0)
+    pi_btemp_avg=np.mean(btemp,axis=0)
+    pi_ctemp_avg=np.mean(ctemp,axis=0)
+
+    #stdev across the time dimension
+    pi_atemp_stdev=np.std(atemp,axis=0)
+    pi_btemp_stdev=np.std(btemp,axis=0)
+    pi_ctemp_stdev=np.std(ctemp,axis=0)
+    
+    pi_seastemp=np.mean((pi_atemp_avg,pi_btemp_avg,pi_ctemp_avg),axis=0)
+    
+    
+    degC=u'\N{DEGREE SIGN}'+'C'
+    
+    lontemp=lon
+    pi_seastemp,lon = shiftgrid(180.,pi_seastemp,lon,start=False)
+    
+    plotdata(pi_seastemp-273.15,0,lon,lat,'PI HadGEM2: '+seasname,-50,50,5.0,0.0,'n',degC)
+    
+
+    fa.close()
+    fb.close()
+    fc.close()
+    #==============
+    # Pliocene
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+plio_expt+'/temp_data/'+plio_expt+'a@pd'+extra+'*'+m1+'_temp.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+plio_expt+'/temp_data/'+plio_expt+'a@pd'+extra+'*'+m2+'_temp.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+plio_expt+'/temp_data/'+plio_expt+'a@pd'+extra+'*'+m3+'_temp.nc')
+    atemp=fa.variables['temp_1'][:]
+    btemp=fb.variables['temp_1'][:]
+    ctemp=fc.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+
+    # average across the time dimension    
+    plio_atemp_avg=np.mean(atemp,axis=0)
+    plio_btemp_avg=np.mean(btemp,axis=0)
+    plio_ctemp_avg=np.mean(ctemp,axis=0)
+
+    # find standard deviation across time dimension
+    plio_atemp_stdev=np.std(atemp,axis=0)
+    plio_btemp_stdev=np.std(btemp,axis=0)
+    plio_ctemp_stdev=np.std(ctemp,axis=0)
+
+    
+    plio_seastemp=np.mean((plio_atemp_avg,plio_btemp_avg,plio_ctemp_avg),axis=0)
+
+    lon=lontemp
+    plio_seastemp,lon = shiftgrid(180.,plio_seastemp,lon,start=False)
+    
+    
+    plotdata(plio_seastemp-273.15,1,lon,lat,'PI HadGEM2: '+seasname,-50,50,5.0,0.0,'n',degC)
+
+
+    fa.close()
+    fb.close()
+    fc.close()
+   
+     #==============
+     # Pliocene+2
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/temp_data/'+pliop2_expt+'a@pd'+extra+'*'+m1+'_temp.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/temp_data/'+pliop2_expt+'a@pd'+extra+'*'+m2+'_temp.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/temp_data/'+pliop2_expt+'a@pd'+extra+'*'+m3+'_temp.nc')
+    atemp=fa.variables['temp_1'][:]
+    btemp=fb.variables['temp_1'][:]
+    ctemp=fc.variables['temp_1'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    
+    pliop2_atemp_avg=np.mean(atemp,axis=0)
+    pliop2_btemp_avg=np.mean(btemp,axis=0)
+    pliop2_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    pliop2_seastemp=np.mean((pliop2_atemp_avg,pliop2_btemp_avg,pliop2_ctemp_avg),axis=0)
+
+    lon=lontemp
+    pliop2_seastemp,lon = shiftgrid(180.,pliop2_seastemp,lon,start=False)
+    
+    fa.close()
+    fb.close()
+    fc.close()
+   
+ 
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_seastemp-pi_seastemp
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    V=0
+    plotdata(plio_anom,2,lon,lat,'Plio - PI Tanom_HG2',0,10,1.0,V,'n',degC)
+    
+    # Pliocene+2 - preindustrial
+
+    pliop2_anom=pliop2_seastemp-pi_seastemp
+    V=[-32,-16,-8,-4,-2,-1,-0.5,0,0.5,1,2,4,8,16,32]
+    V=0
+    plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Tanom_HG2',0,10,1.0,V,'n',degC)
+
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_'+seasname+'anom'+pliop2_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+    
+
+    
+
+
+
+    # plot anomaly plot for +2 on seperate page for paper
+    #V=[-2,-1,0,1,2,4,8,16,32]
+    #V=[-1,0,1,2,4,8,16,32]
+    V=0
+    plotdata(pliop2_anom,99,lon,lat,'a) mPWP temperature anomaly '+seasname,0.,16,1.0,V,'n',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/MAT_anom_only_'+seasname+pliop2_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+
+
+# plot standard deviation for plio for months
+
+
+    plotdata(pi_atemp_stdev,0,lon,lat,'PI stdev m1: '+seasname,0,6,0.5,0.0,'n',degC)
+    plotdata(pi_btemp_stdev,1,lon,lat,'PI stdev m2: '+seasname,0,6,0.5,0.0,'n',degC)
+    plotdata(pi_ctemp_stdev,2,lon,lat,'PI stdev m3: '+seasname,0,6,0.5,0.0,'n',degC)
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/stdevT'+seasname+'_'+preind_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+# plot standard deviation for plio for months
+
+
+    plotdata(plio_atemp_stdev,0,lon,lat,'Plio stdev m1: '+seasname,0,6,0.5,0.0,'n',degC)
+    plotdata(plio_btemp_stdev,1,lon,lat,'Plio stdev m2: '+seasname,0,6,0.5,0.0,'n',degC)
+    plotdata(plio_ctemp_stdev,2,lon,lat,'Plio stdev m3: '+seasname,0,6,0.5,0.0,'n',degC)
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/stdevT'+seasname+'_'+pliop2_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+# plot difference in standard deviation for each month
+
+    stdev_anom_1=plio_atemp_stdev-pi_atemp_stdev
+    stdev_anom_2=plio_btemp_stdev-pi_btemp_stdev
+    stdev_anom_3=plio_atemp_stdev-pi_ctemp_stdev
+    plotdata(stdev_anom_1,0,lon,lat,'Plio stdev m1: '+seasname,-2.5,3.0,0.5,0.0,'a',degC)
+    plotdata(stdev_anom_2,1,lon,lat,'Plio stdev m2: '+seasname,-2.5,3.0,0.5,0.0,'a',degC)
+    plotdata(stdev_anom_3,2,lon,lat,'Plio stdev m3: '+seasname,-2.5,3.0,0.5,0.0,'a',degC)
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surftemp/stdevT'+seasname+'anom'+pliop2_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+    # get land mask and put on correct grid
+
+    fm=Dataset('/nfs/hera1/earjcti/um/HadGEM_ancils/qrparm.mask.nc')
+    lsmlon=fm.variables['longitude'][:]
+    lsmlat=fm.variables['latitude'][:]
+    lsm=fm.variables['lsm'][:]
+    lsm=np.squeeze(lsm)
+    lsm,lsmlon = shiftgrid(180.,lsm,lsmlon,start=False)
+    fm.close()
+   
+    # arctic circle mask polewards of 60N
+    arct_circ_mask=np.zeros(np.shape(lsm))
+    arct_circ_mask_high=np.zeros(np.shape(lsm))
+    antarct_circ_mask=np.zeros(np.shape(lsm))
+    antarct_circ_mask_high=np.zeros(np.shape(lsm))
+    for j in range(0,len(lat)):
+        if lsmlat[j] < 60.:
+            arct_circ_mask[j,:]=1.0
+        if lsmlat[j] < 75.:
+            arct_circ_mask_high[j,:]=1.0
+        if lsmlat[j] > -60.:
+            antarct_circ_mask[j,:]=1.0
+        if lsmlat[j] > -75.:
+            antarct_circ_mask_high[j,:]=1.0
+
+
+
+    if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+        anom_land=pliop2_anom / lsm
+        anom_sea=pliop2_anom / np.abs(lsm-1.0)
+        arctic_anom=pliop2_anom / np.abs(arct_circ_mask-1.0)
+        antarctic_anom_high=pliop2_anom / np.abs(antarct_circ_mask_high-1.0)
+    else:
+        print('error lon/lat of land sea mask dont match')
+        anom_land=pliop2_anom * lsm
+        plotdata(anom_land,99,lon,lat,'a) mPWP temperature anomaly',0,10,1.0,V,'i',degC)
+        plt.show()
+        sys.exit()
+
+
+    # create weighting array
+    weightarr=np.zeros(np.shape(anom_sea))
+    for i in range(0,len(lon)):
+        weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+    print()
+    print(seasname)
+    print('=====')
+    print('mean anom_sea',np.average(pliop2_anom,weights=weightarr * np.abs(lsm-1.0)))
+    print('mean anom_land',np.average(pliop2_anom,weights=weightarr*lsm))
+    print('allmean',np.average(pliop2_anom,weights=weightarr))
+    print('arct circ mean',np.average(pliop2_anom,weights=weightarr* np.abs(arct_circ_mask-1.0)))
+    print('arct circ high mean',np.average(pliop2_anom,weights=weightarr* np.abs(arct_circ_mask_high-1.0)))
+    print('antarct circ mean',np.average(pliop2_anom,weights=weightarr* np.abs(antarct_circ_mask-1.0)))
+    print('antarct circ high mean',np.average(pliop2_anom,weights=weightarr* np.abs(antarct_circ_mask_high-1.0)))
+
+    plotdata(arctic_anom,0,lon,lat,'a) mPWP temperature anomaly',8,16,1.0,V,'n',degC)
+    #plotdata(antarctic_anom_high,1,lon,lat,'a) mPWP temperature anomaly',8,16,1.0,V,'n',degC)
+    #plotdata(anom_land,2,lon,lat,'a) mPWP temperature anomaly',8,16,1.0,V,'n',degC)
+    #plotdata(anom_sea,3,lon,lat,'a) mPWP temperature anomaly',8,16,1.0,V,'n',degC)
+    #plt.show()
+      
+
+
+
+
+
+   
+
+
+
+
+
+
+
+#end def annmean
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+preind_expt='xkvje'
+plio_expt='xkvjf'
+pliop2_expt='xkvjg'
+extra='n'
+
+
+plt.figure(figureno)
+annmean('y',preind_expt,plio_expt,pliop2_expt,extra)
+figureno=figureno+1
+
+#djf mean
+#plt.figure(figureno)
+#seasmean('dc','ja','fb',figureno,'djf',preind_expt,plio_expt,pliop2_expt,extra)
+#figureno=figureno+1
+
+#mam mean
+#plt.figure(figureno)
+#seasmean('mr','ar','my',figureno,'mam',preind_expt,plio_expt,pliop2_expt,extra)
+#figureno=figureno+1
+
+#jja mean
+#plt.figure(figureno)
+#seasmean('jn','jl','ag',figureno,'jja',preind_expt,plio_expt,pliop2_expt,extra)
+#figureno=figureno+1
+
+#son mean
+#plt.figure(figureno)
+#seasmean('sp','ot','nv',figureno,'son',preind_expt,plio_expt,pliop2_expt,extra)
+#figureno=figureno+1
+
+
+
+
+sys.exit(0)
+
+####
+

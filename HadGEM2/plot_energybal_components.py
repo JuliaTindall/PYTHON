@@ -1,0 +1,160 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Aug 29 15:30:44 2019
+
+@author: earjcti
+
+This program will plot the individual components of the energy balance
+and how they differ between HadCM3 and HadGEM2.  It will make use of
+the files produced by plot_energybal.py
+"""
+
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def read_data(filename):
+
+    """
+    reads all the data from the file into an array
+    also reads the titleline into 'names'
+    """
+
+    file1 = open(filename, "r")
+    line = file1.readline() # titleline
+    line = line.rstrip() # remove /n
+    names = line.split(',') # all the names are in the titleline
+
+    alldata = []
+    line = file1.readline()
+
+    while line:
+        linedata = []
+        line = line.rstrip()
+        vals = line.split(',')
+        for val in vals:
+            val = np.float(val)
+            linedata.append(val)
+        alldata.append(linedata)
+        line = file1.readline()
+
+    return (names, alldata)
+
+def data_to_arrays(names, data):
+    """
+    converts the list data that we read in from the file
+    into arrays containing the latitudes and the energy balance fields
+    """
+
+    lats = np.zeros(len(data))
+    fields = np.zeros((len(lats), len(names) - 1))
+
+    for i in range(0, len(lats)):
+        lats[i] = data[i][0]
+        fields[i, :] = data[i][1:]
+
+    return [lats, fields]
+
+def  plot_energybal_components(names, lats, fields, lats2, fields2,
+                               overalltitle, outname):
+    """
+    this will plot all of the energy balance components
+    it requires
+    a) the names of the fields in the data arrays
+    b) the hadgem latitudes
+    c) the hadgem fields
+    d) the hadcm3 latitudes
+    e) the hadcm3 fields
+    """
+    titlename = {"Greenhouse gas emissivity" : "GHG Emissivity",
+                 "Cloud emissivity" : "Cld Emmissivity",
+                 "surfacealbedo" : "Surface Albedo",
+                 "clear sky albedo" : "Clear Sky Albdeo",
+                 "cloud albedo" : "Cloud Albedo",
+                 "heat_transport" : "Heat Transport"
+                }
+
+    fig = plt.figure()
+    #fig.suptitle(overalltitle, fontsize=12)
+
+    for field in range(0, len(names) - 1):
+        ax = fig.add_subplot(2, 3, field + 1)
+
+        print('hglats', np.shape(lats))
+        print('hgnemas', names)
+        ax.plot(lats, fields[:, field])
+        if field + 1 > 3:
+            ax.set_xlabel('latitude')
+        if (field + 1 == 1) or (field + 1 == 4):
+            ax.set_ylabel('deg C')
+        ax.set_xlim(-90, 90)
+
+        if len(fields2) > 1:
+            ax.plot(lats2, fields2[:, field])
+
+        ax.plot([-90, 90], [0, 0], color='black', linestyle=':')
+
+        ax.title.set_text(titlename.get(names[field + 1]))
+
+
+    plt.tight_layout()
+    #fig.subplots_adjust(top=0.8)
+
+    fileout = (FILESTART + outname + '.eps')
+    plt.savefig(fileout, bbox_inches='tight')
+
+    fileout = (FILESTART + outname + '.png')
+    plt.savefig(fileout, bbox_inches='tight')
+
+
+def regrid_data(latold, dataold, latreq):
+    """
+    regrids the HadGEM data onto a HadCM3 grid
+    """
+
+    nlats, nmods = np.shape(dataold)
+    regriddata = np.zeros((len(latreq), nmods))
+
+    for i in range(0, nmods):
+        regriddata[:, i] = np.interp(latreq, latold, dataold[:, i])
+
+
+    return regriddata
+
+def main():
+    """
+    main controller of the program to plot the energy banace components
+    """
+
+# get HadGEM data and HadCM3 data
+    HG_names, HG_data = read_data(HADGEM_FILE)
+    HCM_names, HCM_data = read_data(HADCM3_FILE)
+
+# set up enerby balance components in an array for plotting
+    HGlats, HG_fields = data_to_arrays(HG_names, HG_data)
+    HCMlats, HCM_fields = data_to_arrays(HCM_names, HCM_data)
+
+# plot all energybalance components
+
+    plot_energybal_components(HG_names, HGlats, HG_fields, HCMlats, HCM_fields,
+                              'Warming attributable to each component for HadGEM2 and HadCM3',
+                              'EnergyBalanceComponents')
+
+# put HadGEM data on same grid as HadCM3 data
+    HG_fields_regrid = regrid_data(HGlats, HG_fields, HCMlats)
+
+# get the data anomaly and plot
+    anomaly_fields = HG_fields_regrid - HCM_fields
+    plot_energybal_components(HG_names, HCMlats, anomaly_fields, [], [],
+                              'HadGEM2 - HadCM3: Warming Attributable to each Component',
+                              'EnergyBalanceComponentsAnomaly')
+
+
+FILESTART='/home/earjcti/PYTHON/PLOTS/HadGEM2/plot_energybal/'
+#FILESTART = ''
+HADGEM_FILE = FILESTART + 'RF_energybalxkvjg-xkvje.tex'
+HADCM3_FILE = FILESTART + 'RF_energybalxibot-xibos.tex'
+
+main()

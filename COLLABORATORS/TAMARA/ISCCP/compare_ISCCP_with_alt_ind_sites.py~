@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on 21.12.2022 by Julia
+
+we have two ways of mapping the ipsl clouds onto ISCCP.  These are
+1. map_ipsl_to_ISCCP.py  which minimises the euclidean distance between
+   the histograms
+2. map_ipsl_to_ISCCP_alternative_williams_webb.py  which finds the centroids
+   of tcc, ctp, albedo and minimises the euclidean distance between the
+   centroids
+
+This program will read the westher states from both method at a site.
+It will show a graph of the weather state by month
+"""
+import numpy as np
+import iris
+import iris.plot as iplt
+from iris.cube import CubeList as CubeList
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import cartopy
+import cartopy.crs as ccrs
+import sys
+
+def get_weather_states():
+    """
+    reads in the weather states from the files
+    """
+    filestart = '/home/users/jctindall/cloud_regiemes/'
+    fileend = preind_plio_ind + '_year_' + str(YEAR) + '.nc'
+    orig_ws_file = filestart + '/ISCCP/' + fileend
+    alt_ws_file = filestart + '/ISCCP_alternative/' + fileend
+
+
+    orig = iris.load(alt_ws_file)
+    print(orig[0])
+    sys.exit(0)
+    orig_cube = iris.load_cube(orig_ws_file,'cl')
+    alt_cube = iris.load_cube(alt_ws_file,'ISCCP Cloud Area Fraction')
+
+    lats = orig.cube.coord('latitude').points
+    latix = np.abs(lats - SITELAT).argmin()
+    latuse = lats[latix]
+    
+    lons = orig.cube.coord('longitude').points
+    lonix=np.abs(lons - SITELON).argmin()
+    lonuse = lons[lonix]
+    print(latuse,lonuse)
+    sys.exit(0)
+    
+    return orig_at_site_cube, alt_at_site_cube
+
+    
+########    START OF PROGRAM ########################
+
+preind_plio_ind = 'PLIO' #  optionS PREIND PLIO
+sitename = 'BeaverPond' # 79N, 82W
+SITELAT = 79.0
+SITELON = -82
+YEAR = 2025
+
+orig_ws, alt_ws = get_weather_states()
+sys.exit(0)
+# find where orig_ws and alt_ws agree
+orig_ws_data = orig_ws.data
+alt_ws_data = alt_ws.data
+agree_data = np.ma.where(orig_ws_data == alt_ws_data, orig_ws_data,-99999.)
+agree_cube = orig_ws.copy(data=agree_data)
+agree_cube.long_name = 'both_methods_agree'
+number_agree = np.sum(np.where(agree_data > 0, 1.0, 0.0))
+number_zero = np.sum(np.where(agree_data == 0, 1.0, 0.0))
+print('number in agreement',number_agree,'total=',144*143,'zero=',number_zero)
+print('percentage in disagreement',((144.*143.) - np.float64(number_agree) - np.float64(number_zero)) * 100. / (144.*143.))
+
+# find where they agree or where alt_ws is 7
+orig_7_data = np.ma.where(alt_ws_data==7, alt_ws_data,orig_ws_data)
+agree_or_7_data = np.ma.where(orig_7_data == alt_ws_data, alt_ws_data,-99999.)
+agree_or_7_cube = orig_ws.copy(data=agree_or_7_data)
+agree_or_7_cube.long_name = 'both_methods_agree or low_cloud_fraction'
+number_agree_7 = np.sum(np.where(agree_or_7_data > 0, 1.0, 0.0))
+print('number in agreementor 7',number_agree_7)
+print('percentage in disagreement excl 7',((144.*143.) - np.float64(number_agree_7) - np.float64(number_zero)) * 100. / (144.*143.))
+
+
+cubelist = [agree_cube, agree_or_7_cube]
+iris.save(cubelist,'temporary.nc',fill_value=-99999.,netcdf_format="NETCDF3_CLASSIC")

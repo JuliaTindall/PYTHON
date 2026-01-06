@@ -1,0 +1,383 @@
+#!/usr/bin/env python2.7
+#NAME
+#    enso_anom.py
+#PURPOSE
+#    This program will plot the enso anomaly for the Pliocene and the 
+# preindustrial for figure 1 of the iso_enso paper
+#
+#  It will use the files produced by the IDL program
+#    IDLPRGS/ISOTOPE/elnino/plot_pliocene_patterns_seasonal.pro
+#
+# which are IDLPLOTS/ISOTOPE/elnino/PATTERNS
+#     a) xiboi_0_299_elnino_graph_ONI_ann.nc
+#     b) xibol_0_299_elnino_graph_ONI_ann.nc
+#
+# Note that the program is very specific to the task and is not intended
+# for generic application
+#
+#
+# search for 'main program' to find end of functions
+# Julia 21/4/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+
+   # this is good for a tropical region
+    map=Basemap(llcrnrlon=90.0,urcrnrlon=300.0,llcrnrlat=-45.0,urcrnrlat=45.0,projection='cyl',resolution='c')
+   # this is good for the globe
+   # map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    map.drawmapboundary
+
+    # if it comes from pf file we want to fill the land in white
+    nlons=len(lons)
+    if  nlons > 120:
+        map.drawmapboundary(fill_color='white')
+
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='ar':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V)
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+#   overplot some syms
+    map.scatter(190,0,c='k',marker='o',s=300)
+    map.scatter(190,0,c='g',marker='o',s=250)
+
+    map.scatter(279,-7,c='k',marker='s',s=300)
+    map.scatter(279,-7,c='g',marker='s',s=250)
+
+    map.scatter(141,-3,c='k',marker='^',s=300)
+    map.scatter(141,-3,c='g',marker='^',s=250)
+   
+    map.scatter(175,-16,c='k',marker='D',s=300)
+    map.scatter(175,-16,c='g',marker='D',s=250)
+  
+    map.scatter(124,14.375,c='k',marker='*',s=400)
+    map.scatter(124,14.375,c='g',marker='*',s=340)
+   
+
+    plt.title(titlename,loc='left',fontsize=25)
+    cbar.ax.tick_params(labelsize=15)
+    #cbar.set_label(cbarname,fontsize=15)
+    cbar.ax.set_title(cbarname,fontsize=20)
+#end def plotdata
+
+
+
+################################
+# main program
+
+# open and read in preindstrial data
+
+datasetname='/nfs/hera1/earjcti/IDLPLOTS/ISOTOPE/elnino/PATTERNS/xiboi_0_299_elnino_graph_ONI_ann.nc'
+fpi=Dataset(datasetname)
+latpd = fpi.variables['latitudepd'][:]
+lonpd = fpi.variables['longitudepd'][:]
+latpf = fpi.variables['latitudepf'][:]
+lonpf = fpi.variables['longitudepf'][:]
+pitemp=fpi.variables['a_Preind_temp'][:]
+piprecip=fpi.variables['d_preind_precip'][:]
+pid18op=fpi.variables['g_preind_d18op'][:]
+pid18osw=fpi.variables['j_preind_d18osw'][:]
+fpi.close()
+
+
+# plot a) preindustrial temperature
+degC=u'\N{DEGREE SIGN}'+'C'
+plotdata(pitemp,0,lonpf,latpf,'a) Preindustrial EN-NT SST',-2.0,2.2,0.2,0.0,'ar',degC)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1a.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1a.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot d) preindustrial precipitation
+plotdata(piprecip,0,lonpd,latpd,'d) Preindustrial EN-NT precipitation',-100.0,120.0,20.,0.0,'a','mm/month')
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1d.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1d.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot g) preindustrial d18op
+permil=u'\u2030'
+plotdata(pid18op,0,lonpd,latpd,'g) Preindustrial EN-NT d18O_p',-3.0,3.6,0.6,0.0,'ar','mm/month')
+plt.show()
+sys.exit()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1g.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1g.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+
+
+
+
+precipanom='y'
+tempanom='y'
+d18opanom='y'
+d18oswanom='y'
+
+
+if precipanom=='y':
+    # figure 1d PI panom
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','precip')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','precip')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+
+    # djf - jja  mean for xiboi
+    djf_jja_xiboi_precip=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_precip,0,xiboi_lon,xiboi_lat,'d) Preindustrial DJF-JJA precipitation',-400,405,5,0.0,'a','mm/month')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1d_precip_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1e Pliocene panom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','precip')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','precip')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_precip=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_precip,0,xibol_lon,xibol_lat,'e) mPWP DJF-JJA precipitation',-400,405,5,0.0,'a','mm/month')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1e_precip_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_precip_anom_xibol_xiboi=djf_jja_xibol_precip - djf_jja_xiboi_precip
+    plotdata(seas_precip_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'f) mPWP-PI,  DJF-JJA precipitation',-100,120,20,0.0,'a','mm/month')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1f_precip_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+if tempanom=='y':
+    ##########################
+    # temperature anomaly fig 1a
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','SST')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+    
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','SST')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+    
+    # djf - jja  mean for xiboi
+    degC=u'\N{DEGREE SIGN}'+'C'
+    djf_jja_xiboi_temp=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_temp,0,xiboi_lon,xiboi_lat,'a) Preindustrial DJF-JJA SST',-15,15.5,0.5,0,'ar',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1a_SST_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1b Pliocene Tanom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','SST')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+    
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','SST')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_temp=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_temp,0,xibol_lon,xibol_lat,'b) mPWP DJF-JJA SST',-15,15.5,0.5,0,'ar',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1b_SST_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_temp_anom_xibol_xiboi=djf_jja_xibol_temp - djf_jja_xiboi_temp
+    plotdata(seas_temp_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'c) mPWP-PI,  DJF-JJA SST',-1.0,1.2,0.2,0,'ar',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1c_SST_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+
+if d18opanom=='y':
+    ##########################
+    # d18op anomaly fig 1g
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','d18op')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+    
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','d18op')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+    
+    # djf - jja  mean for xiboi
+    djf_jja_xiboi_d18op=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_d18op,0,xiboi_lon,xiboi_lat,'g) Preindustrial DJF-JJA d18Op',-10,10.5,0.5,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1g_d18op_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1h Pliocene d18opanom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','d18op')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+    
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','d18op')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_d18op=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_d18op,0,xibol_lon,xibol_lat,'h) mPWP DJF-JJA d18Op',-10,10.5,0.5,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1h_d18op_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_d18op_anom_xibol_xiboi=djf_jja_xibol_d18op - djf_jja_xiboi_d18op
+    plotdata(seas_d18op_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'i) mPWP-PI,  DJF-JJA d18Op',-3.0,3.5,0.5,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1i_d18op_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+
+
+if d18oswanom=='y':
+    ##########################
+    # d18osw anomaly fig 1j
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','d18osw')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+    
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','d18osw')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+    
+    # djf - jja  mean for xiboi
+    djf_jja_xiboi_d18osw=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_d18osw,0,xiboi_lon,xiboi_lat,'j) Preindustrial DJF-JJA d18osw',-0.15,0.18,0.03,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1j_d18osw_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1k Pliocene d18oswanom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','d18osw')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+    
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','d18osw')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_d18osw=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_d18osw,0,xibol_lon,xibol_lat,'k) mPWP DJF-JJA d18Osw',-0.15,0.18,0.03,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1k_d18osw_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_d18osw_anom_xibol_xiboi=djf_jja_xibol_d18osw - djf_jja_xiboi_d18osw
+    plotdata(seas_d18osw_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'l) mPWP-PI,  DJF-JJA d18osw',-0.15,0.18,0.03,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1l_d18osw_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+
+
+
+
+
+
+sys.exit(0)
+
+####
+

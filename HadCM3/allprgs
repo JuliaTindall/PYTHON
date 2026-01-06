@@ -1,0 +1,5660 @@
+::::::::::::::
+enso_anom.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    enso_anom.py
+#PURPOSE
+#    This program will plot the enso anomaly for the Pliocene and the 
+# preindustrial for figure 1 of the iso_enso paper
+#
+#  It will use the files produced by the IDL program
+#    IDLPRGS/ISOTOPE/elnino/plot_pliocene_patterns_seasonal.pro
+#
+# which are IDLPLOTS/ISOTOPE/elnino/PATTERNS
+#     a) xiboi_0_299_elnino_graph_ONI_ann.nc
+#     b) xibol_0_299_elnino_graph_ONI_ann.nc
+#
+# Note that the program is very specific to the task and is not intended
+# for generic application
+#
+#
+# search for 'main program' to find end of functions
+# Julia 21/4/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+
+   # this is good for a tropical region
+    map=Basemap(llcrnrlon=90.0,urcrnrlon=300.0,llcrnrlat=-45.0,urcrnrlat=45.0,projection='cyl',resolution='c')
+   # this is good for the globe
+   # map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    map.drawmapboundary
+
+
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='ar':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V)
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+
+
+#   overplot some syms
+    map.scatter(190,0,c='k',marker='o',s=300)
+    map.scatter(190,0,c='g',marker='o',s=250)
+
+    map.scatter(279,-7,c='k',marker='s',s=300)
+    map.scatter(279,-7,c='g',marker='s',s=250)
+
+    map.scatter(141,-3,c='k',marker='^',s=300)
+    map.scatter(141,-3,c='g',marker='^',s=250)
+   
+    map.scatter(175,-16,c='k',marker='D',s=300)
+    map.scatter(175,-16,c='g',marker='D',s=250)
+  
+    map.scatter(124,14.375,c='k',marker='*',s=400)
+    map.scatter(124,14.375,c='g',marker='*',s=340)
+   
+
+    plt.title(titlename,loc='left',fontsize=25)
+    cbar.ax.tick_params(labelsize=15)
+    #cbar.set_label(cbarname,fontsize=15)
+    cbar.ax.set_title(cbarname,fontsize=20)
+#end def plotdata
+
+
+
+################################
+# main program
+
+# open and read in preindstrial data
+
+datasetname='/nfs/hera1/earjcti/IDLPLOTS/ISOTOPE/elnino/PATTERNS/xiboi_0_299_elnino_graph_ONI_ann.nc'
+fpi=Dataset(datasetname)
+latpd = fpi.variables['latitudepd'][:]
+lonpd = fpi.variables['longitudepd'][:]
+latpf = fpi.variables['latitudepf'][:]
+lonpf = fpi.variables['longitudepf'][:]
+pitemp=fpi.variables['a_Preind_temp'][:]
+piprecip=fpi.variables['d_preind_precip'][:]
+pid18op=fpi.variables['g_preind_d18op'][:]
+pid18osw=fpi.variables['j_preind_d18osw'][:]
+fpi.close()
+
+
+# plot a) preindustrial temperature
+degC=u'\N{DEGREE SIGN}'+'C'
+plotdata(pitemp,0,lonpf,latpf,'a) Preindustrial EN-NT SST',-2.0,2.2,0.2,0.0,'ar',degC)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1a.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1a.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot d) preindustrial precipitation
+plotdata(piprecip,0,lonpd,latpd,'d) Preindustrial EN-NT precipitation',-100.0,120.0,20.,0.0,'a','mm/month')
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1d.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1d.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot g) preindustrial d18op
+permil=u'\u2030'
+plotdata(pid18op,0,lonpd,latpd,'g) Preindustrial EN-NT d18O_p',-3.0,3.6,0.6,0.0,'ar',permil)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1g.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1g.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+# plot j) preindustrial d18osw
+permil=u'\u2030'
+plotdata(pid18osw,0,lonpf,latpf,'j) Preindustrial EN-NT d18O_sw',-0.15,0.18,0.03,0.0,'ar',permil)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1j.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1j.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+####################################
+# open and read in Pliocene data
+
+datasetname='/nfs/hera1/earjcti/IDLPLOTS/ISOTOPE/elnino/PATTERNS/xibol_0_299_elnino_graph_ONI_ann.nc'
+fpi=Dataset(datasetname)
+latpd = fpi.variables['latitudepd'][:]
+lonpd = fpi.variables['longitudepd'][:]
+latpf = fpi.variables['latitudepf'][:]
+lonpf = fpi.variables['longitudepf'][:]
+pltemp=fpi.variables['b_Plio_temp'][:]
+plprecip=fpi.variables['e_plio_precip'][:]
+pld18op=fpi.variables['h_plio_d18op'][:]
+pld18osw=fpi.variables['k_plio_d18osw'][:]
+anomtemp=fpi.variables['c_temp_anom'][:]
+anomprecip=fpi.variables['f_anom_precip'][:]
+anomd18op=fpi.variables['i_anom_d18op'][:]
+anomd18osw=fpi.variables['l_anom_d18osw'][:]
+fpi.close()
+
+
+# plot b) mPWP temperature
+degC=u'\N{DEGREE SIGN}'+'C'
+plotdata(pltemp,0,lonpf,latpf,'b) mPWP EN-NT SST',-2.0,2.2,0.2,0.0,'ar',degC)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1b.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1b.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot e) mPWP precipitation
+plotdata(plprecip,0,lonpd,latpd,'e) mPWP EN-NT precipitation',-100.0,120.0,20.,0.0,'a','mm/month')
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1e.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1e.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot h) mPWP d18op
+permil=u'\u2030'
+plotdata(pld18op,0,lonpd,latpd,'h) mPWP EN-NT d18O_p',-3.0,3.6,0.6,0.0,'ar',permil)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1h.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1h.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+# plot k) mPWP d18osw
+permil=u'\u2030'
+plotdata(pld18osw,0,lonpf,latpf,'k) mPWP EN-NT d18O_sw',-0.15,0.18,0.03,0.0,'ar',permil)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1k.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1k.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+##### plot anomalies
+
+# plot c) mPWP temperature
+degC=u'\N{DEGREE SIGN}'+'C'
+plotdata(anomtemp,0,lonpf,latpf,'c) mPWP-Preindustrial [EN-NT] SST',-1.0,1.2,0.2,0.0,'ar',degC)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1c.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1c.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot f) mPWP-Preindustrialprecipitation
+plotdata(anomprecip,0,lonpd,latpd,'f) mPWP-Preind [EN-NT] precip',-100.0,120.0,20.,0.0,'a','mm/month')
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1f.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1f.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+
+# plot i) mPWP-Preindustriald18op
+permil=u'\u2030'
+plotdata(anomd18op,0,lonpd,latpd,'i) mPWP-Preind [EN-NT] d18O_p',-3.0,3.6,0.6,0.0,'ar',permil)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1i.eps' 
+plt.savefig(fileout, bbox_inches='tight') 
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1i.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+# plot l) mPWP-Preindustrial d18osw
+permil=u'\u2030'
+plotdata(anomd18osw,0,lonpf,latpf,'l) mPWP-Preind [EN-NT] d18O_sw',-0.15,0.18,0.03,0.0,'ar',permil)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1l.eps' 
+plt.savefig(fileout, bbox_inches='tight')  
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/enso_anom/fig_1l.png' 
+plt.savefig(fileout, bbox_inches='tight')  
+plt.close()
+ 
+
+
+
+
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+get_nino34_index.py
+::::::::::::::
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on July 21 2020
+
+#
+# This program will produce a regridded 1X1degree timeseries of a given field.  
+# We will remove the annual cycle in order to look for interannual variability 
+# etc.  
+
+
+import numpy as np
+from netCDF4 import Dataset
+import iris
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import iris.analysis.cartography
+import iris.coord_categorisation
+import cf_units as unit
+from iris.experimental.equalise_cubes import equalise_attributes
+import sys
+#import os
+
+###################################################
+# get all data from files as a single cube
+##################################################
+
+def get_hadcm3_cube():
+    """
+    get's the datacube from hadcm3 
+    """
+    allcubes = iris.cube.CubeList([])
+    monthnames = ['ja', 'fb', 'mr', 'ar','my','jn',
+                  'jl','ag','sp','ot','nv','dc']
+    
+    extraalt = {'t' : 'u',
+                'n' : 'o' }
+    
+    for year in range(STARTYEAR, ENDYEAR):
+        if year < 100:
+            yearuse = str(year).zfill(2)
+            filestart2 = FILESTART + EXTRA + yearuse
+        elif year < 200:
+            yearuse = str(year -100).zfill(2)
+            filestart2 = FILESTART + extraalt.get(EXTRA) + yearuse
+        for month in monthnames:
+            filename = filestart2 + month + '.nc'
+            cube = iris.load_cube(filename, depth = 5.0)
+            allcubes.append(cube)
+
+#         if model == 'HadCM3':
+ #           cubetemp.coord('t').rename('time')
+ #       cubetemp.coord('time').points = (np.arange(0, 12)+((i-startyear)*12))*30.
+
+ #       cubetemp.coord('time').units = u
+
+ #       allcubes.append(cubetemp)
+
+
+    equalise_attributes(allcubes)
+    cube_temp = allcubes.concatenate_cube()
+    print(cube_temp)
+
+ #   if model == 'MRI2.3':
+ #       cube_temp.coord('pressure level').rename('surface')
+
+ #   if model == 'HadCM3' and fielduse == 'SST':
+ #       cube_temp.coord('unspecified').rename('surface')
+
+ #   if model == 'HadCM3' and fielduse == 'NearSurfaceTemperature':
+ #       cube_temp.coord('ht').rename('surface')
+
+
+  #  cube_temp.coord('surface').points = 0.
+  #  cube = cube_temp.extract(iris.Constraint(surface=0.))
+
+    return cube
+
+
+######################################################
+def cube_avg(cube):
+    """
+    Extract monthly averaged data from a cube
+
+    Parameters:
+    cube (iris cube): A cube with montly data that we average
+
+    Returns:
+    meanmonthcube (iris cube): the input cube averaged over each of the 12 calendar months
+
+    """
+
+    meanmonthcube = cube.aggregated_by('month', iris.analysis.MEAN)
+
+    # NORESM and CESM1.2 does not start at month = 1,
+    #it starts at month = 2. but should be 1
+    # we are doing dome roundabout way of reordering the data
+    #if modelname in ('NorESM1-F', 'NorESM-L', 'CESM1.2', 'CCSM4', 'CESM2'):
+    if modelname in ('NorESM1-F', 'NorESM-L'):
+        allcubes = iris.cube.CubeList([])
+        for mon in range(2, 13):
+            slice = meanmonthcube.extract(iris.Constraint(month=mon))
+            # attempt to reorder time coordinate
+            slice.coord('time').points = mon-1
+            slice.coord('month').points = mon-1
+            slice.coord('time').bounds = None
+            allcubes.append(slice)
+        # do december (month 1)
+        slice = meanmonthcube.extract(iris.Constraint(month=1))
+        slice.coord('time').points = 12
+        slice.coord('month').points = 12
+        slice.coord('time').bounds = None
+        allcubes.append(slice)
+        #process
+        meanmonthcube = (allcubes.merge_cube())
+
+    meanmonthcube.long_name = fieldnameout
+
+    iris.util.promote_aux_coord_to_dim_coord(meanmonthcube, 'month')
+
+    return meanmonthcube
+
+
+def remove_ann_cycle(cube, mon_avg_cube):
+    """
+    removes the annual cycle stored in mon_avg_cube from cube
+    """
+
+    cubedata = cube.data
+    for i, monthno in enumerate(cube.coord('month').points):
+        mon_avg_data = (mon_avg_cube.extract(iris.Constraint(month=monthno))).data
+        cubedata[i, :, :] = cubedata[i, :, :] - mon_avg_data
+
+
+    timeseries_cube = cube.copy(data=cubedata)
+
+    return timeseries_cube
+
+
+##############################################
+def main():
+    """
+    get average seasonal cycle for the cubes
+    """
+
+    cube = get_hadcm3_cube()
+    sys.exit(0)
+
+    # now regrid the cube onto a 1X1 grid (we will first try regridding the raw data)
+    # we have stored the grid we want in a file 'one_lev_one_deg.nc'
+
+    # do not need to regrid CCSM4_UoTdata or a field that was originally on a tripolar grid
+
+    if ((modelname == 'CCSM4-UoT')
+            or (modelname == 'IPSLCM5A' and fieldnamein == 'tos')
+            or (modelname == 'IPSLCM5A2' and fieldnamein == 'tos')):
+        regridded_cube = cube
+    else:
+        cubegrid = iris.load_cube('one_lev_one_deg.nc')
+        regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
+
+
+    refdate = 'days since 0800-01-01 00:00:00'
+
+    # for cosmos
+    if modelname == 'COSMOS':
+        # cosmos data is in a strange time coordinate line yyyymmdd
+        # we need to convert it to days since reference time
+        origpoints = regridded_cube.coord('time').points
+        npoints = len(origpoints)
+        yeararr = np.zeros(npoints)
+        montharr = np.zeros(npoints)
+        dayarr = np.zeros(npoints)
+        daydecimal = np.zeros(npoints)
+        dayssinceref = np.zeros(npoints)
+        for i in range(0, npoints):
+            origstr = str(origpoints[i])
+            yeararr[i] = origstr[:][0:4]
+            montharr[i] = origstr[:][4:6]
+            dayarr[i] = origstr[:][6:8]
+            daydecimal[i] = origstr[:][8:]
+            dayssinceref[i] = dayssinceref[i-1]+dayarr[i]+daydecimal[i]-daydecimal[i-1]
+        # subtract 1 from days since reference date (as reference date will be 1st Jan)
+        dayssinceref = dayssinceref-1
+
+
+        regridded_cube.coord('time').points = dayssinceref
+        #  end of COSMOS loop
+
+    # for EC-Earth3.1
+    if modelname == 'EC-Earth3.1':
+    # convert from hours to days
+        origpoints = regridded_cube.coord('time').points
+        newpoints = origpoints/24.
+        regridded_cube.coord('time').points = newpoints
+        refdate = 'days since 2390-01-01 00:00:00'
+
+
+    # regrid to mm/day from kg/m2/s if required
+    if modelname in ('EC-Earth3.1', 'EC-Earth3.3', 'IPSLCM5A',
+                     'IPSLCM5A2', 'IPSLCM6A', 'CCSM4-Utr', 'GISS2.1G'):
+        if fieldnamein == 'pr':
+            regridded_cube.data = regridded_cube.data * 60. *60. *24.
+            cube.data = cube.data* 60. *60. *24.
+            regridded_cube.name = 'Total precipitation'
+            regridded_cube.long_name = 'Total precipitation'
+            regridded_cube.units = 'mm/day'
+
+
+
+    if modelname in ('NorESM1-F', 'NorESM-L', 'CESM1.2', 'CESM2', 'CCSM4'):
+
+       # if precipitation is in m/s convert to mm/day
+        if fieldnamein == 'pr':
+            regridded_cube.data = regridded_cube.data * 60. * 60. * 24. * 1000.
+            cube.data = cube.data * 60. * 60. * 24. * 1000.
+            regridded_cube.name = 'Total precipitation'
+            regridded_cube.long_name = 'Total precipitation'
+            regridded_cube.units = 'mm/day'
+
+    if modelname in ('CCSM4-UoT', 'NorESM1-F', 'NorESM-L', 'IPSLCM6A',
+                     'EC-Earth3.1', 'EC-Earth3.3', 'IPSLCM5A', 'IPSLCM5A2',
+                     'HadCM3', 'GISS2.1G'):
+         # convert to celcius
+        if fieldnamein in ('tas', 'tos'):
+            regridded_cube.convert_units('Celsius')
+            cube.convert_units('Celsius')
+
+
+    if modelname in ('COSMOS', 'MIROC4m', 'IPSLCM6A', 'EC-Earth3.1'):
+        regridded_cube.coord('time').units = refdate
+
+
+    # add auxillary coordinates month and year
+    iris.coord_categorisation.add_month_number(regridded_cube, 'time', name='month')
+    iris.coord_categorisation.add_year(regridded_cube, 'time', name='year')
+
+
+     # correct the start month if required
+    regridded_cube = correct_start_month(regridded_cube)
+    
+    # calculate averages
+    mean_mon_cube = cube_avg(regridded_cube)
+
+
+
+    # remove annual cyble
+    anom_cube = remove_ann_cycle(regridded_cube, mean_mon_cube)
+
+    # to check we have removed the average properly get the monthly
+    # average of the anomaly cube it should be zero
+
+    new_mean_mon_cube = cube_avg(anom_cube)
+    qplt.contourf(new_mean_mon_cube[2, :, :], levels=np.arange(-0.01, 0.011, 0.001), extend='both')
+    plt.show()
+
+
+
+    # write the cubes out to a file
+
+    outfile = outstart+'timeseries_no_ann_cycle.nc'
+    iris.save(anom_cube, outfile, netcdf_format='NETCDF3_CLASSIC', fill_value=2.0E20)
+
+
+
+
+
+
+##########################################################
+# main program
+
+exptname = {
+        "e280" : "tenvo",
+        "e400" : "tenvq",
+        "e560":"tenvs",
+        "eoi400" : "tenvj",
+        "eoi350" : "tenvk",
+        "eoi450" : "tenvl",
+        "eoi280" : "tenvm"
+      
+}
+
+extraname = {
+        "e280" : "t",
+        "e400" : "t",
+        "eoi400" : "n",
+        "eoi350" : "o",
+        "eoi450" : "o",
+        "eoi280" : "o",
+        "e560" : "v"}
+
+LINUX_WIN='l'
+STARTYEAR=0
+ENDYEAR=200
+TIMEPERIOD='e280'
+expt=exptname.get(TIMEPERIOD)
+EXTRA=extraname.get(TIMEPERIOD)
+
+FILESTART = '/nfs/hera1/earjcti/um/' + expt + '/' + expt + 'o@pf'
+main()
+::::::::::::::
+orbit_forcing_old.py
+::::::::::::::
+#!/usr/bin/env python2.7
+# -*- coding: utf-8 -*-
+#NAME
+#    orbit_forcing
+#PURPOSE
+#    This program will assess the orbital forcing between two different 
+# experiments.  We are actually trying to replicate the difference in incoming
+# shortwave radiation
+#
+#
+# search for 'main program' to find end of functions
+# Julia January 2019
+
+
+
+import os
+import numpy as np
+import scipy as sp
+#import cf
+import iris
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import netCDF4
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+#import basemap
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+
+
+def get_incom_sw(filestart1,filestart2,expt1,expt2,daily):
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    
+  
+
+    for i in range(0,len(monthnames)):
+        # read in data from expt1 files
+        filename=filestart1+monthnames[i]+'.nc'
+        f=Dataset(filename)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        days=f.variables['t'][:]
+        atemp=f.variables['field200'][:] # get incoming sw radiation
+        atemp=np.squeeze(atemp)
+        f.close()
+
+        if i==0:
+            data1=np.zeros((len(lat),len(monthnames)*len(days)))
+            data2=np.zeros((len(lat),len(monthnames)*len(days)))
+            timesteps=len(monthnames)*len(days)
+
+        daystart=i*len(days)
+        dayend=(i+1)*len(days)
+
+    
+        # read in data from expt2 files
+        f=Dataset(filestart2+monthnames[i]+'.nc')
+        atemp2=f.variables['field200'][:] # get incoming sw radiation
+        atemp2=np.squeeze(atemp2)
+        f.close()
+
+        if daily == 'y':
+            data1[:,daystart:dayend]=np.swapaxes(atemp[0:len(days),:,0],0,1)
+            data2[:,daystart:dayend]=np.swapaxes(atemp2[0:len(days),:,0],0,1)
+        else:
+            data1[:,i]=atemp[:,0]
+            data2[:,i]=atemp2[:,0]
+
+            
+    
+    # get maximum from first experiment
+    max_data1_np=np.argmax(data1[0,:]) # find max at northpole
+    max_data1_sp=np.argmax(data1[len(lat)-1,:]) # find max at southpole
+    print('max expt1')
+    print('np',max_data1_np,data1[0,max_data1_np])
+    print('sp',max_data1_sp,data1[0,max_data1_sp])
+
+
+    # get maximum from second experiment
+    max_data2_np=np.argmax(data2[0,:]) # find max at northpole
+    max_data2_sp=np.argmax(data2[len(lat)-1,:]) # find max at southpole
+    print('max expt2')
+    print('np',max_data2_np,data2[0,max_data2_np])
+    print('sp',max_data2_sp,data2[0,max_data2_sp])
+
+    nh_shift=max_data2_np-max_data1_np
+    sh_shift=max_data2_sp-max_data1_sp
+
+    # if the shift calculated from the NH and the SH are within two days 
+    # use the mean
+
+    if np.abs(nh_shift-sh_shift) > 300:
+        if sh_shift < 0:
+            sh_shift=sh_shift+360.
+        if nh_shift < 0:
+            nh_shift=nh_shift+360.
+
+    if np.abs(nh_shift-sh_shift) <= 4:
+        shiftreq=np.int(np.fix((nh_shift+sh_shift)/2.0))
+    else:
+        print('we are shifting differently in NH and SH')
+        print('nh shift',max_data2_np-max_data1_np)
+        print('sh shift',max_data2_sp-max_data1_sp)
+        sys.exit(0)
+
+
+    print('nh shift',nh_shift)
+    print('sh shift',sh_shift)
+    print('shift',shiftreq)
+
+    data2_raw=data2
+    data2_shifted=np.zeros(np.shape(data2))
+
+    # shift data2 so that the maximum value in the northern hemisphere is in 
+    # the same place as it is in data1
+
+    shiftreq=shiftreq*(-1)
+    
+    for j in range(0,len(lat)):
+        # shift values using np.roll
+        data2_shifted[j,:]=np.roll(data2_raw[j,:],shiftreq,axis=0) 
+        
+    
+
+    anom=data2_shifted-data1
+
+    V=np.arange(0,600,50)
+    
+    plt.subplot(2,2,1)
+    print('j1',np.shape(len(monthnames)))
+    print('j2',np.shape(lat))
+    print('j3',np.shape(data1))
+
+    plt.contourf(np.arange(0,timesteps),lat,data1,V,extend='max')
+    plt.title('PI')
+   
+    plt.colorbar()
+
+    plt.subplot(2,2,2)
+    plt.contourf(np.arange(0,timesteps),lat,data2_raw,V,extend='max')
+    plt.title('new orbit '+expt2+' - raw')
+    plt.colorbar()
+
+    plt.subplot(2,2,3)
+    plt.contourf(np.arange(0,timesteps),lat,data2_shifted,V,extend='max')
+    plt.title('new orb (month+'+np.str(shiftreq)+')')
+
+    plt.colorbar()
+
+    plt.subplot(2,2,4)
+    V=np.arange(-100,105,5)
+    plt.contourf(np.arange(0,timesteps),lat,anom,V,cmap='RdBu_r',extend='both')
+    plt.title('new orbit - PI')
+    if daily == 'y':
+        plt.plot([151,151],[-90,90])
+        plt.plot([270,270],[-90,90])
+    else:
+        plt.plot([5,5],[-90,90])
+        plt.plot([9,9],[-90,90])
+
+    plt.colorbar()
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/'+expt2+'-'+expt1+daily+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+
+    
+    return(shiftreq)
+ 
+
+#end def get_incom_sw
+
+#######################################
+def shiftexpt(shiftreq,expt2,filestart):
+
+
+# read in 30 years of data for each month
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    startyear=41
+    endyear=89
+    for mon in range(0,len(monthnames)):
+        print('setting up month',mon)
+        daystart=mon*30
+        dayend=((mon+1)*30)
+        # testing with iris
+        # note there is no obvious way of automatically averaging becaues
+        # our time dimension is 30
+        
+        for year in range(startyear,endyear):
+            if mon == 0: print('setting up year ',year)
+            # set up for loop
+            if year < 100:
+                extra='7'
+                yearuse=year
+            else:
+                extra='8'
+                yearuse=year-100
+            if yearuse < 10:
+                yearchar='0'+np.str(yearuse)
+            else:
+                yearchar=np.str(yearuse)
+             
+            # get data into iris cubes
+            # atm
+            filename=(filestart+expt2+'/netcdf/'+
+                expt2+'a@pa'+extra+yearchar+monthnames[mon]+'.nc')
+            
+            atmcube=iris.load(filename)
+            ncubes=len(atmcube)
+            
+            #ocean we have two fields with the same name get the first one
+            filename=(filestart+expt2+'/netcdf/'+
+                     expt2+'o@pf'+extra+yearchar+monthnames[mon]+'.nc')
+            
+            ocnallcube=iris.load(filename,'OCN TOP-LEVEL TEMPERATURE          K')
+            ocncube=ocnallcube[0]
+           
+           
+           
+           
+            if (year == startyear) & (mon==0):
+                # set up empty cube from ocean
+                days,odepths,olats,olons=np.shape(ocncube)
+                ndays=days*12
+                dataocn=np.empty((ndays,odepths,olats,olons))
+                dataocn
+                # loop over all cubes and set up empty cubes from atmosphere
+                for c in range(0,ncubes):
+                    # get dimensions
+                    days,ndepths,nlats,nlons=np.shape(atmcube[c])
+                   
+                    # get lats in case we want to plot
+                    #for coord in atmcube[0].coords():
+                    #    #get latitudes
+                    #    if coord.name()=='latitude':
+                    #        lats=coord.points
+                
+                    # this is a horrible way of programming
+                    # doing it like this to save time
+                    if c == 0:
+                        dataarr0=np.zeros((ndays,ndepths,nlats,nlons)) 
+                        # get latitude from array 1 for testing
+                    if c == 1:
+                        dataarr1=np.zeros((ndays,ndepths,nlats,nlons))
+                    if c == 2:
+                        dataarr2=np.zeros((ndays,ndepths,nlats,nlons))
+                    if c == 3:
+                        dataarr3=np.zeros((ndays,ndepths,nlats,nlons))
+                    if c == 4:
+                        dataarr4=np.zeros((ndays,ndepths,nlats,nlons))
+                    if c == 5:
+                        dataarr5=np.zeros((ndays,ndepths,nlats,nlons))
+                    if c == 6:
+                        dataarr6=np.zeros((ndays,ndepths,nlats,nlons))
+                    if c == 7:
+                        print('error you need to add more files to store cube data')
+                        sys.exit(0)
+            else:
+                 # check names in new cube match that in previous cube
+                 if ocncube.long_name !=cubeprevocn.long_name:
+                     print('fields in ocean are not in consistent order')
+                     print(ocncube.long_name,'does not equal',cubeprevocn[c].long_name)
+                     sys.exit(0)
+               
+                 for c in range(0,ncubes):
+                     if atmcube[c].long_name != cubeprev[c].long_name:
+                         print('fields in file are not in consistent order')
+                         print(atmcube[c].long_name,'does not equal',cubeprev[c].long_name)
+                         sys.exit(0)
+                        
+            
+            # put data into cube
+            # add ocean and atm data
+            if year ==startyear:
+                  dataocn[daystart:dayend,:,:,:]=ocncube.data
+                  dataarr0[daystart:dayend,:,:,:]=atmcube[0].data
+                  dataarr1[daystart:dayend,:,:,:]=atmcube[1].data
+                  dataarr2[daystart:dayend,:,:,:]=atmcube[2].data
+                  dataarr3[daystart:dayend,:,:,:]=atmcube[3].data
+                  dataarr4[daystart:dayend,:,:,:]=atmcube[4].data
+                  dataarr5[daystart:dayend,:,:,:]=atmcube[5].data
+                  count=1
+                  
+            else:
+                 dataocn[daystart:dayend,:,:,:]=(
+                            (dataocn[daystart:dayend,:,:,:]+ocncube.data)) 
+            
+                 dataarr0[daystart:dayend,:,:,:]=(
+                            (dataarr0[daystart:dayend,:,:,:]+atmcube[0].data))
+                 dataarr1[daystart:dayend,:,:,:]=(
+                            (dataarr1[daystart:dayend,:,:,:]+atmcube[1].data))
+                 dataarr2[daystart:dayend,:,:,:]=(
+                            (dataarr2[daystart:dayend,:,:,:]+atmcube[2].data))
+                 dataarr3[daystart:dayend,:,:,:]=(
+                            (dataarr3[daystart:dayend,:,:,:]+atmcube[3].data))
+                 dataarr4[daystart:dayend,:,:,:]=(
+                            (dataarr4[daystart:dayend,:,:,:]+atmcube[4].data))
+                 dataarr5[daystart:dayend,:,:,:]=(
+                            (dataarr5[daystart:dayend,:,:,:]+atmcube[5].data))
+                 count=count+1
+                
+            
+            cubeprev=atmcube
+            cubeprevocn=ocncube
+            
+    # data should all be loaded in now
+    # shift it using np.roll
+    dataocn=np.where(dataocn > 10000.,dataocn,dataocn/count)
+    dataarr0=dataarr0/count 
+    dataarr1=dataarr1/count 
+    dataarr2=dataarr2/count 
+    dataarr3=dataarr3/count 
+    dataarr4=dataarr4/count  
+    dataarr5=dataarr5/count 
+    
+    dataocn_sh=np.roll(dataocn,shiftreq,axis=0)
+    for c in range(0,ncubes):
+        if c ==0:
+            dataarr0_sh=np.roll(dataarr0,shiftreq,axis=0)
+        if c ==1:
+            dataarr1_sh=np.roll(dataarr1,shiftreq,axis=0)
+        if c ==2:
+            dataarr2_sh=np.roll(dataarr2,shiftreq,axis=0)
+        if c ==3:
+            dataarr3_sh=np.roll(dataarr3,shiftreq,axis=0)
+        if c ==4:
+            dataarr4_sh=np.roll(dataarr4,shiftreq,axis=0)
+        if c ==5:
+            dataarr5_sh=np.roll(dataarr5,shiftreq,axis=0)
+        if c ==6:
+            dataarr6_sh=np.roll(dataarr6,shiftreq,axis=0)
+        
+        
+        
+        
+    # looks like we have put data in correct place so try and split into
+    # monthly chunks
+    
+    np_slice = atmcube[4].extract(iris.Constraint(latitude=50,longitude=0))
+   
+
+    for mon in range(0,len(monthnames)):
+        daystart=mon*30
+        dayend=((mon+1)*30)
+        fileout=(filestart+expt2+'/netcdf/'+
+                expt2+'a@pa_avg'+monthnames[mon]+'.nc')
+        atmcube[0].data=dataarr0_sh[daystart:dayend,:,:,:]
+        atmcube[1].data=dataarr1_sh[daystart:dayend,:,:,:]
+        atmcube[2].data=dataarr2_sh[daystart:dayend,:,:,:]
+        atmcube[3].data=dataarr3_sh[daystart:dayend,:,:,:]
+        atmcube[4].data=dataarr4_sh[daystart:dayend,:,:,:]
+        atmcube[5].data=dataarr5_sh[daystart:dayend,:,:,:]
+        iris.save(atmcube, fileout,netcdf_format='NETCDF3_CLASSIC',fill_value=2.0E20)
+        ocncube.data=dataocn_sh[daystart:dayend,:,:,:]
+      
+        fileout=(filestart+expt2+'/netcdf/'+
+                expt2+'o@pf_avg'+monthnames[mon]+'.nc')
+        iris.save(ocncube,fileout,netcdf_format='NETCDF3_CLASSIC',fill_value=2.0E+20)
+        
+    #print('j2',atmcube[4].data[:,0,0,0]))
+    #plt.plot(np_slice.data)
+    #np_slice_new = atmcube[4].extract(iris.Constraint(latitude=50,longitude=0))
+    #plt.plot(np_slice_new.data)
+    #print('j2',np_slice_new.data)
+    #plt.show()
+    #print('may have sucessfully overwritten cube')
+    #sys.exit(0)
+    #plt.subplot(2,2,1)
+    #plt.plot(dataarr4[:,0,0,0])
+    #plt.plot(dataarr4[:,0,72,0])
+    #plt.plot(dataarr4[:,0,35,0])
+    #plt.title(atmcube[4].long_name)
+    
+    #plt.subplot(2,2,2)
+    #plt.plot(dataarr4_sh[:,0,0,0])
+    #plt.plot(dataarr4_sh[:,0,72,0])
+    #plt.plot(dataarr4_sh[:,0,35,0])
+    
+   
+    #plt.subplot(2,2,3)
+    #plt.contourf(np.arange(360),lats,np.ndarray.transpose(dataarr2[:,0,:,0]))
+    #plt.title(atmcube[1].long_name)
+    #plt.colorbar()
+    
+    #plt.subplot(2,2,4)
+    #plt.contourf(np.arange(360),lats,np.ndarray.transpose(dataarr2_sh[:,0,:,0]))
+    #plt.title(atmcube[1].long_name)
+    #plt.colorbar()
+    
+    
+    
+    #plt.show()
+    
+    
+    # shift data by required amounts
+    
+    
+    
+        
+
+    
+
+#enddef shiftexpt
+    
+
+
+
+################################
+# main program
+
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+#
+# others are xogzb, xogzc, xogzd, xogze, xogzf
+
+
+#############################
+# from monthly data         #
+#############################
+#expt1='xogzs'
+#filestart1='/nfs/hera1/earjcti/um/xogzs/netcdf/xogzsa@pdz39'
+
+#expt2='xogzw'
+# doesnt matter what year we use
+#filestart2='/nfs/hera1/earjcti/um/xogzw/netcdf/xogzwa@pd729'
+#filestart2='/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy99'
+#filestart2='/nfs/hera1/earjcti/Xiaofang/xhgfk_netcdf/pdfiles/xhgfka@pdy99'
+
+#shiftreq=get_incom_sw(filestart1,filestart2,expt1,expt2,'n')
+#print('new shift required',shiftreq)
+
+
+
+######################################################
+# from daily data                                    #
+######################################################
+##############################################
+# get the shift required from the daily data
+expt1='xogzs'  # preindustrial = xogzs
+filestart1='/nfs/hera1/earjcti/um/xogzs/netcdf/xogzsa@paz99'
+
+expt2='xogzt'
+filestart2='/nfs/hera1/earjcti/um/xogzt/netcdf/xogzta@pa760'
+#filestart2='\\Users\\julia\\OneDrive\\DATA\\HadCM3_DATA\\'
+
+shiftreq=get_incom_sw(filestart1,filestart2,expt1,expt2,'y')
+print('old shift required',shiftreq)
+
+
+########################################
+#shift by appropriate amount
+filestart2='/nfs/hera1/earjcti/um/'
+shiftexpt(shiftreq,expt2,filestart2)
+
+# check shift required is now zero with new files
+filestart2='/nfs/hera1/earjcti/um/xogzt/netcdf/xogzta@pa_avg'
+shiftreq=get_incom_sw(filestart1,filestart2,expt1,expt2,'y')
+print('new shift required',shiftreq)
+################################################################
+
+
+
+#sys.exit(0)
+
+####
+
+::::::::::::::
+orbit_forcing.py
+::::::::::::::
+#!/usr/bin/env python2.7
+# -*- coding: utf-8 -*-
+"""
+#NAME
+#    orbit_forcing
+#PURPOSE
+#    This program will assess the orbital forcing between two different
+# experiments.  We are actually trying to replicate the difference in incoming
+# shortwave radiation
+#
+#  It actually also does the calendar correction for some fields.
+#
+#
+# search for 'main program' to find end of functions
+# Julia January 2019
+# ammended in September 2019 to add new fields including d18o
+"""
+
+
+import numpy as np
+import iris
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import sys
+import cf_units
+
+#import basemap
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+def get_incom_sw_read(filename):
+    """
+    called by get_incom_sw.  Gets the incoming sw radiation from 'filename'
+    """
+    f = Dataset(filename)
+    lat = f.variables['latitude'][:]
+    days = f.variables['t'][:]
+    atemp = f.variables['field200'][:] # get incoming sw radiation
+    atemp = np.squeeze(atemp)
+    f.close()
+
+    return lat, days, atemp
+
+def get_incom_sw_calcshift(lat, d1, d2):
+    """
+    called by get_incom_sw to calculate the shift required
+    d1 and d2 are the data arrays containing the incoming
+              shortwave radiation for the experiments
+    """
+
+ # get maximum from first experiment
+    max_data1_np = np.argmax(d1[0, :]) # find max at northpole
+    max_data1_sp = np.argmax(d1[len(lat)-1, :]) # find max at southpole
+
+    print('np', max_data1_np, d1[0, max_data1_np])
+    print('sp', max_data1_sp, d1[0, max_data1_sp])
+
+
+    # get maximum from second experiment
+    max_data2_np = np.argmax(d2[0, :]) # find max at northpole
+    max_data2_sp = np.argmax(d2[len(lat)-1, :]) # find max at southpole
+
+    print('np', max_data2_np, d2[0, max_data2_np])
+    print('sp', max_data2_sp, d2[0, max_data2_sp])
+
+    nh_shift = max_data2_np - max_data1_np
+    sh_shift = max_data2_sp - max_data1_sp
+
+    # if the shift calculated from the NH and the SH are within two days
+    # use the mean
+
+    if np.abs(nh_shift-sh_shift) > 300:
+        if sh_shift < 0:
+            sh_shift = sh_shift + 360.
+        if nh_shift < 0:
+            nh_shift = nh_shift + 360.
+
+    if np.abs(nh_shift - sh_shift) <= 5:
+        shiftreq = np.int(np.fix((nh_shift + sh_shift)/2.0))
+    else:
+        print('we are shifting differently in NH and SH')
+        print('nh shift', max_data2_np - max_data1_np)
+        print('sh shift', max_data2_sp - max_data1_sp)
+        sys.exit(0)
+        #shiftreq = nh_shift
+
+    print('nh shift', nh_shift)
+    print('sh shift', sh_shift)
+    print('shift', shiftreq)
+    #sys.exit(0)
+    return shiftreq
+
+def get_incom_sw_plotdata(lat_, timesteps_, d1,
+                          d2_raw, d2_shifted, expt1_, expt2_, shiftreq_, daily_):
+
+    """
+    called by get_incom_sw
+    plots the incoming short wave radition and shows
+    what the anomaly is like after the data has been shifted in order to
+    check that the shift is correct
+    """
+
+    anom = d2_shifted - d1
+
+    V = np.arange(0, 600, 50)
+
+    plt.subplot(2, 2, 1)
+
+
+    plt.contourf(np.arange(0, timesteps_), lat_, d1, V, extend='max')
+    plt.title('PI')
+
+    plt.colorbar()
+
+    plt.subplot(2, 2, 2)
+    plt.contourf(np.arange(0, timesteps_), lat_, d2_raw, V, extend='max')
+    plt.title('new orbit ' + expt2_ + ' - raw')
+    plt.colorbar()
+
+    plt.subplot(2, 2, 3)
+    plt.contourf(np.arange(0, timesteps_), lat_, d2_shifted, V, extend='max')
+    plt.title('new orb (month+' + np.str(shiftreq_) + ')')
+
+    plt.colorbar()
+
+    plt.subplot(2, 2, 4)
+    V = np.arange(-100, 105, 5)
+    plt.contourf(np.arange(0, timesteps_), lat_, anom, V, cmap='RdBu_r', extend='both')
+    plt.title('new orbit - PI')
+    if daily_ == 'y':
+        plt.plot([151, 151], [-90, 90])
+        plt.plot([270, 270], [-90, 90])
+    else:
+        plt.plot([5, 5], [-90, 90])
+        plt.plot([9, 9], [-90, 90])
+
+    plt.colorbar()
+
+    plt.savefig(plotout, bbox_inches='tight')
+    plt.close()
+
+
+def get_incom_sw(filestart1, filestart2, expt1, expt2, daily):
+    """
+    the top level for getting the incoming shortwave radiation from
+    two experiments and seeing how much we have to shift by to get the
+    solstaces to line up
+
+    inputs:
+    filestart1/2, expt1/2 are the experiment name and the file path
+                             for the control/anomaly experiment
+    daily is a y/n indicator saying whether the input data is daily data
+          (ie from a pa file) or monthly data (ie from a pd file)
+
+    returns:
+        shiftreq:  the number of days/months to shift the second experiment
+                   by to get the two experiments to line up
+    """
+
+    print('j2')
+    for i in range(0, len(monthnames)):
+        # read in data from expt1 files
+        filename1 = filestart1 + monthnames[i] + '.nc'
+        lat1, days1, atemp1 = get_incom_sw_read(filename1)
+
+        if i == 0:
+            data1 = np.zeros((len(lat1), len(monthnames)*len(days1)))
+            data2 = np.zeros((len(lat1), len(monthnames)*len(days1)))
+            timesteps = len(monthnames)*len(days1)
+
+        daystart = i*len(days1)
+        dayend = (i + 1)*len(days1)
+
+
+        # read in data from expt2 files
+        filename2 = filestart2 + monthnames[i] + '.nc'
+        lat2, days2, atemp2 = get_incom_sw_read(filename2)
+
+
+        if daily == 'y':
+            data1[:, daystart:dayend] = np.swapaxes(atemp1[0:len(days1), :, 0], 0, 1)
+            data2[:, daystart:dayend] = np.swapaxes(atemp2[0:len(days1), :, 0], 0, 1)
+        else:
+            data1[:, i] = atemp1[:, 0]
+            data2[:, i] = atemp2[:, 0]
+
+    print('j3')
+    if daily == 'y':
+        shiftreq = get_incom_sw_calcshift(lat1, data1, data2)
+    else:
+        shiftreq=0.0
+    print('j4')
+
+   # shift data
+
+    data2_raw = data2
+    data2_shifted = np.zeros(np.shape(data2))
+
+    # shift data2 so that the maximum value in the northern hemisphere is in
+    # the same place as it is in data1
+
+    shiftreq = shiftreq * (-1)
+
+    for j in range(0, len(lat1)):
+        # shift values using np.roll
+        data2_shifted[j, :] = np.roll(data2_raw[j, :], shiftreq, axis=0)
+
+
+
+
+    get_incom_sw_plotdata(lat1, timesteps, data1, data2_raw,
+                          data2_shifted, expt1, expt2, shiftreq, daily)
+
+
+
+    return shiftreq
+
+
+#end def get_incom_sw
+
+def shiftexpt_init(mon_, year_, filestart__):
+
+    daystart_ = mon_ * 30
+    dayend_ = ((mon_ + 1) * 30)
+
+    if year_ < 100:
+        extra_ = 'o'
+        yearuse_ = year_
+    else:
+        extra_ = '80'
+        yearuse_ = year_ - 100
+
+    if yearuse_ < 10:
+        yearchar_ = '0' + np.str(yearuse_)
+    else:
+        yearchar_ = np.str(yearuse_)
+
+    filename_ = (filestart__ + extra_ + yearchar_ + monthnames[mon_] + '.nc')
+
+    return daystart_, dayend_, filename_
+
+def shiftexpt_monchunk(cubeorig, mon_, dataarr_sh_, fieldname_):
+
+    daystart = mon_ * 30
+    dayend = ((mon_ + 1) * 30)
+
+    # take a copy of the original cube but put in the new data
+    newcube = cubeorig.copy(data=dataarr_sh_[daystart:dayend, :, :, :])
+
+    plt.plot(newcube.data[:, 0, 20, 20])
+
+
+    # rename if required
+
+    if fieldname_ == 'Stash code = 8244':
+        newcube.rename('SOIL MOISTURE CONTENT 18O')
+    if fieldname_ == 'Stash code = 8246':
+        newcube.rename('SOIL MOISTURE CONTENT IN LAYER 18O')
+
+    return newcube
+
+def shiftexpt_d18o(cube):
+
+    cube.coord('level-1').rename('level')
+    precip16o = (cube.extract(iris.Constraint(level=1.0)) +
+                 cube.extract(iris.Constraint(level=4.0)) +
+                 cube.extract(iris.Constraint(level=7.0)) +
+                 cube.extract(iris.Constraint(level=10.0)))
+    precip18o = (cube.extract(iris.Constraint(level=2.0)) +
+                 cube.extract(iris.Constraint(level=5.0)) +
+                 cube.extract(iris.Constraint(level=8.0)) +
+                 cube.extract(iris.Constraint(level=11.0)))
+
+    cubed18o = ((precip18o / precip16o) - 2005.2E-6)/2005.2E-9
+    tempdata = cubed18o.data
+    tempdata2 = np.where(np.isfinite(tempdata), tempdata, 1.0E20)
+    cubed18o.data = tempdata2
+    cubed18o.rename('d18o')
+    precip18o.rename('precip 18o')
+    precip16o.rename('precip 16o')
+    #u = cf_units.Unit('permille')
+    cubed18o.units = None
+    precip18o.units = 'kg/m2/s'
+    precip16o.units = 'kg/m2/s'
+
+    return cubed18o, precip18o, precip16o
+
+
+
+#######################################
+def shiftexpt(shiftreq, filestart_, fieldname):
+
+
+# read in 30 years of data for each month
+
+    for mon in range(0, len(monthnames)):
+
+        for year in range(startyear, endyear):
+            # get initial data
+            daystart, dayend, filename = shiftexpt_init(mon, year, filestart_)
+
+            # read in the initial data (30 days worth into a cube)
+            cubes = iris.load(filename, fieldname)
+            cube = cubes[0]
+
+
+
+            # put cube data from each month into a file for the
+            # average year data
+            if (year == startyear) & (mon == 0):
+                # set up empty cube from
+                days, ndepths, nlats, nlons = np.shape(cube)
+                ndays = days * 12
+
+                # create a masked array place to put data
+                dataarr1d = np.zeros((ndepths, nlats, nlons))
+                dataarr1d = np.ma.masked_where(np.ma.getmask(cube.data[0, :, :, :]), dataarr1d)
+                dataarr = np.expand_dims(dataarr1d, axis=0)
+                dataarr = np.repeat(dataarr, ndays, axis=0)
+
+            dataarr[daystart:dayend, :, :, :] = (
+                (dataarr[daystart:dayend, :, :, :] + cube.data))
+
+
+    # data should all be loaded in now
+    # shift it using np.roll
+
+
+    dataarr = dataarr / (endyear - startyear)
+
+    dataarr_sh = np.roll(dataarr, shiftreq, axis=0)
+
+    plt.subplot(1, 2, 2)
+    plt.plot(dataarr[:, 0, 20, 20])
+    print(np.shape(dataarr_sh))
+    plt.plot(dataarr_sh[:, 0, 20, 20])
+    plt.subplot(2, 2, 2)
+
+
+    # looks like we have put data in correct place so try and split into
+    # monthly chunks
+
+    cubemon = iris.cube.CubeList([])
+    precip16omon = iris.cube.CubeList([])
+    precip18omon = iris.cube.CubeList([])
+    for mon in range(0, len(monthnames)):
+        chunkcube = shiftexpt_monchunk(cube, mon, dataarr_sh, fieldname)
+
+        if fieldname == 'Stash code = 338': # need to extract d18o
+            d18ocube, precip18ocube, precip16ocube = shiftexpt_d18o(chunkcube)
+            cubemon.append(d18ocube)
+            precip18omon.append(precip18ocube)
+            precip16omon.append(precip16ocube)
+        else:
+            cubemon.append(chunkcube)
+
+
+    return [cubemon, precip18omon, precip16omon]
+
+
+#enddef shiftexpt
+
+
+
+
+################################
+# main program
+
+monthnames = ['ja', 'fb', 'mr', 'ar', 'my', 'jn', 'jl', 'ag', 'sp', 'ot', 'nv', 'dc']
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c',
+#xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+# others are xogzb, xogzc, xogzd, xogze, xogzf
+
+
+#############################
+# from monthly data         #
+#############################
+expt1='xogzb'
+filestart1='/nfs/hera1/earjcti/um/xogzb/netcdf/xogzba@pdt39'
+
+expt2='xogzc'
+# doesnt matter what year we use
+filestart2='/nfs/hera1/earjcti/um/xogzc/netcdf/xogzca@pdt39'
+#filestart2='/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy99'
+#filestart2='/nfs/hera1/earjcti/Xiaofang/xhgfk_netcdf/pdfiles/xhgfka@pdy99'
+plotout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/'
+               + expt2 + '-' + expt1 + 'monthorig.eps')
+
+
+print('j1')
+shiftreq=get_incom_sw(filestart1,filestart2,expt1,expt2,'n')
+print('new shift required',shiftreq)
+sys.exit(0)
+
+
+######################################################
+# from daily data                                    #
+######################################################
+linuxwin = 'l'
+if linuxwin == 'w':
+    filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+else:
+    filestart = '/nfs/hera1/earjcti/um/'
+##############################################
+# get the shift required from the daily data
+e1 = 'xozza'  # preindustrial = xogzs, xozza
+f1 = filestart + 'xozza/netcdf/xozzaa@pam34'
+
+e2 = 'xozzd'
+f2 = filestart + e2 + '/netcdf/' + e2 + 'a@pao87'
+filestart2='\\Users\\julia\\OneDrive\\DATA\\HadCM3_DATA\\'
+
+if linuxwin == 'l':
+    plotout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/'
+               + e2 + '-' + e1 + 'dailyorig.eps')
+else:
+    plotout = filestart + e2 + '-' + e1 + 'dailyorig.png'
+
+toshift = get_incom_sw(f1, f2, e1, e2, 'y')
+print('old shift required', toshift)
+ 
+
+########################################
+#shift by appropriate amount
+#fieldnames = ['Stash code = 338',
+#              'INCOMING SW RAD FLUX (TOA): ALL TSS',
+#              'TOTAL PRECIPITATION RATE     KG/M2/S',
+#              'SOIL MOISTURE CONTENT',
+#              'SOIL MOISTURE CONTENT IN A LAYER',
+#              'Stash code = 8244',
+#              'Stash code = 8246',
+#              'U COMPNT OF WIND ON PRESSURE LEVELS',
+#              'V COMPNT OF WIND ON PRESSURE LEVELS',
+#              'GEOPOTENTIAL HEIGHT: PRESSURE LEVELS',
+#              'SURFACE TEMPERATURE AFTER TIMESTEP']
+
+fieldnames = ['INCOMING SW RAD FLUX (TOA): ALL TSS',
+               'SURFACE TEMPERATURE AFTER TIMESTEP']
+
+
+
+startyear = 51
+#endyear=53
+endyear = 99
+
+
+cube_list_ja = iris.cube.CubeList([])
+cube_list_fb = iris.cube.CubeList([])
+cube_list_mr = iris.cube.CubeList([])
+cube_list_ar = iris.cube.CubeList([])
+cube_list_my = iris.cube.CubeList([])
+cube_list_jn = iris.cube.CubeList([])
+cube_list_jl = iris.cube.CubeList([])
+cube_list_ag = iris.cube.CubeList([])
+cube_list_sp = iris.cube.CubeList([])
+cube_list_ot = iris.cube.CubeList([])
+cube_list_nv = iris.cube.CubeList([])
+cube_list_dc = iris.cube.CubeList([])
+
+
+#filestarto = (filestart + e2 + '/netcdf/' + e2 + 'o@pf')
+#cube1, dummy1, dummy2 = shiftexpt(toshift, filestarto,
+#                                  'OCN TOP-LEVEL TEMPERATURE          K')
+#cube_list_ja.append(cube1[0])
+#cube_list_fb.append(cube1[1])
+#cube_list_mr.append(cube1[2])
+#cube_list_ar.append(cube1[3])
+#cube_list_my.append(cube1[4])
+#cube_list_jn.append(cube1[5])
+#cube_list_jl.append(cube1[6])
+#cube_list_ag.append(cube1[7])
+#cube_list_sp.append(cube1[8])
+#cube_list_ot.append(cube1[9])
+#cube_list_nv.append(cube1[10])
+#cube_list_dc.append(cube1[11])
+
+
+f2 = (filestart + e2 + '/netcdf/' + e2 + 'a@pa')
+print(f2)
+
+for field in range(0, len(fieldnames)):
+    cube1, cube2, cube3 = shiftexpt(toshift, f2, fieldnames[field])
+
+
+    cube_list_ja.append(cube1[0])
+    cube_list_fb.append(cube1[1])
+    cube_list_mr.append(cube1[2])
+    cube_list_ar.append(cube1[3])
+    cube_list_my.append(cube1[4])
+    cube_list_jn.append(cube1[5])
+    cube_list_jl.append(cube1[6])
+    cube_list_ag.append(cube1[7])
+    cube_list_sp.append(cube1[8])
+    cube_list_ot.append(cube1[9])
+    cube_list_nv.append(cube1[10])
+    cube_list_dc.append(cube1[11])
+
+    if fieldnames[field] == 'Stash code = 338':
+        cube_list_ja.append(cube2[0])
+        cube_list_fb.append(cube2[1])
+        cube_list_mr.append(cube2[2])
+        cube_list_ar.append(cube2[3])
+        cube_list_my.append(cube2[4])
+        cube_list_jn.append(cube2[5])
+        cube_list_jl.append(cube2[6])
+        cube_list_ag.append(cube2[7])
+        cube_list_sp.append(cube2[8])
+        cube_list_ot.append(cube2[9])
+        cube_list_nv.append(cube2[10])
+        cube_list_dc.append(cube2[11])
+        cube_list_ja.append(cube3[0])
+        cube_list_fb.append(cube3[1])
+        cube_list_mr.append(cube3[2])
+        cube_list_ar.append(cube3[3])
+        cube_list_my.append(cube3[4])
+        cube_list_jn.append(cube3[5])
+        cube_list_jl.append(cube3[6])
+        cube_list_ag.append(cube3[7])
+        cube_list_sp.append(cube3[8])
+        cube_list_ot.append(cube3[9])
+        cube_list_nv.append(cube3[10])
+        cube_list_dc.append(cube3[11])
+
+
+
+fileout = (f2 + '_avgja.nc')
+print(f2, fileout)
+iris.save(cube_list_ja, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+print('saved first cube')
+
+fileout = (f2 + '_avgfb.nc')
+iris.save(cube_list_fb, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgmr.nc')
+iris.save(cube_list_mr, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgar.nc')
+iris.save(cube_list_ar, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgmy.nc')
+iris.save(cube_list_my, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgjn.nc')
+iris.save(cube_list_jn, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgjl.nc')
+iris.save(cube_list_jl, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgag.nc')
+iris.save(cube_list_ag, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgsp.nc')
+iris.save(cube_list_sp, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgot.nc')
+iris.save(cube_list_ot, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgnv.nc')
+iris.save(cube_list_nv, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+
+fileout = (f2 + '_avgdc.nc')
+iris.save(cube_list_dc, fileout, netcdf_format='NETCDF3_CLASSIC', fill_value=1.0E20)
+print('saved all cubes')
+
+
+# check shift required is now zero with new files
+if linuxwin == 'l':
+    plotout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/'
+               + e2 + '-' + e1 + 'dailynew.eps')
+else:
+    plotout = filestart + e2 + '-' + e1 + 'dailynew.png'
+f2 = filestart + e2 + '/netcdf/' + e2 + 'a@pa_avg'
+
+newshift = get_incom_sw(f1, f2, e1, e2, 'y')
+print('new shift required', newshift)
+::::::::::::::
+plot_d18o_timeslice.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_d18o_timeslice
+#PURPOSE
+#    This program will plot d18o diagnostics from timeslice experiments
+#    it will plot the difference between two given experiments
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,latmin,latmax,lonmin,lonmax):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+ 
+    map=Basemap(llcrnrlon=lonmin,urcrnrlon=lonmax,llcrnrlat=latmin,urcrnrlat=latmax,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                mycmap=mp.cm.get_cmap('bwr',len(V+2))
+                newcolors=mycmap(np.linspace(0,1,len(V+2)))
+                white=([1,1,1,1])
+                newcolors[(len(V)/2)-1:(len(V)/2)+2,:]=white
+                mycmap=ListedColormap(newcolors)
+                print(mycmap)
+                
+                cs = map.contourf(x,y,plotdata,V,cmap=mycmap,extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    cs = map.contourf(x,y,plotdata,V,extend='both',cmap='rainbow')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        #cbar.set_label(cbarname,labelpad=-70,size=15)
+        cbar.set_label(cbarname,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=15)
+   
+
+
+#end def plotdata
+
+def d18o_precip(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2):
+
+    # read in data from expt1 files
+    filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'a@pd'+extra1+'['+startdec1+'-'+enddec1+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['QCL'][:] # get d18o
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    tot_18o=atemp_avg[1,:,:]+atemp_avg[4,:,:]+atemp_avg[7,:,:]+atemp_avg[10,:,:]
+    tot_16o=atemp_avg[0,:,:]+atemp_avg[3,:,:]+atemp_avg[6,:,:]+atemp_avg[9,:,:]
+    
+
+    # check if tot_16o is zero at poles.  If so set it to vsmow
+    for j in range(0,len(lat)):
+        for i in range(0,len(lon)):
+            if tot_16o[j,i]==0:
+                if lat[j]==90. or lat[j]==-90.:
+                    tot_16o[j,i]=1.0
+                    tot_18o[j,i]=2005.2E-6
+   
+    d18o_expt1=((tot_18o/tot_16o)-2005.2E-6)/2005.2E-9
+    d18o_expt1,lon1 = shiftgrid(180.,d18o_expt1,lon,start=False)
+
+    latmin=0.
+    #latmax=40.
+    latmax=60.
+    lonmin=50.
+    lonmax=130.
+
+
+    titlename='d18O_p ('+timeslice1+')'
+    plotdata(d18o_expt1,99,lon1,lat,titlename,-20,2.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+
+
+  
+    # read in data from expt2 files
+
+    filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pd'+extra2+'['+startdec2+'-'+enddec2+']*.nc'
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['QCL'][:] # get d18o
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    tot_18o=atemp_avg[1,:,:]+atemp_avg[4,:,:]+atemp_avg[7,:,:]+atemp_avg[10,:,:]
+    tot_16o=atemp_avg[0,:,:]+atemp_avg[3,:,:]+atemp_avg[6,:,:]+atemp_avg[9,:,:]
+    
+    d18o_expt2=((tot_18o/tot_16o)-2005.2E-6)/2005.2E-9
+    d18o_expt2,lon = shiftgrid(180.,d18o_expt2,lon,start=False)
+
+   
+    titlename='d18O_p ('+timeslice2+'-'+timeslice1+')'
+    plotdata(d18o_expt2-d18o_expt1,99,lon1,lat,titlename,-3,3.5,0.5,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt2+'-'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt2+'-'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    
+ 
+
+#end def d18o_precip
+
+
+
+def d18o_runoff(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2):
+
+    # read in data from expt1 files
+    filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'a@pd'+extra1+'['+startdec1+'-'+enddec1+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    #sruoff_18o=f.variables['slowrunoff_1'][:] 
+    #fruoff_18o=f.variables['fastrunoff_1'][:]
+    sruoff_16o=f.variables['slowrunoff'][:] 
+    fruoff_16o=f.variables['fastrunoff'][:]
+    f.close()
+
+    #runoff_18o=np.mean(sruoff_18o,axis=0)+np.mean(fruoff_18o,axis=0)
+    runoff_16o=np.mean(sruoff_16o,axis=0)+np.mean(fruoff_16o,axis=0)
+
+    # calculate runoff in mm/day (currently mm/30minutes)    
+    runoff_16o_expt1=np.squeeze(runoff_16o)*2. *24.
+    runoff_16o_expt1,lon1 = shiftgrid(180.,runoff_16o_expt1,lon,start=False)
+    #d18o_expt1=((runoff_18o/runoff_16o)-2005.2E-6)/2005.2E-9
+    #d18o_expt1=np.squeeze(d18o_expt1)
+    #d18o_expt1,lon1 = shiftgrid(180.,d18o_expt1,lon,start=False)
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+
+    #titlename='d18O_runoff ('+timeslice1+')'
+    #plotdata(d18o_expt1,99,lon1,lat,titlename,-20,2.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_runoff_'+expt1+'.eps'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_runoff_'+expt1+'.png'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #plt.close()
+
+
+  
+    # read in data from expt2 files
+
+    filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pd'+extra2+'['+startdec2+'-'+enddec2+']*.nc'
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    #sruoff_18o=f.variables['slowrunoff_1'][:] 
+    #fruoff_18o=f.variables['fastrunoff_1'][:]
+    sruoff_16o=f.variables['slowrunoff'][:] 
+    fruoff_16o=f.variables['fastrunoff'][:]
+    f.close()
+
+    #runoff_18o=np.mean(sruoff_18o,axis=0)+np.mean(fruoff_18o,axis=0)
+    runoff_16o=np.mean(sruoff_16o,axis=0)+np.mean(fruoff_16o,axis=0)
+    
+    # calculate runoff in mm/day (currently mm/30minutes)
+    runoff_16o_expt2=np.squeeze(runoff_16o)*2. *24.
+    runoff_16o_expt2,lon2 = shiftgrid(180.,runoff_16o_expt2,lon,start=False)
+    #d18o_expt2=((runoff_18o/runoff_16o)-2005.2E-6)/2005.2E-9
+    #d18o_expt2=np.squeeze(d18o_expt2)
+    #d18o_expt2,lon = shiftgrid(180.,d18o_expt2,lon,start=False)
+
+
+
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+    #latmin=-90
+    #latmax=90
+    #lonmin=-180.
+    #lonmax=180.
+    
+    # plot d18o runoff
+    #titlename='d18O_runoff ('+timeslice2+'-'+timeslice1+')'
+    #plotdata(d18o_expt2-d18o_expt1,99,lon1,lat,titlename,-10,11,1.0,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18orunoff_'+expt2+'-'+expt1+'.eps'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18orunoff_'+expt2+'-'+expt1+'.png'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #plt.close()
+
+    # plot runoff amount
+    titlename='Total Runoff ('+timeslice2+'-'+timeslice1+')'
+    plotdata(runoff_16o_expt2-runoff_16o_expt1,99,lon1,lat,titlename,-3,3.1,0.1,0.0,'a','mm/day',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/runoff_'+expt2+'-'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/runoff_'+expt2+'-'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+  
+    #titlename='d18O_runoff ('+timeslice2+'-'+timeslice1+')'  
+    #plotdata(d18o_expt2-d18o_expt1,0,lon1,lat,titlename,-10,11,1.0,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    #titlename='Total Runoff ('+timeslice2+'-'+timeslice1+')'
+    #plotdata(runoff_16o_expt2-runoff_16o_expt1,1,lon1,lat,titlename,-0.5,0.6,0.1,0.0,'a','mm/day',latmin,latmax,lonmin,lonmax)
+    #titlename='d18o Runoff ('+timeslice1+')'
+    #plotdata(d18o_expt1,2,lon1,lat,titlename,-30.0,0.0,1.0,0.0,'n','mm/day',latmin,latmax,lonmin,lonmax)
+    #titlename='Total Runoff ('+timeslice1+')'
+    #plotdata(runoff_16o_expt1,3,lon1,lat,titlename,0,4.1,0.1,0.0,'n','mm/day',latmin,latmax,lonmin,lonmax)
+   
+
+#end def d18o_runoff
+
+
+
+def d18o_ocean(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2):
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+    icevolcorr_diff=icevolcorr2-icevolcorr1
+   
+    # read in data from expt1 files
+    filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'o@pg'+extra1+'['+startdec1+'-'+enddec1+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['otracer1'][:] # get d18o
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    d18o_expt1=((atemp_top - 2005.2E-6)/2005.2E-9)+icevolcorr1
+    d18o_expt1,lon1 = shiftgrid(180.,d18o_expt1,lon,start=False)
+
+    
+  
+    # read in data from expt2 files
+
+    filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'o@pg'+extra2+'['+startdec2+'-'+enddec2+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['otracer1'][:] # get d18o
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    d18o_expt2=((atemp_top - 2005.2E-6)/2005.2E-9)+icevolcorr2
+    d18o_expt2,lon = shiftgrid(180.,d18o_expt2,lon,start=False)
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+    titlename='d18O_sw ('+timeslice2+'-'+timeslice1+')'
+    plotdata(d18o_expt2-d18o_expt1,99,lon1,lat,titlename,-0.5+icevolcorr_diff,0.55+icevolcorr_diff,0.05,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'-'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'-'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+  
+    titlename='d18O_sw ('+timeslice2+')'
+    plotdata(d18o_expt2,0,lon1,lat,titlename,-1.0,1.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    titlename='d18O_sw ('+timeslice1+')'
+    plotdata(d18o_expt1,1,lon1,lat,titlename,-1.0,1.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'_and_'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'_and_'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    
+ 
+
+#end def d18o_ocean
+
+
+def salinity_ocean(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2):
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+
+    latmin=-90
+    latmax=90
+    lonmin=-180.
+    lonmax=180.
+
+
+    # read in data from expt1 files
+    filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'o@pg'+extra1+'['+startdec1+'-'+enddec1+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['salinity'][:] # get d18o
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    sal_expt1=(atemp_top * 1000.)+35.0
+    sal_expt1,lon1 = shiftgrid(180.,sal_expt1,lon,start=False)
+
+    
+  
+    # read in data from expt2 files
+
+    filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'o@pg'+extra2+'['+startdec2+'-'+enddec2+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['salinity'][:] # get sal
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    sal_expt2=(atemp_top *1000.)+35.0
+    sal_expt2,lon = shiftgrid(180.,sal_expt2,lon,start=False)
+
+   
+    titlename='sal_sw ('+timeslice2+'-'+timeslice1+')'
+    plotdata(sal_expt2-sal_expt1,99,lon1,lat,titlename,-3.0,3.0,0.1,0.0,'a','psu',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'-'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'-'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+  
+    titlename='sal_sw ('+timeslice2+')'
+    plotdata(sal_expt2,0,lon1,lat,titlename,30.0,40.0,1.0,0.0,'n','psu',latmin,latmax,lonmin,lonmax)
+    titlename='sal_sw ('+timeslice1+')'
+    plotdata(sal_expt1,1,lon1,lat,titlename,30.0,40.0,1.0,0.0,'n','psu',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'_and_'+expt1+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'_and_'+expt1+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    
+ 
+
+#end def salinity_ocean
+
+################################
+# main program
+
+figureno=0
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+expt1='xiboi'
+timeslice1='preindustrial'
+extra1='y'
+startdec1='5'
+enddec1='9'
+icevolcorr1=0.0
+
+
+expt2='xibol'
+extra2='y'
+startdec2='5'
+enddec2='9'
+timeslice2='KM5C'
+icevolcorr2=-0.3 # expt2-expt1, so km5c-pi is negative because pliocene
+                # oceans were reduced in d18o.
+
+
+
+##########################################################################
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+
+#expt1='xjplc'
+#extra1='6'
+#startdec1='7'
+#enddec1='9'
+#timeslice1='KM5C'
+#icevolcorr1=-0.3
+
+#extra2='6'
+#startdec2='7'
+#enddec2='9'
+#icevolcorr2=-0.3
+
+
+#expt2='xjpld'
+#timeslice2='K1'
+
+#expt2='xjple'
+#timeslice2='G17'
+
+#expt2='xjplf'
+#timeslice2='KM3'
+
+
+################################################################
+d18o_precip(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2)
+
+#d18o_ocean(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2)
+
+#salinity_ocean(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2)
+
+#d18o_runoff(expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,en#ddec2,timeslice2,icevolcorr1,icevolcorr2)
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+plot_d18o_timeslice_seasonal.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_d18o_timeslice_seasonal
+#PURPOSE
+#    This program will plot d18o diagnostics from timeslice experiments
+#    it will plot the difference between two given experiments
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,latmin,latmax,lonmin,lonmax):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+ 
+    map=Basemap(llcrnrlon=lonmin,urcrnrlon=lonmax,llcrnrlat=latmin,urcrnrlat=latmax,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    map.drawcountries()
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    cs = map.contourf(x,y,plotdata,V,extend='both',cmap='rainbow')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        #cbar.set_label(cbarname,labelpad=-70,size=15)
+        cbar.set_label(cbarname,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=15)
+   
+
+
+#end def plotdata
+
+
+def get_init_data(exptname):
+    
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c'
+#xiboi/l use extra=y and dec=7-9
+
+#  xjplc=3205-km5c, xjlpd=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+                #for xjplc-xjplf extra is 6 and decs are from 7-9
+# continued timeslices (with smc output are) xogzs=PI, xogzt=3205-km5c xogzu=3060-k1,
+#                                            xogzv=g17-2950,xogzw=km3-3155
+                #for xogzt-xogzw suggest using extra 7 and dec from 1-3
+                #for xogzs suggest using extra z and dec 2-4
+   
+
+    # only use this to define pliocene timeslices pi timeslices are defined elsewhere
+    timeplio = {
+                "xjplc" : "KM5c",
+                "xjpld" : "K1",
+                "xjple" : "G17",
+                "xjplf" : "KM3",
+                "xogzt" : "KM5c",
+                "xogzu" : "K1",
+                "xogzv" : "G17",
+                "xogzw" : "KM3",
+                }
+
+    #print('exptname',exptname,exptname[0:3])
+
+    if exptname[0:4]=='xibo':
+        extra='y'
+        startdec='7'
+        enddec='9'
+    
+    if exptname[0:4]=='xjpl':
+        extra='6'
+        startdec='7'
+        enddec='9'
+    
+    if exptname[0:4]=='xogz':
+        if exptname[4]=='s':
+            extra='z'
+            startdec='0'
+            enddec='3'
+        else:
+            extra='7'
+            startdec='0'
+            enddec='3'
+
+
+    if exptname=='xiboi' or exptname=='xogzs':
+        timeslice='PI'
+        icevolcorr=0.0
+    else:
+        timeslice=timeplio.get(exptname)
+        icevolcorr=-0.3
+   
+    #print(extra)
+    
+    return extra,startdec,enddec,timeslice,icevolcorr
+
+
+
+def d18o_precip(monthnames,expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2,seasonname):
+
+    atemp_all=0
+    for mon in range(0,len(monthnames)):
+        # read in data from expt1 files
+        filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'a@pd'+extra1+'['+startdec1+'-'+enddec1+']*'+monthnames[mon]+'.nc'
+        print(filenames)
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        atemp=f.variables['QCL'][:] # get d18o
+        atemp_all=atemp_all+atemp
+        f.close()
+    atemp_all=atemp_all / len(monthnames)
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    tot_18o=atemp_avg[1,:,:]+atemp_avg[4,:,:]+atemp_avg[7,:,:]+atemp_avg[10,:,:]
+    tot_16o=atemp_avg[0,:,:]+atemp_avg[3,:,:]+atemp_avg[6,:,:]+atemp_avg[9,:,:]
+    
+
+    # check if tot_16o is zero at poles.  If so set it to vsmow
+    for j in range(0,len(lat)):
+        for i in range(0,len(lon)):
+            if tot_16o[j,i]==0:
+                if lat[j]==90. or lat[j]==-90.:
+                    tot_16o[j,i]=1.0
+                    tot_18o[j,i]=2005.2E-6
+  
+   
+    d18o_expt1=((tot_18o/tot_16o)-2005.2E-6)/2005.2E-9
+    d18o_expt1,lon1 = shiftgrid(180.,d18o_expt1,lon,start=False)
+
+
+ 
+
+    latmin=0.
+    #latmax=40.
+    latmax=60.
+    lonmin=60.
+    lonmax=140.
+
+
+    titlename='d18O_p ('+timeslice1+')'
+    plotdata(d18o_expt1,99,lon1,lat,titlename,-20,2.0,1.0,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+
+
+    atemp_all=0
+    for mon in range(0,len(monthnames)):
+        # read in data from expt2 files
+        filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pd'+extra2+'['+startdec2+'-'+enddec2+']*'+monthnames[mon]+'.nc'
+        print(filenames,monthnames[mon])
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        atemp=f.variables['QCL'][:] # get d18o
+        atemp_all=atemp_all+atemp
+        f.close()
+    atemp_all=atemp_all / len(monthnames)
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    tot_18o=atemp_avg[1,:,:]+atemp_avg[4,:,:]+atemp_avg[7,:,:]+atemp_avg[10,:,:]
+    tot_16o=atemp_avg[0,:,:]+atemp_avg[3,:,:]+atemp_avg[6,:,:]+atemp_avg[9,:,:]
+    
+    d18o_expt2=((tot_18o/tot_16o)-2005.2E-6)/2005.2E-9
+    d18o_expt2,lon = shiftgrid(180.,d18o_expt2,lon,start=False)
+
+    # plot out timeslice 2.
+    titlename='d18O_p ('+timeslice2+')'
+    plotdata(d18o_expt2,99,lon1,lat,titlename,-20,2.0,1.0,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt2+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt2+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    titlename='d18O_p ('+timeslice2+'-'+timeslice1+')'
+    plotdata(d18o_expt2-d18o_expt1,99,lon1,lat,titlename,-5,5.5,0.5,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt2+'-'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18op_'+expt2+'-'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    
+ 
+
+#end def d18o_precip
+
+
+
+def d18o_runoff(monthnames,expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2,seasonname):
+
+    totrunoff=0
+    for mon in range(0,len(monthnames)):                    
+        # read in data from expt1 files
+        filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'a@pd'+extra1+'['+startdec1+'-'+enddec1+']*'+monthnames[mon]+'.nc'
+        print(filenames)
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        #sruoff_18o=f.variables['slowrunoff_1'][:] 
+        #fruoff_18o=f.variables['fastrunoff_1'][:]
+        sruoff_16o=f.variables['slowrunoff'][:] 
+        fruoff_16o=f.variables['fastrunoff'][:]
+        f.close()
+        totrunoff=sruoff_16o+fruoff_16o+totrunoff
+
+    totrunoff=totrunoff/len(monthnames)
+           
+    #runoff_18o=np.mean(sruoff_18o,axis=0)+np.mean(fruoff_18o,axis=0)
+    runoff_16o=np.mean(totrunoff,axis=0)
+
+    # calculate runoff in mm/day (currently mm/30minutes)    
+    runoff_16o_expt1=np.squeeze(runoff_16o)*2. *24.
+    runoff_16o_expt1,lon1 = shiftgrid(180.,runoff_16o_expt1,lon,start=False)
+    #d18o_expt1=((runoff_18o/runoff_16o)-2005.2E-6)/2005.2E-9
+    #d18o_expt1=np.squeeze(d18o_expt1)
+    #d18o_expt1,lon1 = shiftgrid(180.,d18o_expt1,lon,start=False)
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+
+    #titlename='d18O_runoff ('+timeslice1+')'
+    #plotdata(d18o_expt1,99,lon1,lat,titlename,-20,2.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_runoff_'+expt1+'.eps'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_runoff_'+expt1+'.png'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #plt.close()
+
+
+  
+    # read in data from expt2 files
+    totrunoff=0
+    for mon in range(0,len(monthnames)):                    
+        filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pd'+extra2+'['+startdec2+'-'+enddec2+']*'+monthnames[mon]+'.nc'
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        #sruoff_18o=f.variables['slowrunoff_1'][:] 
+        #fruoff_18o=f.variables['fastrunoff_1'][:]
+        sruoff_16o=f.variables['slowrunoff'][:] 
+        fruoff_16o=f.variables['fastrunoff'][:]
+        f.close()
+        totrunoff=sruoff_16o+fruoff_16o+totrunoff
+
+    totrunoff=totrunoff/len(monthnames)
+           
+    #runoff_18o=np.mean(sruoff_18o,axis=0)+np.mean(fruoff_18o,axis=0)
+    runoff_16o=np.mean(totrunoff,axis=0)
+    
+    # calculate runoff in mm/day (currently mm/30minutes)
+    runoff_16o_expt2=np.squeeze(runoff_16o)*2. *24.
+    runoff_16o_expt2,lon2 = shiftgrid(180.,runoff_16o_expt2,lon,start=False)
+    #d18o_expt2=((runoff_18o/runoff_16o)-2005.2E-6)/2005.2E-9
+    #d18o_expt2=np.squeeze(d18o_expt2)
+    #d18o_expt2,lon = shiftgrid(180.,d18o_expt2,lon,start=False)
+
+
+
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+    #latmin=-90
+    #latmax=90
+    #lonmin=-180.
+    #lonmax=180.
+    
+    # plot d18o runoff
+    #titlename='d18O_runoff ('+timeslice2+'-'+timeslice1+')'
+    #plotdata(d18o_expt2-d18o_expt1,99,lon1,lat,titlename,-10,11,1.0,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18orunoff_'+expt2+'-'+expt1+'.eps'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18orunoff_'+expt2+'-'+expt1+'.png'
+    #plt.savefig(fileout,bbox_inches='tight')
+    #plt.close()
+
+    # plot runoff amount
+    titlename='Total Runoff ('+timeslice2+'-'+timeslice1+')'
+    plotdata(runoff_16o_expt2-runoff_16o_expt1,99,lon1,lat,titlename,-5,5.5,0.5,0.0,'a','mm/day',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/runoff_'+expt2+'-'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/runoff_'+expt2+'-'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+  
+    #titlename='d18O_runoff ('+timeslice2+'-'+timeslice1+')'  
+    #plotdata(d18o_expt2-d18o_expt1,0,lon1,lat,titlename,-10,11,1.0,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    #titlename='Total Runoff ('+timeslice2+'-'+timeslice1+')'
+    #plotdata(runoff_16o_expt2-runoff_16o_expt1,1,lon1,lat,titlename,-0.5,0.6,0.1,0.0,'a','mm/day',latmin,latmax,lonmin,lonmax)
+    #titlename='d18o Runoff ('+timeslice1+')'
+    #plotdata(d18o_expt1,2,lon1,lat,titlename,-30.0,0.0,1.0,0.0,'n','mm/day',latmin,latmax,lonmin,lonmax)
+    #titlename='Total Runoff ('+timeslice1+')'
+    #plotdata(runoff_16o_expt1,3,lon1,lat,titlename,0,4.1,0.1,0.0,'n','mm/day',latmin,latmax,lonmin,lonmax)
+   
+
+#end def d18o_runoff
+    
+    
+    
+def d18o_smc(monthnames,expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2,seasonname):
+
+    # read data from experiment 1 files
+    for mon in range(0,len(monthnames)):                    
+        # read in data from expt1 files
+        filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'a@pd'+extra1+'['+startdec1+'-'+enddec1+']*'+monthnames[mon]+'.nc'
+        print(filenames)
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        smc_18o=f.variables['sm_2'][:] 
+        smc_16o=f.variables['sm'][:] 
+        f.close()
+     
+    smc_16o_1=np.squeeze(np.mean(smc_16o,axis=0)) # get smc
+    
+    d18o_smc_1=((np.mean(smc_18o,axis=0)/np.mean(smc_16o,axis=0))-2005.2E-6)/2005.2E-9
+    d18o_smc_1=np.squeeze(d18o_smc_1)
+    # mask out where smc is low in preindustrial (ie smc_16o < 5)
+    d18o_smc_1_mask=np.ma.masked_where(smc_16o_1 < 1.0, d18o_smc_1)
+  
+    # read in data from expt2 file
+    for mon in range(0,len(monthnames)):                    
+        filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pd'+extra2+'['+startdec2+'-'+enddec2+']*'+monthnames[mon]+'.nc'
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        smc_18o=f.variables['sm_2'][:] 
+        smc_16o=f.variables['sm'][:] 
+        f.close()
+    
+    d18o_smc_2=((np.mean(smc_18o,axis=0)/np.mean(smc_16o,axis=0))-2005.2E-6)/2005.2E-9
+    d18o_smc_2=np.squeeze(d18o_smc_2)
+    # mask where smc is low in preindustrial
+    d18o_smc_2_mask=np.ma.masked_where(smc_16o_1 < 1.0, d18o_smc_2)
+  
+           
+   
+    latmin=0.
+    latmax=60.
+    lonmin=60.
+    lonmax=140.
+ 
+    # plot d18o smc
+   
+    titlename='SMC ('+timeslice2+'-'+timeslice1+')'
+    plotdata(d18o_smc_2_mask-d18o_smc_1_mask,99,lon,lat,titlename,-5,5.5,0.5,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/smc_'+expt2+'-'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/smc_'+expt2+'-'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+   
+    # plot smc16o in control so that we can see 'dry'areas'
+    #titlename='SMC ('+timeslice2+'-'+timeslice1+')'
+    #plotdata(smc_16o_1,99,lon,lat,titlename,-0,10.5,0.5,0.0,'n','kg/m2',latmin,latmax,lonmin,lonmax)
+    #plt.show()
+    #sys.exit(0)
+   
+
+#end def d18o_smc
+
+
+
+def d18o_ocean(monthnames,expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2,seasname):
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+    icevolcorr_diff=icevolcorr2-icevolcorr1
+   
+    # read in data from expt1 files
+    atemp_tot=0
+    for mon in range(0,len(monthnames)):
+        filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'o@pf'+extra1+'['+startdec1+'-'+enddec1+']*'+monthnames[mon]+'.nc'
+        print(filenames)
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        atemp=f.variables['otracer1'][:] # get d18o
+        f.close()
+        atemp_tot=atemp_tot+atemp
+    atemp_tot=atemp_tot / len(monthnames)
+    atemp_avg=np.mean(atemp_tot,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    d18o_expt1=((atemp_top - 2005.2E-6)/2005.2E-9)+icevolcorr1
+    d18o_expt1,lon1 = shiftgrid(180.,d18o_expt1,lon,start=False)
+
+    
+  
+    # read in data from expt2 files
+
+    atemp_tot=0.
+    for mon in range(0,len(monthnames)):
+        filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'o@pf'+extra2+'['+startdec2+'-'+enddec2+']*'+monthnames[mon]+'.nc'
+        print(filenames)
+        f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        atemp=f.variables['otracer1'][:] # get d18o
+        f.close()
+        atemp_tot=atemp_tot+atemp
+    atemp_tot=atemp_tot / len(monthnames)
+    atemp_avg=np.mean(atemp_tot,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    d18o_expt2=((atemp_top - 2005.2E-6)/2005.2E-9)+icevolcorr2
+    d18o_expt2,lon = shiftgrid(180.,d18o_expt2,lon,start=False)
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+    titlename='d18O_sw ('+timeslice2+'-'+timeslice1+')'
+    plotdata(d18o_expt2-d18o_expt1,99,lon1,lat,titlename,-0.5+icevolcorr_diff,0.55+icevolcorr_diff,0.05,0.0,'a','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'-'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'-'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+  
+    titlename='d18O_sw ('+timeslice2+')'
+    plotdata(d18o_expt2,0,lon1,lat,titlename,-1.0,1.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    titlename='d18O_sw ('+timeslice1+')'
+    plotdata(d18o_expt1,1,lon1,lat,titlename,-1.0,1.1,0.1,0.0,'n','permille',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'_and_'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/d18o_ocn_'+expt2+'_and_'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    
+ 
+
+#end def d18o_ocean
+
+
+def salinity_ocean(monthnames,expt1,extra1,startdec1,enddec1,timeslice1,expt2,extra2,startdec2,enddec2,timeslice2,icevolcorr1,icevolcorr2,seasname):
+
+    latmin=0.
+    latmax=40.
+    lonmin=50.
+    lonmax=130.
+
+
+    latmin=-90
+    latmax=90
+    lonmin=-180.
+    lonmax=180.
+
+
+    # read in data from expt1 files
+    filenames='/nfs/hera1/earjcti/um/'+expt1+'/netcdf/'+expt1+'o@pg'+extra1+'['+startdec1+'-'+enddec1+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['salinity'][:] # get d18o
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    sal_expt1=(atemp_top * 1000.)+35.0
+    sal_expt1,lon1 = shiftgrid(180.,sal_expt1,lon,start=False)
+
+    
+  
+    # read in data from expt2 files
+
+    filenames='/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'o@pg'+extra2+'['+startdec2+'-'+enddec2+']*.nc'
+    print(filenames)
+    f=MFDataset(filenames)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    atemp=f.variables['salinity'][:] # get sal
+    f.close()
+    atemp_avg=np.mean(atemp,axis=0)  # average by time
+    atemp_top=atemp_avg[0,:,:]
+   
+    sal_expt2=(atemp_top *1000.)+35.0
+    sal_expt2,lon = shiftgrid(180.,sal_expt2,lon,start=False)
+
+   
+    titlename='sal_sw ('+timeslice2+'-'+timeslice1+')'
+    plotdata(sal_expt2-sal_expt1,99,lon1,lat,titlename,-3.0,3.0,0.1,0.0,'a','psu',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'-'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'-'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+  
+    titlename='sal_sw ('+timeslice2+')'
+    plotdata(sal_expt2,0,lon1,lat,titlename,30.0,40.0,1.0,0.0,'n','psu',latmin,latmax,lonmin,lonmax)
+    titlename='sal_sw ('+timeslice1+')'
+    plotdata(sal_expt1,1,lon1,lat,titlename,30.0,40.0,1.0,0.0,'n','psu',latmin,latmax,lonmin,lonmax)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'_and_'+expt1+'_'+seasonname+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/d18o_timeslice/sal_ocn_'+expt2+'_and_'+expt1+'_'+seasonname+'.png'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+   
+    
+ 
+
+#end def salinity_ocean
+
+################################
+# main program
+
+# get all the data that we need to run the program
+figureno=0
+cntlexpt='xogzs' # control experiment is normally pi or km5c
+expt='xogzt'
+#season=['jn','jl','ag']
+#season=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+season=['ag']
+
+
+extracntl,startdeccntl,enddeccntl,timeslicecntl,icevolcorrcntl=get_init_data(cntlexpt)
+extra,startdec,enddec,timeslice,icevolcorr=get_init_data(expt)
+
+# get seasonname by cobbling together the first character of each 
+seasonname=''
+for i in range(0,len(season)):
+    seasonname=seasonname+season[i][0]
+ 
+
+#######################################################################################
+# choose what we want to output by uncommenting as appropriate
+
+
+
+d18o_precip(season,cntlexpt,extracntl,startdeccntl,enddeccntl,timeslicecntl,expt,extra,startdec,enddec,timeslice,icevolcorrcntl,icevolcorr,seasonname)
+
+#d18o_ocean(season,cntlexpt,extracntl,startdeccntl,enddeccntl,timeslicecntl,expt,extra,startd#ec,enddec,timeslice,icevolcorrcntl,icevolcorr,seasonname)
+
+#salinity_ocean(cntlexpt,extracntl,startdeccntl,enddeccntl,timeslicecntl,expt,extra,startdec,enddec,timeslice,icevolcorrcntl,icevolcorr)
+
+#d18o_runoff(season,cntlexpt,extracntl,startdeccntl,enddeccntl,timeslicecntl,expt,extra,start#dec,enddec,timeslice,icevolcorrcntl,icevolcorr,seasonname)
+
+d18o_smc(season,cntlexpt,extracntl,startdeccntl,enddeccntl,timeslicecntl,expt,extra,startdec,enddec,timeslice,icevolcorrcntl,icevolcorr,seasonname)
+
+
+
+#sys.exit(0)
+
+####
+
+::::::::::::::
+plot_flow_fram_strait.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_FLOW_FRAM_STRAIT
+#PURPOSE
+#   This program will find the volume of water flowing through the fram strait
+#
+# search for 'main program' to find end of functions
+# Julia 20/02/2019
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+import pdb
+
+#functions are:
+#  def plotdata
+#  def annmean_throughflow
+
+# functions start here
+def plotdata(region,plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,lonmin,lonmax,latreq):
+
+    if region == 'NP':
+        proj='npstere'
+        latbb=45.
+    if region == 'SP':
+        proj='spstere'
+        latbb=-45.
+    #proj='stere'
+
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+  
+    map=Basemap(projection=proj,resolution='c',lon_0=0,boundinglat=latbb,round=True,lat_0=90)
+  
+    #map.drawmapboundary(fill_color='green')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    mycmap=mp.cm.get_cmap('Reds',len(V+2))
+                    newcolors=mycmap(np.linspace(0,1,len(V+2)))
+                    white=([1,1,1,1])
+                    newcolors[0:2,:]=white
+                    mycmap=ListedColormap(newcolors)
+                    cs = map.contourf(x,y,plotdata,V,cmap=mycmap)
+                   # map.drawparallels(np.arange(-80.,81.,20.))
+                   # map.drawmeridians(np.arange(-180.,181.,20.))
+                    map.fillcontinents()
+                  
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                    # overplot in contours where control sea ice was over 50% (or 0.5)
+  
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=15)
+   
+    lon_transect=np.linspace(lonmin,lonmax)
+    lat_transect=np.linspace(latreq,latreq)
+    x1,y1=map(lon_transect,lat_transect)
+    map.plot(x1,y1,linewidth=1.5,color='yellow')
+        
+
+
+#end def plotdata
+
+def annmean_throughflow(expt_list,extra_list,endlist,names_list,latreq,lonmin,lonmax):
+
+
+    nexpts=len(expt_list)
+ 
+
+    for expt in range(0,nexpts):
+        f=MFDataset('/nfs/hera1/earjcti/um/'+expt_list[expt]+'/netcdf/'+expt_list[expt]+'o@pg'+extra_list[expt]+'[7-9]*'+endlist[expt]+'.nc')
+        # get velocity
+        lat = f.variables['latitude_1'][:]
+        lon = f.variables['longitude_1'][:]
+        dep = f.variables['depth_1'][:]
+        atemp=f.variables['field704'][:] # velocity in cm/s
+        atemp=np.squeeze(atemp)
+        ntimes,nz,ny,nx=np.shape(atemp)
+
+        # get potential temperature
+        lat_theta = f.variables['latitude'][:]
+        lon_theta = f.variables['longitude'][:]
+        btemp=f.variables['temp'][:] # degC
+
+
+        f.close()
+
+        velocity_arr=np.mean(atemp,axis=0)
+        theta_arr=np.mean(btemp,axis=0)+273.15  #(theta in kelvin)
+
+
+        velocity_arr,lon = shiftgrid(180.,velocity_arr,lon,start=False)
+
+            
+
+        #plotdata('NP',velocity_arr[0,:,:],99,lon,lat,'velocity_map (v)',-5.0,5.5,0.5,0,'a','cm/s',lonmin,lonmax,latreq)
+        #plt.show()
+        #plt.close()
+
+        # setup array for longitude height plot through transect
+        if expt ==0:
+            lon_req=np.where((lonmin<=lon) & (lonmax>=lon)) # note that lonreq are subscripts
+                                                      # so lon[lonreq] will give the longitudes
+           
+            vel_trans=np.zeros((nexpts,nz,len(lon_req[0])))
+            theta_trans=np.zeros((nexpts,nz,len(lon_req[0])))
+
+        # put the data into the transect array
+        lat_ix=np.where(lat==latreq)
+        lonmin_ix=lon_req[0][0]
+        lonmax_ix=lon_req[0][len(lon_req[0])-1]
+     
+        vel_trans[expt,:,:]=np.squeeze(velocity_arr[:,lat_ix[0],lonmin_ix:lonmax_ix+1])
+        lon_trans=lon[lonmin_ix:lonmax_ix+1]
+
+        # find out where the theta grid of latitude crosses the
+        # velocity grid
+        lat_theta_ix1=lat_ix[0]
+        lat_theta_ix2=lat_ix[0]+1
+
+        # check velocity lat is in middle of theta latitudes
+        if lat_ix[0] > lat_theta_ix2[0] or lat_ix[0] < lat_theta_ix1[0]:
+            print('your grid spacing is wrong')
+            sys.exit()
+
+
+        theta_diff=theta_arr[:,lat_theta_ix1,:]-theta_arr[:,lat_theta_ix2,:]
+        theta_diff=np.squeeze(theta_diff)
+        theta_diff,lon_theta = shiftgrid(180.,theta_diff,lon_theta,start=False)
+
+        ncount=np.zeros(len(lon_trans))
+        for i in range(0,len(lon_trans)):
+            for i2 in range(0,len(lon_theta)):
+                if np.abs(lon_theta[i2]-lon_trans[i]) < 1.0:
+                    theta_trans[:,:,i]=theta_trans[:,:,i]+theta_diff[:,i2]
+                    ncount[i]=ncount[i]+1
+
+        theta_trans=theta_trans/ncount
+    
+   
+
+
+       
+    # plot velocity data
+
+    for expt in range(0,nexpts):
+        
+        plt.subplot(2,3,expt+1)
+        V=np.arange(-5.,5.5,0.5)
+        cs=plt.contourf(lon_trans,dep,vel_trans[expt,:,:],V,extend='both',cmap='RdBu_r')
+        plt.gca().invert_yaxis()
+        plt.title(names_list[expt])
+        plt.ylim(500,0)
+        plt.ylabel('depth (m)')
+
+        plt.tick_params(axis='both',labelsize=8)
+    
+        locs=np.arange(-20,30,10)
+        labs2=[]
+        for i in range(0,len(locs)):
+            if locs[i]<0:
+                labs2.append(np.str(locs[i]*(-1))+'W')
+            else:
+                labs2.append(np.str(locs[i])+'E')
+        
+   
+        plt.xticks(locs,labs2)
+    
+    
+        if expt==1:
+            plt.subplot(2,3,6)
+            plt.gca().set_visible(False)
+            cbar = plt.colorbar(cs,orientation="vertical",fraction=0.7)
+            cbar.set_label('cm/s',rotation=0,fontsize=10,labelpad=20)
+
+
+    plt.tight_layout()
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_flow_fram_strait/flow_fram_strait.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_flow_fram_strait/flow_fram_strait.png' 
+    plt.savefig(fileout, dpi=300)
+  
+    plt.close()
+
+    # plot anomalies from pi
+
+    for expt in range(1,nexpts):
+        vel_tran_anom=vel_trans[expt,:,:]-vel_trans[0,:,:]
+        plt.subplot(2,2,expt)
+        V=np.arange(-2.,2.2,0.2)
+        cs=plt.contourf(lon_trans,dep,vel_tran_anom,V,extend='both',cmap='RdBu_r')
+        plt.gca().invert_yaxis()
+        plt.title(names_list[expt]+'minus'+names_list[0])
+
+    plt.subplots_adjust(bottom=0.25)
+    cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+    plt.colorbar(cax=cax,orientation="horizontal")
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_flow_fram_strait/flow_fram_strait_anom_pi.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+  
+    plt.close()
+
+
+    # plot anomalies from km5c
+
+    for expt in range(2,nexpts):
+        vel_tran_anom=vel_trans[expt,:,:]-vel_trans[1,:,:]
+        plt.subplot(2,2,expt)
+        V=np.arange(-1.,1.1,0.1)
+        cs=plt.contourf(lon_trans,dep,vel_tran_anom,V,extend='both',cmap='RdBu_r')
+        plt.gca().invert_yaxis()
+        plt.title(names_list[expt]+'minus'+names_list[1])
+
+    plt.subplots_adjust(bottom=0.25)
+    cax = plt.axes([0.1, 0.1, 0.8, 0.05])
+    plt.colorbar(cax=cax,orientation="horizontal")
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_flow_fram_strait/flow_fram_strait_anom_km5c.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+  
+    plt.close()
+
+
+    # #############################################################
+    # calculate total transport through fram strait in top 500m only
+    
+    
+    # calculate size of depths
+    boundary_depth=np.zeros(len(dep)+1)
+    boundary_depth[0]=0.
+    boundary_depth[len(dep)]=dep[len(dep)-1]
+    for z in range(1,len(dep)):
+        boundary_depth[z]=(dep[z]+dep[z-1])/2.
+    
+    layer_size=boundary_depth[1:]-boundary_depth[:-1]
+   
+    # calculate transport for top 500m
+    
+    flux=np.zeros((nexpts,len(lon_trans)))
+    north_flux=np.zeros(nexpts)
+    south_flux=np.zeros(nexpts)
+   
+    onegridbox = (lon[1]-lon[0])*111000.*np.cos(np.deg2rad(latreq))
+    area=layer_size * onegridbox
+    print(onegridbox,lon[1],lon[0])
+    print(area)
+    
+    # plot flux within 50m of surface
+    plt.subplot(2,1,1)
+    for expt in range(0,nexpts):
+        for z in range(0,len(dep)): 
+            if dep[z] < 50.:
+                waterflux=vel_trans[expt,z,:] * area[z] / 100.
+                flux[expt,:]=flux[expt,:]+waterflux
+                for i in range(0,len(lon_trans)):
+                    if waterflux[i] > 0:
+                        north_flux[expt]=north_flux[expt]+waterflux[i]
+                    else:
+                        south_flux[expt]=south_flux[expt]+waterflux[i]
+                
+      
+        #legname=(names_list[expt]+':'+np.str(np.round(north_flux[expt]/1.0E6,2))+
+        #         'Sv N :'+np.str(np.round(south_flux[expt]/1.0E6,2))+'Sv S')
+        legname=(names_list[expt]+':'+np.str(np.round(np.sum(flux[expt,:])/1.0E6,2))+'Sv')
+        plt.plot(lon_trans,flux[expt,:]/1.0E6,label=legname)
+    
+    plt.plot([-100,180],[0,0],color='black')
+    print(lon_req[0])
+ 
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.ylabel('Sv')
+    #plt.xlabel('longitude')
+    locs=np.arange(-20,30,10)
+    labs2=[]
+    for i in range(0,len(locs)):
+        if locs[i]<0:
+            labs2.append(np.str((locs[i]*(-1)))+'W')
+        else:
+            labs2.append(np.str(locs[i])+'E')
+        print(np.str(locs[i]))
+    
+   
+    plt.xticks(locs,labs2)
+    
+    plt.title('flux in top 50m')
+    plt.xlim(np.min(lon_trans),np.max(lon_trans))
+    
+    
+    # plot flux within 500m of surface
+    flux=np.zeros((nexpts,len(lon_trans))) 
+    north_flux=np.zeros(nexpts)
+    south_flux=np.zeros(nexpts)
+    plt.subplot(2,1,2)
+    for expt in range(0,nexpts):
+        for z in range(0,len(dep)): 
+            if dep[z] < 500.:
+                waterflux=vel_trans[expt,z,:] * area[z] / 100.
+                flux[expt,:]=flux[expt,:]+waterflux
+                for i in range(0,len(lon_trans)):
+                    if waterflux[i] > 0:    
+                        north_flux[expt]=north_flux[expt]+waterflux[i]
+                    else:
+                        south_flux[expt]=south_flux[expt]+waterflux[i]
+        print(names_list[expt],np.sum(flux[expt,:]/1.0E6))
+        #legname=(names_list[expt]+':'+np.str(np.round(north_flux[expt]/1.0E6,2))+
+        #         'Sv N :'+np.str(np.round(south_flux[expt]/1.0E6,2))+'Sv S')
+        legname=(names_list[expt]+':'+np.str(np.round(np.sum(flux[expt,:])/1.0E6,2))+'Sv')
+        plt.plot(lon_trans,flux[expt,:]/1.0E6,label=legname)
+    
+    plt.plot([-100,180],[0,0],color='black')
+    print(lon_req[0])
+ 
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.ylabel('Sv')
+    #plt.xlabel('longitude')
+    
+    locs=np.arange(-20,30,10)
+    labs2=[]
+    for i in range(0,len(locs)):
+        if locs[i]<0:
+            labs2.append(np.str((locs[i]*(-1)))+'W')
+        else:
+            labs2.append(np.str(locs[i])+'E')
+        print(np.str(locs[i]))
+    
+   
+    plt.xticks(locs,labs2)
+    
+    plt.title('flux in top 500m')
+    plt.xlim(np.min(lon_trans),np.max(lon_trans))
+    plt.tight_layout()
+  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_flow_fram_strait/waterflux.eps' 
+    plt.savefig(fileout, bbox_inches='tight')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_flow_fram_strait/waterflux.png' 
+    plt.savefig(fileout, dpi=300)
+    plt.close()
+
+    
+    
+   
+    
+
+#
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+
+expt_list=['xiboi','xjplc','xjpld','xjple','xjplf']
+extra_list=['y','6','6','6','6']
+end_list=['c1','11','11','11','11']
+names_list=['PreInd','KM5C','K1','G17','KM3']
+
+#djf mean
+season=['dc','ja','fb']
+seasonname='djf'
+
+# seasonmean throughflow will do a longitude depth plot of velocity at a 
+# given latitude
+
+#Fraim strait
+latreq=78.75   # fraim strait is between 77N and 81N
+lonmin=338.75 - 360. # this is Greenland
+lonmax=30.       # Svalbard is about 15E but I don't think it is in the UM
+
+#latreq=30.0
+#lonmin=-180.
+#lonmax=180.
+annmean_throughflow(expt_list,extra_list,end_list,names_list,latreq,lonmin,lonmax)
+
+#
+
+####
+
+::::::::::::::
+plot_global_timeseries.py
+::::::::::::::
+#!/usr/bin/env python3.8
+#NAME
+#    TEMPERATURE_TIMESERIES
+#PURPOSE
+#    this program will write out the ocean temperature timeseries from 
+#    the pg file and plot it.
+#
+# search for 'main program' to find end of functions
+# Julia 14/1/2017
+
+
+
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.plot as iplt
+import iris.quickplot as qplt
+
+
+def get_global_avg(year):
+    """
+    gets the global average value of the field for the given year
+    """
+    cent_ind = {0: "0", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 
+                7: "7", 8: "8", 9: "9", 10: "a", 11: "b", 12: "c", 13: "d", 
+               14: "e", 15: "f", 16: "g", 17: "h", 18: "i", 19: "j", 20: "k", 
+               21: "l", 22: "m", 23: "n", 24: "o", 25: "p", 26: "q", 27: "r", 
+               28: "s", 29: "t", 30: "u", 31: "v", 32: "w", 33: "x", 34: "y", 
+               36: "z"}
+
+    if NEW_VERSION:
+        filename = FILESTART + '#' + 'pg' + str(year).zfill(9) + 'c1+.nc'
+        print(filename)
+    else:
+        cent = np.floor(year/100.)
+        filename = (FILESTART + '@pg' + cent_ind.get(cent) + 
+                    str(np.int(year - (cent*100))).zfill(2) + 'c1.nc')
+       
+    cube = iris.load_cube(filename,FIELD)
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    cube.coord('depth_1').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(cube)
+    meanval = cube.collapsed(['depth_1','latitude','longitude'],
+                             iris.analysis.MEAN, weights=grid_areas)
+
+    if FIELD == 'salinity':
+        globmean = (meanval.data * 1000.)+35.0
+    else:
+        globmean = meanval.data
+
+    
+    return globmean[0]
+
+################################
+# main program
+
+EXPT = 'xpkma'
+NEW_VERSION = True
+STARTYEAR=1851
+NYEARS=500
+FIELD = 'temp'    # valid fields are 'salinity', 'temp'
+
+FILESTART = '/nfs/hera1/earjcti/um/' + EXPT + '/pg/' + EXPT + 'o'
+meandata = np.zeros(NYEARS)
+for year in range(STARTYEAR, STARTYEAR+NYEARS):
+    globavgval = get_global_avg(year)
+    meandata[year-STARTYEAR] = globavgval
+
+
+plt.plot(meandata)
+plt.xlabel('year')
+plt.title(FIELD)
+if FIELD == 'salinity':
+    plt.ylabel('psu')
+if FIELD == 'temp':
+    plt.ylabel('degC (potential temperature)')
+plt.savefig('/nfs/hera1/earjcti/HadCM3_plots/OceanTimeseries/' + EXPT + '_' + FIELD + '.eps')
+plt.savefig('/nfs/hera1/earjcti/HadCM3_plots/OceanTimeseries/' + EXPT + '_' + FIELD + '.png')
+plt.close()
+::::::::::::::
+plot_MOC_Atlantification_paper.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_MOC_Atlantification_paper
+#PURPOSE
+#    This program is partially based on plot_MOC.  However it will obtain 
+# a publication quality MOC plot for the Atlantification paper (1st Author Rahaman)
+#
+# search for 'main program' to find end of functions
+# Julia 14/1/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import scipy.signal as sig
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+import sklearn.decomposition as sk
+from sklearn.preprocessing import normalize
+
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+
+
+
+# functions start here
+def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,
+             cbarname,pcplot,ygrid,xgrid,yuse,xuse,yspan,xspan):
+    
+    depuse=dep/1000.
+    lats, depths = np.meshgrid(lat,depuse)
+
+    plotdata2 = np.ma.array(plotdata, mask=plotdata < -100) 
+    
+    
+    plt.subplot2grid((ygrid,xgrid),(yuse,xuse),colspan=yspan,rowspan=xspan)
+
+    #V=np.arange(minval,maxval,valinc)
+    V=np.arange(-15.,16.,1.)
+    plt.gca().patch.set_color('0.1')
+    if pcplot =='pc':
+        cs = plt.contourf(lats,depths,plotdata2,V,cmap='RdBu_r',extend='both')
+    else:
+        cs = plt.contourf(lats,depths,plotdata2,V,extend='both',cmap='rainbow')
+        contourvals=[-15,-12,-9,-6,-3,0,3,6,9,12,15]
+        #contourvals=np.arange(-15,16,1)
+        plt.contour(lats,depths,plotdata,contourvals)
+   
+    plt.gca().invert_yaxis()
+    plt.title(titlename,loc='left')
+    plt.tick_params(axis='both',labelsize=8)
+    plt.ylabel('depth (km)',fontsize=10)
+   
+    #locs,labels=plt.xticks()
+    #labs2=[]
+    #print(locs,labels)
+    locs=np.arange(-90,90,20)
+    labs2=[]
+    for i in range(0,len(locs)):
+        if locs[i]<0:
+            labs2.append(np.str(locs[i])+'S')
+        else:
+            labs2.append(np.str(locs[i])+'N')
+        print(np.str(locs[i]))
+    print(labs2)
+   
+    plt.xticks(locs,labs2)
+    print(locs,labs2)
+    
+    
+   
+    plt.xlim(-30,90)
+    print(plotdata)
+    
+    if yuse==0 and xuse==0:
+        plt.subplot2grid((ygrid,xgrid),(ygrid-1,xgrid-xspan-2),colspan=yspan,rowspan=xspan)
+        plt.gca().set_visible(False)
+        cbar = plt.colorbar(cs,orientation="horizontal",fraction=0.7)
+        cbar.set_label(cbarname)
+
+
+
+#end def plotdata
+
+
+
+
+
+##################################################
+def plot_avg_moc(expt_name,extra,yearstart,yearend,ending):
+
+    nyears=yearend-yearstart+1
+    figcount=0
+    for year in range(yearstart,yearend):
+        print(year,extra,expt_name)
+        if year >= 10:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+        else:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+        f=Dataset(datasetname)
+        lat = f.variables['latitude'][:]
+        depth = f.variables['depth'][:]
+        ndepth=len(depth)
+        nlat=len(lat)
+        AMOC=f.variables['Merid_Atlantic'][:]
+        AMOC=np.squeeze(AMOC)
+        if year == yearstart:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+
+        allAMOC[year-yearstart,:,:]=AMOC
+        f.close()
+
+    avgAMOC=np.mean(allAMOC,axis=0)
+    
+    return(lat,depth,avgAMOC)
+    
+    
+#end def plot_avg_MOC
+#======================================================
+def amoc_diff(expt_name,cntl_name,AMOC_e,AMOC_c,lat,depth):
+# this function will difference two AMOCs
+    AMOC_diff=AMOC_e-AMOC_c
+    titlename='diff '+expt_name+'  and '+cntl_name
+    plotdata(AMOC_diff,-99,lat,depth,titlename,-2,2.5,0.5,0.0,'n','Sv','avg')
+    plt.tight_layout()
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'+expt_name+'-'+cntl_name+'_avg.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+    
+#end def amoc_diff
+
+    
+    
+#end def plot_all_MOC
+#######################################
+# do principal component analysis to find the periods over which the MOC varies
+
+
+
+
+################################
+# main program
+
+
+##################################
+# plot average of the MOC
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+extra = {
+        "xjplc" : "6",
+        "xibol" : "y",
+        "xiboi" : "y",
+        "xjpld" : "6",
+        "xjple" : "6",
+        "xjplf" : "6",
+        "xogzb" : "w",
+        }
+
+yearend = {
+        "xjplc" : "11",
+        "xibol" : "c1",
+        "xiboi" : "c1",
+        "xjpld" : "11",
+        "xjple" : "11",
+        "xjplf" : "11",
+        "xogzb" : "c1",
+        }
+
+timeperiod = {
+        "xjplc" : "KM5C",
+        "xibol" : "KM5C",
+        "xiboi" : "PreInd",
+        "xjpld" : "K1",
+        "xjple" : "G17",
+        "xjplf" : "KM3",
+        "xogzb" : "max",
+        }
+
+ygrid=3
+xgrid=5
+xspan=1
+yspan=2
+
+exptname='xjple'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+lat=retdata[0]
+depth=retdata[1]
+AMOC=retdata[2]
+
+
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,0,0,yspan,xspan)
+        
+
+exptname='xjpld'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,0,yspan,yspan,xspan)
+
+
+exptname='xjplf'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,1,0,yspan,xspan)
+
+
+#exptname='xogzb'
+exptname='xjplc'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,1,yspan,yspan,xspan)
+
+
+
+exptname='xiboi'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,2,0,yspan,xspan)
+
+
+
+#retdata=plot_avg_moc('xibol','y',70,99,'c1')
+#xibol_AMOC=retdata[2]
+
+#plt.show()
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/MOC_atlantification.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/MOC_atlantification.png'
+plt.savefig(fileout,dpi=300)
+plt.close()
+
+
+
+
+
+
+
+
+
+
+
+####
+
+::::::::::::::
+plot_MOC.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_MOC
+#PURPOSE
+#    This program will do some plots on the MOC (which were calculated in the 
+#    ~earjcti/MOC directory
+#
+# search for 'main program' to find end of functions
+# Julia 14/1/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import scipy.signal as sig
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#import sklearn.decomposition as sk
+#from sklearn.preprocessing import normalize
+
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,cbarname,pcplot,ax):
+    lats, depths = np.meshgrid(lat,dep)
+
+    V=np.arange(minval,maxval,valinc)
+    if pcplot =='pc':
+        cs = ax.contourf(lats,depths,plotdata,V,cmap='RdBu_r',extend='both')
+    else:
+        cs = ax.contourf(lats,depths,plotdata,V,extend='both',cmap='rainbow')
+        contourvals=[-16,-12,-8,-4,0,4,8,12,16]
+        ax.contour(lats,depths,plotdata,contourvals)
+    plt.gca().invert_yaxis()
+    plt.title(titlename)
+
+    if pcplot != 'n' or fileno >9:
+        cbar = plt.colorbar(cs,orientation="horizontal")
+        cbar.set_label(cbarname,labelpad=-40)
+
+    return
+
+#end def plotdata
+
+def plotmap(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for a NAO region
+   # map=Basemap(width=12000000,height=8000000,projection='stere',\
+   #                 resolution='c',lat_ts=50,lat_0=50,lon_0=0)
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='at':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(x),np.shape(y),np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotmap
+
+
+def indexplot(toplot,xdata,fileno,data_sm,xmin,xmax,expt,xlabel,ymin,ymax,titlename):
+    plt.subplot(4,2,fileno*2)
+    print(fileno)
+
+    plt.xlim([xmin,xmax])
+    plt.ylim([ymin,ymax])
+    datasize=len(toplot)
+
+    
+    # plot data
+    plt.plot(xdata,toplot)
+    plt.title(titlename)
+    plt.xlabel(xlabel)
+    # overplot smoothed data
+    plt.plot(xdata,data_sm,'-')
+    # overplot zero line and +-0.5deg line
+    plt.plot(xdata,np.zeros(datasize))
+    #bar_width=1.0/12.0
+    #plt.bar(xdata,elninoarr,bar_width,color='red',edgecolor="none")
+    #plt.bar(xdata,laninaarr,bar_width,color='blue',edgecolor="none")
+   
+# 
+
+# end def indexplot
+
+##################################################
+def plot_avg_moc(expt_name,extra,yearstart,yearend,ending):
+    """
+    note use extra=# for new fileformats
+    This plots a longitude depth plot of the average AMOC
+    and also the AMOC strength through time
+    """
+
+    nyears=yearend-yearstart
+    figcount=0
+    for year in range(yearstart,yearend):
+        if extra == '#':
+            datasetname = '/nfs/hera1/earvk/um/' + expt_name + '/pk2/' + expt_name + 'o#pk' + str(year).zfill(9) + ending + '+.nc'
+            print(datasetname)
+        else:
+            if year >= 10:
+                datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+            else:
+                datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+        f=Dataset(datasetname)
+        lat_full = f.variables['latitude'][:]
+        depth = f.variables['depth'][:]
+        ndepth=len(depth)
+        nlatf=len(lat_full)
+        AMOC_full=f.variables['Merid_Atlantic'][:]
+        AMOC_full=np.squeeze(AMOC_full)
+        # ignore all data below 40S
+        nlat=0
+        for latitude in lat_full:
+            if latitude > -40.: nlat=nlat+1
+        lat = np.zeros(nlat)
+        AMOC = np.zeros((ndepth, nlat))
+        latix=0
+        for i, latitude in enumerate(lat_full):
+            #print('j',latitude)
+            if latitude > -40.:
+             #  print('here',i,lat,latix)
+               lat[latix]=lat_full[i]
+               AMOC[:,latix]=AMOC_full[:,i]
+               latix=latix+1
+       # plt.contourf(lat,depth,AMOC)
+       # plt.show()
+       # sys.exit(0)
+                          
+        
+        if year == yearstart:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+
+        allAMOC[year-yearstart,:,:]=AMOC
+        maxAMOC[year-yearstart]=np.max(AMOC)
+        f.close()
+
+    avgAMOC=np.mean(allAMOC,axis=0)
+
+    fig = plt.figure()
+    ax1 = plt.subplot(2,1,1)
+    titlename='AMOC avg: '+expt_name
+    plotdata(avgAMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',ax1)
+        
+    ax2=plt.subplot(2,1,2)
+    yeararr=np.arange(yearstart,yearend,1)
+    ax2.plot(yeararr,maxAMOC)
+    plt.title('max AMOC')
+    
+    plt.tight_layout()
+    plt.show()
+    sys.exit(0)
+       #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'#+expt_name+'_avg.eps' 
+    fileout = ('/nfs/hera1/earjcti/um/' + expt_name + '/AMOC_' + expt_name + 
+               extra + 
+               np.str(np.int(yearstart)) + '_' + np.str(np.int(yearend)) + 
+               '.eps')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/nfs/hera1/earjcti/um/' + expt_name + '/AMOC_' + expt_name + 
+               extra + np.str(np.int(yearstart)) + '_' + 
+               np.str(np.int(yearend)) + 
+               '.png')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+    
+    return(lat,depth,avgAMOC)
+    
+    
+#end def plot_avg_MOC
+#======================================================
+def amoc_diff(expt_name,cntl_name,AMOC_e,AMOC_c,lat,depth):
+# this function will difference two AMOCs
+    AMOC_diff=AMOC_e-AMOC_c
+    titlename='diff '+expt_name+'  and '+cntl_name
+    plotdata(AMOC_diff,-99,lat,depth,titlename,-2,2.5,0.5,0.0,'n','Sv','avg')
+    plt.tight_layout()
+    #fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'+expt_name+'-'+cntl_name+'_avg.eps' 
+    fileout = ('/nfs/hera1/earjcti/um/' + expt_name + '/pk2/' + expt_name + 
+               '-' + cntl_name + '_avg.eps')
+   
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+    
+#end def amoc_diff
+#==========================================
+def plot_all_moc(expt_name,extra,yearstart,yearend,plotallyears):
+    """
+    this plots the latitude-dapth of the AMOC for individual years
+    """
+
+    nyears=yearend-yearstart+1
+    figcount=0
+    for year in range(yearstart,yearend):
+        if year >= 10:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+        else:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+        f=Dataset(datasetname)
+        lat = f.variables['latitude'][:]
+        depth = f.variables['depth'][:]
+        ndepth=len(depth)
+        nlat=len(lat)
+        AMOC=f.variables['Merid_Atlantic'][:]
+        AMOC=np.squeeze(AMOC)
+
+        if plotallyears == 'y':
+            titlename='AMOC yr:'+str(year)
+            plotdata(AMOC,figcount,lat,depth,titlename,-30,30,5.0,0.0,'n','Sv')
+            if figcount == 9:
+                plt.tight_layout()
+                plt.show()
+                sys.exit()
+            figcount=(figcount+1)%10
+          
+        if year == yearstart:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+
+        allAMOC[year-yearstart,:,:]=AMOC
+        f.close()
+    
+
+    sys.exit()
+    
+    
+#end def plot_all_MOC
+#######################################
+# do principal component analysis to find the periods over which the MOC varies
+def MOC_PC(expt_name,extra,yearstart,yearend):
+
+# read in data
+
+    nyears=yearend-yearstart+1
+    figcount=0
+    for year in range(yearstart,yearend+1):
+        if year >= 10:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+        else:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+        f=Dataset(datasetname)
+        lat = f.variables['latitude'][:]
+        depth = f.variables['depth'][:]
+        ndepth=len(depth)
+        nlat=len(lat)
+        AMOC=f.variables['Merid_Atlantic'][:]
+        AMOC=np.squeeze(AMOC)
+
+        # mask out region south of equator
+        ix1=(lat >=0)
+        lats_reg=lat[ix1]
+        nlat=len(lats_reg)
+        lat=lats_reg
+        AMOC=AMOC[:,ix1]
+    
+
+        if year == yearstart:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            
+        print(yearend-yearstart,year-yearstart,nyears)
+        allAMOC[year-yearstart,:,:]=AMOC
+        f.close()
+
+
+    
+
+  
+    # remove time average from all AMOC 
+    for j in range(0,nlat):
+        for i in range(0,ndepth):
+            allAMOC[:,i,j]=allAMOC[:,i,j]-np.mean(allAMOC[:,i,j])
+    
+    # ideally we will need to multiply by a weighting factor to account for the fact that all latitudes have a different number of gridboxes at different sizes
+
+
+    # reshape and transpose the data to the correct dimension
+    print('amoc shape',np.shape(allAMOC),nlat,ndepth,nyears)
+    rs_allAMOC_nt=np.reshape(allAMOC,(nyears,nlat*ndepth))
+    rs_allAMOC=np.transpose(rs_allAMOC_nt)
+
+    # do a PC analysis using sklearn
+    neofs=2
+    AMOCpca=sk.PCA(n_components=neofs)
+    AMOCpca.fit(rs_allAMOC)
+    expl_var=AMOCpca.explained_variance_ratio_
+    EOFs=AMOCpca.transform(rs_allAMOC)
+    
+    # scale so each EOF has unit length
+    EOFs=normalize(EOFs,axis=0)
+
+    # get principal components
+    PCs=np.mat(rs_allAMOC_nt) * np.mat(EOFs)
+
+    for i in range(0,neofs):
+        EOF_temp=EOFs[:,i]
+        EOF_plot=np.reshape(EOF_temp,(ndepth,nlat))
+        stdevpc=np.std(PCs[:,i])
+        PCs[:,i]=PCs[:,i]/stdevpc
+        EOF_plot=EOF_plot * stdevpc
+        
+        titlename='PC'+str(i+1)+':'+expt_name+' '+str(np.ceil(expl_var[i]*100.))+'%'
+        plotdata(EOF_plot,(i*2),lat,depth,titlename,-2.0,2.2,0.2,0,'n','Sv','pc')
+        
+        toplot=PCs[:,i]
+        datasize=len(toplot)
+        xdata=np.arange(datasize)
+        indexplot(toplot,xdata,(2*i)+1,toplot,0,nyears,expt_name,'year',-2.0,2.0,'index')
+
+        # do a spectral analysis on the index
+        # to see over which periods it is varying
+
+        print('toplot is',toplot)
+        toplot=np.squeeze(toplot)
+
+        Pxx_f, Pxx_den=sig.periodogram(toplot,1.0)
+        Pxx_den=np.squeeze(Pxx_den)
+        print('PXx',Pxx_f,'size',np.shape(Pxx_f),np.shape(toplot))
+        print('pxx2',Pxx_den,'size',np.shape(Pxx_den))
+        indexplot(Pxx_den,Pxx_f,(2*i)+2,Pxx_den,0,0.5,expt_name,'cycles per year',0,10,'index power spectrun')
+        
+
+    plt.tight_layout()
+  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'+expt_name+'_PCs.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+#  write both indexes out to a file
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'+expt_name+'_PCs.txt' 
+    f1=open(fileout,'w+')
+    f1.write('strength of principal components')
+    f1.write('nyears='+str(nyears)+' \n')
+    f1.write('extra year  PC1    PC2 \n')
+    for year in range (yearstart,yearend+1):
+        yearuse=year
+        extrause=extra
+        if yearuse >= 100:
+            yearuse=yearuse-100
+            extrause=chr(ord(extra)+1)
+
+        if yearuse < 0:
+            yearuse=yearuse+100
+            extrause=chr(ord(extra)-1)
+
+        yearfname=str(yearuse)
+
+        if yearuse < 10:
+            yearfname='0'+str(yearuse)
+
+        print(year,yearstart,yearend,np.shape(PCs))
+        f1.write(extrause+';'+str(yearfname)+';'+str(PCs[year-yearstart,0])+';'+str(PCs[year-yearstart,1])+'\n')
+    f1.close()
+        
+
+
+# 
+
+#end def annmean
+
+# relate principal components to climate
+def PCs_to_climate_telecon(exptname,fieldlocation,fileext,fieldname,seasname,monthnames,lonname,latname):
+ 
+# this will plot the teleconnections associated with the MOC principal 
+# components by taking the
+# most exteme 5% of the MOC years and plotting the climate anomaly
+
+
+    # read in the MOC principal components
+
+    filein='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'+exptname+'_PCs.txt' 
+    f=open(filein,'r')
+    # get titleline which contains number of years
+    textline=f.readline()
+    b=textline.split()  # split text by removing newline
+    print(b)
+    c=b[3]
+    b=c.split('=')  # split text by removing equals sign
+    nyears=int(b[1])
+    # discard second titleline
+    textline=f.readline()
+
+   
+    # read over the rest of the data
+    extraindex=np.empty(nyears,dtype=np.dtype('S1'))
+    yearindex=np.zeros(nyears)
+    PC1index=np.zeros(nyears)
+    PC2index=np.zeros(nyears)
+    extremePC1=np.zeros(nyears)  # here we mark the 5% most extreme values
+    extremePC2=np.zeros(nyears)  # here we mark the 5% most extreme values
+    
+
+    count=0
+    for line in f:
+        # extract extra year and NAOindex
+        linesplit=line.split(';')   # the data in the file is split by ;
+        extraindex[count]=linesplit[0]
+        yearindex[count]=linesplit[1]
+        PC1index[count]=linesplit[2]
+        PC2index[count]=linesplit[3]
+        count=count+1
+
+
+    # next we want to find the years that have the largest positive and negative
+    # nao index
+
+    num_extr=int(np.ceil(nyears*0.05))
+
+    # get highest 5 values.
+    # note that 'zip' zips the arrays together forming a multi dim list
+    # sort sorts the list on the first element
+    # reverse will reverse the sort
+    lowPC1=sorted(zip(PC1index,extraindex,yearindex))[:num_extr]
+    uppPC1=sorted(zip(PC1index,extraindex,yearindex),reverse=True)[:num_extr]
+    lowPC2=sorted(zip(PC2index,extraindex,yearindex))[:num_extr]
+    uppPC2=sorted(zip(PC2index,extraindex,yearindex),reverse=True)[:num_extr]
+    
+
+    # we will now put our indices to one side and get the data we are 
+    # interested in 
+    # the field we are using will be passed in the calling program
+
+    nmonths=len(monthnames)
+
+    dirname='/nfs/hera1/earjcti/um/'+exptname+'/'+fieldlocation+'/'
+    os.chdir(dirname)
+
+    # firstly get average field over the season
+    allfiles=[]
+    for month in monthnames:
+        allfiles.append(dirname+exptname+'a@pd*'+month+fileext)
+
+    for monthno in range(0,nmonths):
+        print(allfiles)
+        f=MFDataset(allfiles[monthno])
+        lat = f.variables[latname][:]
+        lon = f.variables[lonname][:]
+    
+        if len(fieldname) ==1 :
+            atemp=f.variables[fieldname[0]][:]
+            atemp=np.squeeze(atemp)
+
+        if len(fieldname) == 2:
+            atemp=f.variables[fieldname[0]][:]
+            atemp=np.squeeze(atemp)
+            atemp2=f.variables[fieldname[1]][:]
+            atemp2=np.squeeze(atemp2)
+        
+        if len(fieldname) > 2:
+            print('length of fieldname is', len(fieldname))
+            print('you are requesting too many variables')
+            sys.exit()
+        f.close()
+        ntimes,ny,nx=np.shape(atemp)
+
+        #average across the time dimension
+        temp_m1=np.mean(atemp,axis=0)
+
+        # set array for storing average
+        if monthno == 0:
+            temp_avg=temp_m1
+        else:
+            temp_avg=temp_avg+temp_m1
+
+        
+        if len(fieldname) ==2:
+            temp_m1=np.mean(atemp2,axis=0)
+            if monthno == 0:
+                temp2_avg=temp_m1
+            else:
+                temp2_avg=temp2_avg+temp_m1
+
+                
+
+    temp_avg=temp_avg/nmonths
+    if len(fieldname) == 2:
+        temp2_avg=temp2_avg/nmonths
+
+    
+
+    # now get data for the highest and lowest years
+
+
+    for ex in range(0,2):     # loop for lowest or highest year
+        for npcs in range (0,2):   # we will have to loop over PCS
+            if ex == 0:
+                if npcs == 0: 
+                    extremedata=lowPC1
+                if npcs == 1:
+                    extremedata=lowPC2
+            if ex == 1:
+                if npcs == 0:
+                    extremedata=uppPC1
+                if npcs == 1:
+                    extremedata=uppPC2
+
+
+            for time in range (0,num_extr):
+                for monthno in range (0,nmonths):
+                    singleline=extremedata[time]
+                    yearuse=int(singleline[2])
+                    extrause=singleline[1]
+                    month=monthnames[monthno]
+
+                    if seasname == 'djf-1' and month == 'dc':
+                        yearuse=yearuse-1
+
+                    if seasname == 'djf+1' and month == 'ja':
+                        yearuse=yearuse+1
+
+                    if seasname == 'djf+1' and month == 'fb':
+                        yearuse=yearuse+1
+
+                    if yearuse >= 100:
+                        yearuse=yearuse-100
+                        extrause=chr(ord(extrause)+1)
+                                    
+                    if yearuse < 0:
+                        yearuse=yearuse+100
+                        extrause=chr(ord(extrause)-1)
+                                        
+                    yearfname=str(yearuse)
+
+                    if yearuse < 10:
+                        yearfname='0'+str(yearuse)
+                        
+
+                    fname=dirname+exptname+'a@pd'+extrause+yearfname+month+fileext
+                
+                    f=Dataset(fname,mode='r')
+                    lat = f.variables[latname][:]
+                    latsize=len(lat)
+                    lon = f.variables[lonname][:]
+                    lonsize=len(lon)
+                    lontemp=lon
+
+                    if len(fieldname) ==1 :
+                        atemp=f.variables[fieldname[0]][:]
+                        atemp=np.squeeze(atemp)
+
+                    if len(fieldname) == 2:
+                        atemp=f.variables[fieldname[0]][:]
+                        atemp=np.squeeze(atemp)
+                        atemp2=f.variables[fieldname[1]][:]
+                        atemp2=np.squeeze(atemp2)
+                        
+                    if len(fieldname) > 2:
+                        print('you are requesting too many variables')
+                        sys.exit()
+    
+
+                    # set array for storing average
+                    if monthno == 0 and time == 0:
+                        temp_extreme=atemp
+                        count=1
+                        count2=1
+                        temp2_extreme=0.
+                        if len(fieldname)==2:
+                            temp2_extreme=atemp2
+                    else:
+                        temp_extreme=temp_extreme+atemp
+                        count=count+1
+                        if len(fieldname)==2:
+                            temp2_extreme=temp2_extreme+atemp2
+                            count2=count2+1
+
+            # put temperature data in lower or higher catogry
+            if ex == 0:
+                if npcs == 0: 
+                    temp_low_PC1=temp_extreme/count
+                    temp2_low_PC1=temp2_extreme/count2
+                if npcs == 1: 
+                    temp_low_PC2=temp_extreme/count
+                    temp2_low_PC2=temp2_extreme/count2
+            if ex == 1:
+                if npcs == 0: 
+                    temp_high_PC1=temp_extreme/count
+                    temp2_high_PC1=temp2_extreme/count2
+                if npcs == 1: 
+                    temp_high_PC2=temp_extreme/count
+                    temp2_high_PC2=temp2_extreme/count2
+
+
+    # we have finished with the loop        
+    # shiftdata for plot
+    lontemp=lon
+    temp_low_PC1,lon = shiftgrid(180.,temp_low_PC1,lon,start=False)    
+    lon=lontemp
+    temp_high_PC1,lon = shiftgrid(180.,temp_high_PC1,lon,start=False)    
+    lon=lontemp
+    temp_low_PC2,lon = shiftgrid(180.,temp_low_PC2,lon,start=False)    
+    lon=lontemp
+    temp_high_PC2,lon = shiftgrid(180.,temp_high_PC2,lon,start=False)    
+    lon=lontemp
+    temp_avg,lon = shiftgrid(180.,temp_avg,lon,start=False)    
+
+
+
+    if fieldname[0] == 'temp_1':  # temperature data
+        plotmap(temp_low_PC1-temp_avg,0,lon,lat,'low PC1 Tanom',-2.0,2.2,0.2,0,'at','degC')
+        plotmap(temp_high_PC1-temp_avg,1,lon,lat,'high PC1 Tanom',-2.0,2.2,0.2,0,'at','degC')
+        plotmap(temp_low_PC2-temp_avg,2,lon,lat,'low PC2 Tanom',-2.0,2.2,0.2,0,'at','degC')
+        plotmap(temp_high_PC2-temp_avg,3,lon,lat,'high PC2 Tanom',-2.2,2.0,0.2,0,'at','degC')
+       
+
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_PCs_tempanom'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        plt.show()
+        plt.close()
+
+
+        titlename=exptname+' low seas temp'
+        plotmap(temp_low_PC1-273.15,0,lon,lat,'low PC1 temp',-40.0,40.0,10.0,0,'n','degC')
+        plotmap(temp_high_PC1-273.15,1,lon,lat,'high PC1 temp',-40.0,40.0,10.0,0,'n','degC')
+        plotmap(temp_low_PC2-273.15,2,lon,lat,'low PC2 temp',-40.0,40.0,10.0,0,'n','degC')
+        plotmap(temp_high_PC2-273.15,3,lon,lat,'high PC2 temp',-40.0,40.0,10.0,0,'n','degC')
+
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeeslices/plot_MOC/teleconnections_PC/tele_PCs_temp'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        plt.close()
+
+    
+
+
+      
+
+
+    if fieldname[0] == 'p':  # mean se level pressure data
+        plotmap((temp_low_PC1-temp_avg)/100.,0,lon,lat,'low PC1 mslp anom',-5.,6.,1.,0,'at','hPa')
+        plotmap((temp_high_PC1-temp_avg)/100.,1,lon,lat,'high PC1 mslp anom',-5.,6.,1.,0,'at','hPa')
+        plotmap((temp_low_PC2-temp_avg)/100.,2,lon,lat,'low PC2 mslp anom',-5.,6.,1.,0,'at','hPa')
+        plotmap((temp_high_PC2-temp_avg)/100.,3,lon,lat,'high PC2 mslp anom',-5.,6.,1.,0,'at','hPa')
+       
+
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_PCs_mslpanom'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        plt.close()
+
+        plotmap(temp_low_PC1/100.,0,lon,lat,'low PC1 mslp',980.,1040.,5,0,'n','hPa')
+        plotmap(temp_high_PC1/100.,1,lon,lat,'high PC1 mslp',980.,1040.,5,0,'n','hPa')
+        plotmap(temp_low_PC2/100.,2,lon,lat,'low PC2 mslp',980.,1040.,5,0,'n','hPa')
+        plotmap(temp_high_PC2/100.,3,lon,lat,'high PC2 mslp',980.,1040.,5,0,'n','hPa')
+
+
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_PCs_mslp_'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight') 
+        plt.show()
+        plt.close()
+
+    
+
+
+       
+
+    if fieldname[0] == 'precip_1':  # precipitation data
+        titlename=exptname+' low seas precip'
+        plotmap(temp_low_PC1*60.*60.*24.*30.,0,lon,lat,'low PC1 precip',-0,275,25,0,'n','mm/month')
+        plotmap(temp_high_PC1*60.*60.*24.*30.,1,lon,lat,'high PC1 precip',0,275,25,0,'n','mm/month')
+        plotmap(temp_low_PC2*60.*60.*24.*30.,2,lon,lat,'low PC2 precip',-0,275,25,0,'n','mm/month')
+        plotmap(temp_high_PC2*60.*60.*24.*30.,3,lon,lat,'high PC2 precip',0,275,25,0,'n','mm/month')
+
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_precip'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+        plt.close()
+
+
+        plotmap((temp_low_PC1-temp_avg)*60.*60.*24.*30.,0,lon,lat,'low PC1 panom',-30,35,5,0,'a','mm/month')
+        plotmap((temp_high_PC1-temp_avg)*60.*60.*24.*30.,1,lon,lat,'high PC1 panom',-30,35,5,0,'a','mm/month')
+
+        plotmap((temp_low_PC2-temp_avg)*60.*60.*24.*30.,2,lon,lat,'low PC2 panom',-30,35,5,0,'a','mm/month')
+        plotmap((temp_high_PC2-temp_avg)*60.*60.*24.*30.,3,lon,lat,'high PC2 panom',-30,35,5,0,'a','mm/month')
+
+     
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_precipanom'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+        plt.close()
+
+        # if precip also do percentage change
+        pcent_low_PC1=((temp_low_PC1-temp_avg)/temp_avg)*100.
+        pcent_high_PC1=((temp_high_PC1-temp_avg)/temp_avg)*100.
+        pcent_low_PC2=((temp_low_PC2-temp_avg)/temp_avg)*100.
+        pcent_high_PC2=((temp_high_PC2-temp_avg)/temp_avg)*100.
+        titlename=exptname+' low PC1 precip anom'
+        plotmap(pcent_low_PC1,0,lon,lat,titlename,-50,60,5,0,'a','%')
+        plotmap(pcent_high_PC1,1,lon,lat,'high PC1 Precip anomaly',-50,60,5,0,'a','%')
+        plotmap(pcent_low_PC2,2,lon,lat,'low PC2 precip anomaly',-50,60,5,0,'a','%')
+        plotmap(pcent_high_PC2,3,lon,lat,'high PC2 Precip anomaly',-50,60,5,0,'a','%')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_precip_pcent'+exptname+'_'+seasname+'.eps' 
+
+
+
+
+    if len(fieldname)==2 and fieldname[0] == 'u':  # winds dat
+        ms='m/s'
+        lon=lontemp
+        temp2_low,lon = shiftgrid(180.,temp2_low,lon,start=False)    
+        lon=lontemp
+        temp2_high,lon = shiftgrid(180.,temp2_high,lon,start=False)    
+        lon=lontemp
+        temp2_avg,lon = shiftgrid(180.,temp2_avg,lon,start=False)    
+
+        titlename=exptname+' low seas winds'
+        plotquiver(temp_low,temp2_low,lon,lat,0,titlename,0,400,40.0,0.0,'n',ms)
+        plotquiver(temp_high,temp2_high,lon,lat,1,'high seas winds',1,400,40.0,0.0,'n',ms)       
+        #plotquiver(temp_avg,temp2_avg,lon,lat,1,'avg winds',1,400,40.0,0.0,'n',ms)       
+        plotquiver(temp_low-temp_avg,temp2_low-temp2_avg,lon,lat,2,'low seas uvanom',0,400,40.0,0.0,'n',ms)
+        plotquiver(temp_high-temp_avg,temp2_high-temp2_avg,lon,lat,3,'high seas uvanom',1,400,40.0,0.0,'n',ms)       
+     
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/teleconnections_PC/tele_winds'+exptname+'_'+seasname+'.eps' 
+
+    
+
+
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+ 
+#end def PCs_to_climate
+
+################################
+# main program
+
+
+##################################
+# plot average of the MOC
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+##############################################
+#  plot_avg_moc will plot the lat-depth avg AMOC and also the maximum
+#  AMOC strength through time.
+EXPTNAME = 'xppca'
+retdata=plot_avg_moc(EXPTNAME,'#',4399,4499,'c1') # extra is '#' or letter
+lat=retdata[0]
+depth=retdata[1]
+xpkmg_AMOC=retdata[2]
+sys.exit(0)
+
+################################################
+# difference of two AMOCs - you will have to have calculated the
+# AMOCs from the last section
+
+#amoc_diff('xjpld','xjplc',xjpld_AMOC,xjplc_AMOC,lat,depth)
+#amoc_diff('xjple','xjplc',xjple_AMOC,xjplc_AMOC,lat,depth)
+#amoc_diff('xjplf','xjplc',xjplf_AMOC,xjplc_AMOC,lat,depth)
+#amoc_diff('xogzb','xjplc',xjplf_AMOC,xjplc_AMOC,lat,depth)
+#amoc_diff('xibol','xiboi',xibol_AMOC,xiboi_AMOC,lat,depth)
+
+
+
+##################################################
+# plot all years of the MOC
+
+plt.figure(figureno)
+plotallyears='y'
+#plot_all_moc('xjpld','n',1,99,plotallyears)
+plot_all_moc('xpowb','#',1,99,plotallyears)
+figureno=figureno+1
+
+###########################################################################
+# Principal component analysis to determine periods of variability in the MOC
+
+#MOC_PC('xjplc','n',1,98)
+#MOC_PC('xjpld','n',1,98)
+
+#############################################################
+# Relate extreme values of PC's to climate
+
+
+# usage Pcs_to_climate(expt_name',dirname,fileextension,fieldname,monthnames)
+#PCs_to_climate_telecon('xjpld','temp_data','_temp.nc',['temp_1'],'djf+1',\
+#            ['dc','ja','fb'],\
+#            'longitude','latitude')
+
+#PCs_to_climate_telecon('xjpld','precip_data','_precip.nc',['precip_1'],'djf+1',#\
+#            ['dc','ja','fb'],\
+#            'longitude','latitude')
+
+#PCs_to_climate_telecon('xjpld','mslp_data','_mslp.nc',['p'],'djf+1',\
+#            ['dc','ja','fb'],\
+#            'longitude','latitude')
+
+
+
+
+
+
+
+####
+
+::::::::::::::
+plot_orbit_swrad_diff.py
+::::::::::::::
+#!/usr/bin/env python2.7
+# -*- coding: utf-8 -*-
+"""
+#NAME
+#    orbit_forcing
+# NOTE
+#   before runing the program you will need to calendar correct the data
+#   you do this by running PYTHON/PROGRAMS/HadCM3/orbit_forcing.py
+#PURPOSE
+#   will do a difference in incoming shortwave raditaion for latitude
+#   and day (for looking at orbital forcing)
+
+"""
+
+import numpy as np
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import sys
+import cf_units
+
+
+
+
+################################
+# main program
+
+monthnames = ['ja', 'fb', 'mr', 'ar', 'my', 'jn', 'jl', 'ag', 'sp', 'ot', 'nv', 'dc']
+
+exptname = 'xogzb'
+cntlname = 'xogzc'
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c',
+#xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+# others are xogzb, xogzc, xogzd, xogze, xogzf
+
+
+# read in expt data
+filestart = '/nfs/hera1/earjcti/um/'
+exptcubes = CubeList([])
+
+f2 = (filestart + exptname + '/netcdf/' + exptname + 'a@pa')
+for i,month in enumerate(monthnames):
+    print(f2 + '_avg' + month + '.nc')
+    cube = iris.load_cube(f2 + '_avg' + month + '.nc','INCOMING SW RAD FLUX (TOA): ALL TSS')
+    cube.attributes = None
+    cube.data.mask = None
+    cube.coord('t').attributes = None
+    cube.coord('t').points = np.arange(i*30, (i+1)*30, 1) 
+    exptcubes.append(cube)
+
+exptyear_cube = exptcubes.concatenate_cube()
+exptyear_sw_cube = exptyear_cube[:,0,:,50]
+exptyear_sw_cube.coord('t').rename('day')
+exptyear_sw_cube.coord('day').attributes = None
+
+# read in cntl data
+filestart = '/nfs/hera1/earjcti/um/'
+cntlcubes = CubeList([])
+
+f2 = (filestart + cntlname + '/netcdf/' + cntlname + 'a@pa')
+for i,month in enumerate(monthnames):
+    print(f2 + '_avg' + month + '.nc')
+    cube = iris.load_cube(f2 + '_avg' + month + '.nc','INCOMING SW RAD FLUX (TOA): ALL TSS')
+    cube.attributes = None
+    cube.data.mask = None
+    cube.coord('t').attributes = None
+    cube.coord('t').points = np.arange(i*30, (i+1)*30, 1) 
+    cntlcubes.append(cube)
+
+cntlyear_cube = cntlcubes.concatenate_cube()
+cntlyear_sw_cube = cntlyear_cube[:,0,:,50]
+cntlyear_sw_cube.coord('t').rename('day')
+cntlyear_sw_cube.coord('day').attributes = None
+
+#fig = plt.figure()
+#fig.add_subplot(2,2,1)
+#cs=plt.contourf(exptyear_sw_cube.coord('day').points, exptyear_sw_cube.coord('la#titude').points, np.transpose(exptyear_sw_cube.data), extend='max')
+#plt.xticks(ticks=np.arange(15, (30*12)+15, 30),labels = monthnames)
+#cbar = plt.colorbar(cs)
+#fig.add_subplot(2,2,2)
+#cs=plt.contourf(cntlyear_sw_cube.coord('day').points, cntlyear_sw_cube.coord('la#titude').points, np.transpose(cntlyear_sw_cube.data), extend='max')
+#plt.xticks(ticks=np.arange(15, (30*12)+15, 30),labels = monthnames)
+#cbar = plt.colorbar(cs)
+
+#fig.add_subplot(2,2,3)
+
+V = np.arange(-120,130,10)
+cs=plt.contourf(exptyear_sw_cube.coord('day').points, exptyear_sw_cube.coord('latitude').points, np.transpose(exptyear_sw_cube.data - cntlyear_sw_cube.data), extend='both',cmap='RdBu_r', levels=V)
+plt.xticks(ticks=np.arange(15, (30*12)+15, 30),labels = monthnames)
+cbar = plt.colorbar(cs)
+outfile = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/anom_' + exptname + '-' + cntlname)
+plt.savefig(outfile + '.eps')
+plt.savefig(outfile + '.png')
+::::::::::::::
+plot_radiation.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_RADIATION
+#PURPOSE
+#    This program will plot the radiation budget for the pliocene simulations
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+#from mpl_toolkits.basemap import Basemap
+import subprocess
+import iris
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+    #map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    #map.drawmapboundary
+    #x, y = map(lons, lats)
+    #map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = plt.contourf(lon,lat,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.),extend="both")
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = plt.contourf(lon,lat,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r',extend="both")
+            cbar = plt.colorbar(cs,orientation="horizontal")
+
+        else:
+            if uselog =='a':
+                cs = plt.contourf(lon,lat,plotdata,V,cmap='RdBu_r',extend="both")
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                print(np.shape(plotdata))
+                cs = plt.contourf(lon,lat,plotdata,V,extend="both")
+                cbar = plt.colorbar(cs,orientation="horizontal",)
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotdata
+
+def annmean(switch,HadCM3,expt):
+    # switch is a dummy variable to allow the program to be called
+
+    # we will plot a) incoming sw ra flux (toa) field200
+    #              b) incoming sw ra flux (toa) field201
+    #              c) outgoing lw rad flux (toa) olr
+    # other things if the budgets don't balance
+
+    if NEW_VERSION:
+        datasetname=('/nfs/hera1/earjcti/um/' + expt + '/pd/'+expt+'a#pd00000'+fileends)
+    else:
+        datasetname=('/nfs/hera1/earjcti/um/' + expt + '/pd/'+expt+'a@pd'+fileends)
+
+
+    # get fields
+    print(datasetname)
+    #insw_cubes = iris.load(datasetname,'field200')
+    #iris.util.equalise_attributes(insw_cubes)
+    #insw_cube = insw_cubes.concatenate_cube()
+    #print(insw_cube)
+    #sys.exit(0)
+    f=MFDataset(datasetname)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    insw=f.variables['field200'][:]
+    outsw=f.variables['field201'][:]
+    outlw=f.variables['olr'][:]
+    netlw= (-1.0) *outlw
+    netsw=insw-outsw
+
+
+    netsw=np.squeeze(netsw)
+    netlw=np.squeeze(netlw)
+    ntimes,ny,nx=np.shape(netsw)
+    
+#average across the time dimension
+    netsw_ann=np.mean(netsw,axis=0)
+    netlw_ann=np.mean(netlw,axis=0)
+    
+    
+    plt.figure(0)
+    wm2='w/m2'
+    lontemp=lon
+    titlename=expt+'net SW ann'
+    #netsw_ann,lon = shiftgrid(180.,netsw_ann,lon,start=False)    
+    plotdata(netsw_ann,0,lon,lat,titlename,0,400,40.0,0.0,'n',wm2)
+
+
+    lon=lontemp
+    #netlw_ann,lon = shiftgrid(180.,netlw_ann,lon,start=False)    
+    plotdata(netlw_ann * (-1.0),1,lon,lat,' net lw ann',100,300,40.0,0.0,'n',wm2)
+
+    # calculate residual and mean residual weighted by cos latitude
+
+    residual=netsw_ann+ netlw_ann
+  
+    weights=np.cos(np.radians(lat))
+    print('len weights',len(weights))
+    resid_zon=np.average(residual,axis=0,weights=weights)
+    average_residual=np.average(resid_zon)
+
+    print(average_residual)
+    titlename='residual, avg='+str(average_residual)+'(w/m2)'
+    plotdata(residual,2,lon,lat,titlename,-100,100,20.0,0.0,'n',wm2)
+    
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/radiation_budget/annmean_'+expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+
+#end def annmean
+
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+#exptname='xkvjg'  #xkvje xkvjf xkvjg
+#extra='n'
+#HadCM3='n'
+#exptname='ximut'
+#extra='l'
+#plt.figure(figureno)
+#annmean('y',HadCM3,exptname,extra)
+#figureno=figureno+1
+
+
+HadCM3='y'
+NEW_VERSION = False
+exptname='xozzb'
+#fileends='23[2-5]???+.nc'
+fileends='o[7-9]???.nc'
+plt.figure(figureno)
+annmean('y',HadCM3,exptname)
+figureno=figureno+1
+
+
+
+
+#djf mean
+#plt.figure(figureno)
+#seasmean('dc','ja','fb',figureno,'djf',HadCM3)
+#figureno=figureno+1
+
+#jja mean
+#plt.figure(figureno)
+#seasmean('jn','jl','ag',figureno,'jja',HadCM3)
+#figureno=figureno+1
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+plot_seaice.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_SEAICE
+#PURPOSE
+#    This program will plot the sea ice change in two experiments
+#
+# search for 'main program' to find end of functions
+# Julia 28/11/2018
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(region,plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,oplot_cntl,cntl_seaice):
+
+    if region == 'NP':
+        proj='npstere'
+        latbb=60.
+    if region == 'SP':
+        proj='spstere'
+        latbb=-60.
+    #proj='stere'
+
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+  
+    map=Basemap(projection=proj,resolution='c',lon_0=0,boundinglat=latbb,round=True,lat_0=90)
+  
+    #map.drawmapboundary(fill_color='green')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    mycmap=mp.cm.get_cmap('Reds',len(V+2))
+                    newcolors=mycmap(np.linspace(0,1,len(V+2)))
+                    white=([1,1,1,1])
+                    newcolors[0:2,:]=white
+                    mycmap=ListedColormap(newcolors)
+                    cs = map.contourf(x,y,plotdata,V,cmap=mycmap)
+                   # map.drawparallels(np.arange(-80.,81.,20.))
+                   # map.drawmeridians(np.arange(-180.,181.,20.))
+                    map.fillcontinents()
+                  
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                    # overplot in contours where control sea ice was over 50% (or 0.5)
+                    if oplot_cntl == 'y':
+                        map.contour(x,y,cntl_seaice,[0,0.5],colors='lime',linestyles=[':','--'],linewidth=10)
+  
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=15)
+   
+
+
+#end def plotdata
+
+def seasmean(m1,m2,m3,figureno,seasname,control_expt,new_expt,extra,control_time,new_time):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # control
+
+    # read in temperature from a single file in order to get land mask
+    f=Dataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'76ja.nc')
+    temp=f.variables['temp'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+    mask=np.squeeze(mask)
+    f.close()
+ 
+   
+   
+    # read in data from multiple files
+    fa=MFDataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'*'+m3+'.nc')
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    atemp=fa.variables['iceconc'][:]
+    btemp=fb.variables['iceconc'][:]
+    ctemp=fc.variables['iceconc'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    ntimes,ny,nx=np.shape(atemp)
+   
+    
+    #average across the time dimension
+    cntl_atemp_avg=np.mean(atemp,axis=0)
+    cntl_btemp_avg=np.mean(btemp,axis=0)
+    cntl_ctemp_avg=np.mean(ctemp,axis=0)
+
+    #stdev across the time dimension
+    cntl_atemp_stdev=np.std(atemp,axis=0)
+    cntl_btemp_stdev=np.std(btemp,axis=0)
+    cntl_ctemp_stdev=np.std(ctemp,axis=0)
+    
+    
+
+    cntl_seaice=np.mean((cntl_atemp_avg,cntl_btemp_avg,cntl_ctemp_avg),axis=0)
+   
+    
+    cntl_seaice=cntl_seaice * mask
+    
+    plotdata('NP',cntl_seaice,0,lon,lat,control_expt+seasname,0,1.1,0.1,0,'n','fraction','y',cntl_seaice)
+    plotdata('SP',cntl_seaice,1,lon,lat,control_expt+seasname,0,1.1,0.1,0,'n','fraction','y',cntl_seaice)
+ 
+   
+
+    fa.close()
+    fb.close()
+    fc.close()
+   
+    print('j1')
+
+     #==============
+     # New_Expt
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m3+'.nc')
+    atemp=fa.variables['iceconc'][:]
+    btemp=fb.variables['iceconc'][:]
+    ctemp=fc.variables['iceconc'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    
+    new_atemp_avg=np.mean(atemp,axis=0)
+    new_btemp_avg=np.mean(btemp,axis=0)
+    new_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    new_seaice=np.mean((new_atemp_avg,new_btemp_avg,new_ctemp_avg),axis=0)
+
+    
+    fa.close()
+    fb.close()
+    fc.close()
+   
+
+    print('j2')
+
+
+    # plot data
+    
+    #new_seaice=new_seaice * mask
+
+    plotdata('NP',new_seaice,2,lon,lat,new_expt+seasname,0,1.1,0.1,0,'n','fraction','n',cntl_seaice)
+    plotdata('SP',new_seaice,3,lon,lat,new_expt+seasname,0,1.1,0.1,0,'n','fraction','n',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+    
+
+    # New_Expt - control
+
+    perc_lost=((new_seaice-cntl_seaice)/cntl_seaice)*100.
+    titlename='Sea ice change '+new_time+'-'+control_time+':'+seasname
+    plotdata('NP',perc_lost,99,lon,lat,titlename,-100,105.,5.0,0,'a','%','y',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_NP_iceanom.eps' 
+    plt.savefig(fileout, bbox_inches='tight') 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_NP_iceanom.png' 
+    plt.savefig(fileout, bbox_inches='tight') 
+    plt.close()
+  
+
+    plotdata('SP',perc_lost,99,lon,lat,titlename,-100,105.,5.0,0,'a','%','y',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_SP_iceanom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+    
+    print('j4')
+    
+
+
+######################################################   
+def seascyc(expt_list,extra_list,names_list):
+
+# get seasonal cycle of sea ice
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    filestart='/nfs/hera1/earjcti/um/'
+    filemid='/netcdf/'
+  
+    # read in temperature from a single file in order to get land mask
+    # recommend putting control experiment (PI) in expt_list[0]
+    f=Dataset(filestart+expt_list[0]+filemid+expt_list[0]+'o@pf'+extra_list[0]+'76ja.nc')
+    temp=f.variables['temp'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+   
+    mask=np.ma.array(temp,mask=temp > 1E10)
+    mask=mask/mask
+
+    mask=np.squeeze(mask)
+    f.close()
+   
+   
+    # read in data from cntl and new_expt files
+    for expt in range(0,len(expt_list)):
+        exptname=expt_list[expt]
+        extra=extra_list[expt]
+        for mon in range(0,len(monthnames)):
+            fa=MFDataset(filestart+exptname+'/netcdf/'+exptname+'o@pf'+extra+'[7-9]*'+monthnames[mon]+'.nc')
+            lat = fa.variables['latitude'][:]
+            lon = fa.variables['longitude'][:]
+            atemp=fa.variables['iceconc'][:]
+            atemp=np.squeeze(atemp)
+            htemp=fa.variables['icedepth'][:]
+            htemp=np.squeeze(htemp)
+            fa.close()
+            atemp_avg=np.mean(atemp,axis=0)
+            htemp_avg=np.mean(htemp,axis=0)
+      
+            ny,nx=np.shape(atemp_avg)
+
+            if mon == 0 and expt ==0:
+                conc_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+                depth_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+               
+            conc_seaice[expt,mon,:,:]=atemp_avg
+            depth_seaice[expt,mon,:,:]=htemp_avg
+        
+   
+    #======================================================
+    # get average area of seaice
+
+    xres=lon[1]-lon[0]
+    yres=lat[1]-lat[0]
+    a=40075. # circumference of earth in km
+    onedeg=a/360.
+    gridbox_nonweight=xres * yres * onedeg * onedeg
+  
+    avg_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    avg_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    vol_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    vol_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    for expt in range(0,len(expt_list)):
+        for mon in range(0,len(monthnames)):
+            for j in range(0,ny):
+                coslat=np.cos(np.radians(lat[j]))
+                if lat[j] > 0 :
+                    for i in range(0,nx):
+                        avg_ice_nh[expt,mon]=(avg_ice_nh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_nh[expt,mon]=(vol_ice_nh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                if lat[j] < 0 :
+                    for i in range(0,nx):
+                  
+                        avg_ice_sh[expt,mon]=(avg_ice_sh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_sh[expt,mon]=(vol_ice_sh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                    
+       
+    # plot nh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_areal_extent.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+
+
+    # plot nh seasonal cycle vol
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_volume.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_volume.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+    retdata=[avg_ice_nh,avg_ice_sh,vol_ice_nh,vol_ice_sh]
+    return(retdata)
+
+# end def seascyc
+
+
+######################################################   
+def seascyc_region(expt_list,extra_list,names_list,latreq,lonreq,ngridboxes):
+
+# get seasonal cycle of sea ice over a given region
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    filestart='/nfs/hera1/earjcti/um/'
+    filemid='/netcdf/'
+  
+    # read in temperature from a single file in order to get land mask
+    # recommend putting control experiment (PI) in expt_list[0]
+    f=Dataset(filestart+expt_list[0]+filemid+expt_list[0]+'o@pf'+extra_list[0]+'76ja.nc')
+    temp=f.variables['temp'][:]
+    lon=f.variables['longitude'][:]
+    lat=f.variables['latitude'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+   
+    mask=np.ma.array(temp,mask=temp > 1E10)
+    mask=mask/mask
+
+    mask=np.squeeze(mask)
+    print(mask)
+
+    # find index of required latitude and longitude
+
+    lonindex = (np.abs(lon-lonreq)).argmin()
+    latindex=(np.abs(lat-latreq)).argmin()
+   
+    # change the mask so that any values which are not within range are set 
+    # to zero
+
+    ny,nx=(np.shape(mask))
+    for j in range(0,ny):
+        if (j<latindex-ngridboxes) or (j > latindex+ngridboxes):
+            mask[j,:]=0
+        else:
+            for i in range(0,nx):
+                if (i<lonindex-ngridboxes) or (i > lonindex+ngridboxes):
+                    mask[j,i]=0
+   
+    print('there are ',np.sum(mask),'unmasked gridboxes')
+    #plotdata('NP',mask,99,lon,lat,'check mask',-1.,2.,0.1,0,'a','%','n',0)
+    #plt.show()
+    #plt.close()
+ 
+
+    f.close()
+       
+    # read in data from cntl and new_expt files
+    for expt in range(0,len(expt_list)):
+        exptname=expt_list[expt]
+        print('processing',exptname)
+        extra=extra_list[expt]
+        for mon in range(0,len(monthnames)):
+            fa=MFDataset(filestart+exptname+'/netcdf/'+exptname+'o@pf'+extra+'[7-9]*'+monthnames[mon]+'.nc')
+            lat = fa.variables['latitude'][:]
+            lon = fa.variables['longitude'][:]
+            atemp=fa.variables['iceconc'][:]
+            atemp=np.squeeze(atemp)
+            htemp=fa.variables['icedepth'][:]
+            htemp=np.squeeze(htemp)
+            fa.close()
+            atemp_avg=np.mean(atemp,axis=0)
+            htemp_avg=np.mean(htemp,axis=0)
+      
+            ny,nx=np.shape(atemp_avg)
+
+            if mon == 0 and expt ==0:
+                conc_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+                depth_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+               
+            conc_seaice[expt,mon,:,:]=atemp_avg*mask
+            depth_seaice[expt,mon,:,:]=htemp_avg*mask
+        
+   
+    #======================================================
+    # get average area of seaice
+
+    xres=lon[1]-lon[0]
+    yres=lat[1]-lat[0]
+    a=40075. # circumference of earth in km
+    onedeg=a/360.
+    gridbox_nonweight=xres * yres * onedeg * onedeg
+  
+    avg_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    mask_area_nh=0
+    avg_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    vol_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    vol_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    for expt in range(0,len(expt_list)):
+        for mon in range(0,len(monthnames)):
+            for j in range(0,ny):
+                coslat=np.cos(np.radians(lat[j]))
+                if lat[j] > 0 :
+                    for i in range(0,nx):
+                        avg_ice_nh[expt,mon]=(avg_ice_nh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_nh[expt,mon]=(vol_ice_nh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                if lat[j] < 0 :
+                    for i in range(0,nx):
+                  
+                        avg_ice_sh[expt,mon]=(avg_ice_sh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_sh[expt,mon]=(vol_ice_sh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+
+    for j in range(0,ny):
+        coslat=np.cos(np.radians(lat[j]))
+        if lat[j] > 0 :
+            for i in range(0,nx):
+                mask_area_nh=(mask_area_nh + 
+                        (mask[j,i]*coslat * gridbox_nonweight))
+                                 
+       
+    # plot nh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Areal extent',fontsize=12)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent_region.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # plot nh fractional coverage
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:]/mask_area_nh,label=names_list[expt])
+    print(lon,lonindex-ngridboxes)
+   
+    print(np.str(lat[latindex-ngridboxes]))
+    print(np.str(lon[lonindex+ngridboxes]))
+    degree_sign= u'\N{DEGREE SIGN}' 
+    region=(np.str(lat[latindex-ngridboxes])+degree_sign+'N-'+
+            np.str(lat[latindex+ngridboxes])+degree_sign+'N, '+
+            np.str(lon[lonindex-ngridboxes])+degree_sign+'E-'+
+            np.str(lon[lonindex+ngridboxes])+degree_sign+'E')
+    plt.title('  Fraction of sea ice: \n ('+region+')',fontsize=15,loc='left')
+    plt.ylabel('fraction',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.tick_params(axis='both',labelsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_fraction_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_fraction_region.png' 
+    plt.savefig(fileout, bbox_inches='tight',dpi=300)  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_areal_extent_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+
+
+    # plot nh seasonal cycle vol
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_volume_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_volume_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+    retdata=[avg_ice_nh,avg_ice_sh,vol_ice_nh,vol_ice_sh]
+    return(retdata)
+
+# end def seascyc_region
+
+
+
+
+
+
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+
+control_expt=['xjplc','xjplc','xjplc','xiboi']
+control_time=['3.205Ma','3.205Ma','3.205Ma','PreInd']
+new_expt=['xjpld','xjple','xjplf','xibol']
+new_time=['K1','G17','KM3','KM5C']
+extra=['6','6','6','y']
+HadCM3='y'
+
+
+
+#plt.figure(figureno)
+figureno=0
+#for expt in range(0,len(new_expt)):
+    #djf mean
+#    seasmean('dc','ja','fb',figureno,'djf',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+     #mam mean
+#    seasmean('mr','ar','my',figureno,'mam',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+     #jja mean
+#    seasmean('jn','jl','ag',figureno,'jja',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+     #son mean
+#    seasmean('sp','ot','nv',figureno,'son',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+#####################################
+# plot annual cycle of sea ice loss
+
+
+expt_list=['xiboi','xjplc','xjpld','xjple','xjplf']
+extra_list=['y','6','6','6','6']
+names_list=['PreInd','KM5C','K1','G17','KM3']
+
+retdata=seascyc(expt_list,extra_list,names_list)
+#area_ice_nh_HadCM3=retdata[0]
+#area_ice_sh_HadCM3=retdata[1]
+#vol_nh_HadCM3=retdata[2]
+#vol_sh_HadCM3=retdata[3]
+#print('got HadCM3 data') 
+
+# plot seasonal cycle over a given region
+# it will get gridbox containing required value.  using argmin()
+# ngridboxes is how far away we are allowed to be 0 means use this gridbox only
+# 1 will allow one gridbox away to be used (ie 9 squares centred on the gridbox)
+
+latreq=80.15
+lonreq=6
+ngridboxes=2
+seascyc_region(expt_list,extra_list,names_list,latreq,lonreq,ngridboxes)
+#area_ice_nh_HadCM3=retdata[0]
+#area_ice_sh_HadCM3=retdata[1]
+#vol_nh_HadCM3=retdata[2]
+#vol_sh_HadCM3=retdata[3]
+#print('got HadCM3 data') 
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+seas_cycle.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_SEAS_CYCLE.py
+#PURPOSE
+#    This program will plot the seasonal cycle over a given region for the
+#    HadCM3 data.
+#    It was originally set up for the isotopes el nino paper to look at how
+#    seasonal differences had changed between the Pliocene and the preindustrial
+#
+# search for 'main program' to find end of functions
+# Julia 2/4/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+
+   # this is good for a tropical region
+    map=Basemap(llcrnrlon=90.0,urcrnrlon=300.0,llcrnrlat=-45.0,urcrnrlat=45.0,projection='cyl',resolution='c')
+   # this is good for the globe
+   # map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    map.drawmapboundary
+
+    # if it comes from pf file we want to fill the land in white
+    nlons=len(lons)
+    if  nlons > 120:
+        map.drawmapboundary(fill_color='white')
+
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='ar':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V)
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename,loc='left',fontsize=25)
+    cbar.ax.tick_params(labelsize=15)
+    #cbar.set_label(cbarname,fontsize=15)
+    cbar.ax.set_title(cbarname,fontsize=20)
+#end def plotdata
+
+
+#==================================================
+def seasmean(m1,m2,m3,seasname,exptname,fieldname):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # preindustrial
+    
+    if fieldname=='precip':
+        filetype1='a'
+        filetype2='d'
+        varname='precip'
+    
+    if fieldname =='SST':
+        filetype1='o'
+        filetype2='f'
+        varname='temp'
+
+    if fieldname =='d18op':
+        filetype1='a'
+        filetype2='d'
+        varname='QCL'
+
+    if fieldname =='d18osw':
+        filetype1='o'
+        filetype2='f'
+        varname='otracer1'
+
+   
+    # read in data from multiple files
+    datasetname='/nfs/hera1/earjcti/um/netcdf/'+exptname+'_netcdf/'+exptname+filetype1+'@p'+filetype2+'[w-y]*'+m1+'.nc'
+    #datasetname='/nfs/hera1/earjcti/um/netcdf/'+exptname+'_netcdf/'+exptname+filetype1+'@p'+filetype2+'y[7-9]*'+m1+'.nc'
+    print(datasetname)
+    fa=MFDataset(datasetname)
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    avar=fa.variables[varname][:]
+    fa.close()
+
+
+    datasetname='/nfs/hera1/earjcti/um/netcdf/'+exptname+'_netcdf/'+exptname+filetype1+'@p'+filetype2+'[w-y]*'+m2+'.nc'
+    #datasetname='/nfs/hera1/earjcti/um/netcdf/'+exptname+'_netcdf/'+exptname+filetype1+'@p'+filetype2+'y[7-9]*'+m2+'.nc'
+    fb=MFDataset(datasetname)
+    bvar=fb.variables[varname][:]
+    fb.close()
+
+
+    datasetname='/nfs/hera1/earjcti/um/netcdf/'+exptname+'_netcdf/'+exptname+filetype1+'@p'+filetype2+'[w-y]*'+m3+'.nc'
+    #datasetname='/nfs/hera1/earjcti/um/netcdf/'+exptname+'_netcdf/'+exptname+filetype1+'@p'+filetype2+'y[7-9]*'+m3+'.nc'
+    fc=MFDataset(datasetname)
+    cvar=fc.variables[varname][:]
+    fc.close()
+
+    avar=np.squeeze(avar)
+    bvar=np.squeeze(bvar)
+    cvar=np.squeeze(cvar) 
+
+    if fieldname=='d18op' or fieldname =='d18osw':
+        ntimes,nz,ny,nx=np.shape(avar)
+        ntimesb,nz,ny,nx=np.shape(bvar)
+        ntimesc,nz,ny,nx=np.shape(cvar)
+    else:
+        ntimes,ny,nx=np.shape(avar)
+        ntimesb,ny,nx=np.shape(bvar)
+        ntimesc,ny,nx=np.shape(cvar)
+
+    # abort if we are getting a different number of files from each month
+    if ntimes != ntimesb or ntimes !=ntimesc:
+        print('you are not getting the same number of times for each month')
+        print(ntimes,ntimesb,ntimesc)
+        sys.exit()
+
+    
+#average across the time dimension
+    avar_avg=np.mean(avar,axis=0)
+    bvar_avg=np.mean(bvar,axis=0)
+    cvar_avg=np.mean(cvar,axis=0)
+    
+    seasvar=np.mean((avar_avg,bvar_avg,cvar_avg),axis=0)
+    if fieldname=='precip':
+        seasvar=seasvar * 60. * 60. * 30. * 24.
+
+    if fieldname=='d18op':
+        temporarydata=seasvar
+        seasvar=0
+        tot16o=temporarydata[0,:,:]+temporarydata[3,:,:]+ \
+            temporarydata[6,:,:]+temporarydata[9,:,:]
+        tot18o=temporarydata[1,:,:]+temporarydata[4,:,:]+ \
+            temporarydata[7,:,:]+temporarydata[10,:,:]
+        seasvar=((tot18o/tot16o)-2005.2E-6)/2005.2E-9
+    
+    if fieldname=='d18osw': #we just need level 0
+        temporarydata=seasvar
+        seasvar=0
+        seasvar=(temporarydata[0,:,:]-2005.2E-6)/2005.2E-9
+    
+    allretdata=[lon,lat,seasvar]
+    print('size of allretdata',np.shape(allretdata))
+    return allretdata
+
+
+#end def seasmean
+
+################################
+# main program
+
+precipanom='y'
+tempanom='y'
+d18opanom='y'
+d18oswanom='y'
+
+
+if precipanom=='y':
+    # figure 1d PI panom
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','precip')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','precip')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+
+    # djf - jja  mean for xiboi
+    djf_jja_xiboi_precip=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_precip,0,xiboi_lon,xiboi_lat,'d) Preindustrial DJF-JJA precipitation',-400,405,5,0.0,'a','mm/month')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1d_precip_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1e Pliocene panom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','precip')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','precip')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_precip=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_precip,0,xibol_lon,xibol_lat,'e) mPWP DJF-JJA precipitation',-400,405,5,0.0,'a','mm/month')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1e_precip_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_precip_anom_xibol_xiboi=djf_jja_xibol_precip - djf_jja_xiboi_precip
+    plotdata(seas_precip_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'f) mPWP-PI,  DJF-JJA precipitation',-100,120,20,0.0,'a','mm/month')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1f_precip_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+if tempanom=='y':
+    ##########################
+    # temperature anomaly fig 1a
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','SST')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+    
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','SST')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+    
+    # djf - jja  mean for xiboi
+    degC=u'\N{DEGREE SIGN}'+'C'
+    djf_jja_xiboi_temp=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_temp,0,xiboi_lon,xiboi_lat,'a) Preindustrial DJF-JJA SST',-15,15.5,0.5,0,'ar',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1a_SST_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1b Pliocene Tanom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','SST')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+    
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','SST')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_temp=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_temp,0,xibol_lon,xibol_lat,'b) mPWP DJF-JJA SST',-15,15.5,0.5,0,'ar',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1b_SST_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_temp_anom_xibol_xiboi=djf_jja_xibol_temp - djf_jja_xiboi_temp
+    plotdata(seas_temp_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'c) mPWP-PI,  DJF-JJA SST',-1.0,1.2,0.2,0,'ar',degC)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1c_SST_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+
+if d18opanom=='y':
+    ##########################
+    # d18op anomaly fig 1g
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','d18op')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+    
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','d18op')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+    
+    # djf - jja  mean for xiboi
+    djf_jja_xiboi_d18op=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_d18op,0,xiboi_lon,xiboi_lat,'g) Preindustrial DJF-JJA d18Op',-10,10.5,0.5,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1g_d18op_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1h Pliocene d18opanom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','d18op')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+    
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','d18op')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_d18op=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_d18op,0,xibol_lon,xibol_lat,'h) mPWP DJF-JJA d18Op',-10,10.5,0.5,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1h_d18op_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_d18op_anom_xibol_xiboi=djf_jja_xibol_d18op - djf_jja_xiboi_d18op
+    plotdata(seas_d18op_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'i) mPWP-PI,  DJF-JJA d18Op',-3.0,3.5,0.5,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1i_d18op_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+
+
+if d18oswanom=='y':
+    ##########################
+    # d18osw anomaly fig 1j
+    #djf mean for xiboi
+
+    retdata=seasmean('dc','ja','fb','djf','xiboi','d18osw')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_djf_mean=retdata[2]
+    
+    #jja mean for xiboi
+    retdata=seasmean('jn','jl','ag','jja','xiboi','d18osw')
+    xiboi_lon=retdata[0]
+    xiboi_lat=retdata[1]
+    xiboi_jja_mean=retdata[2]
+    
+    # djf - jja  mean for xiboi
+    djf_jja_xiboi_d18osw=xiboi_djf_mean-xiboi_jja_mean
+    plotdata(djf_jja_xiboi_d18osw,0,xiboi_lon,xiboi_lat,'j) Preindustrial DJF-JJA d18osw',-0.15,0.18,0.03,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1j_d18osw_pi_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    ##########################
+    # figure 1k Pliocene d18oswanom
+    #djf mean for xibol
+    retdata=seasmean('dc','ja','fb','djf','xibol','d18osw')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_djf_mean=retdata[2]
+    
+    #jja mean for xibol
+    retdata=seasmean('jn','jl','ag','jja','xibol','d18osw')
+    xibol_lon=retdata[0]
+    xibol_lat=retdata[1]
+    xibol_jja_mean=retdata[2]
+
+    # djf - jja  mean for xibol
+    djf_jja_xibol_d18osw=xibol_djf_mean-xibol_jja_mean
+    plotdata(djf_jja_xibol_d18osw,0,xibol_lon,xibol_lat,'k) mPWP DJF-JJA d18Osw',-0.15,0.18,0.03,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1k_d18osw_plio_djf-jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # djf - jja  mean for xibol-xiboi
+    seas_d18osw_anom_xibol_xiboi=djf_jja_xibol_d18osw - djf_jja_xiboi_d18osw
+    plotdata(seas_d18osw_anom_xibol_xiboi,0,xibol_lon,xibol_lat,'l) mPWP-PI,  DJF-JJA d18osw',-0.15,0.18,0.03,0,'ar',u'\u2030')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/seas_cycle/fig_s1l_d18osw_plio_pi_djf_jja.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+
+
+
+
+
+
+
+sys.exit(0)
+
+####
+

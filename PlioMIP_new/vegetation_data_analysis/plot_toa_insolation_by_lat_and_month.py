@@ -1,0 +1,81 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created Sept 2021 by Julia
+
+This program will plot the TOA insolation for the modern.
+
+"""
+
+import numpy as np
+import pandas as pd
+import iris
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.quickplot as qplt
+import iris.plot as iplt
+import cartopy.crs as ccrs
+import matplotlib.ticker as ticker
+import netCDF4
+
+import sys
+
+FILESTART = '/nfs/hera1/earjcti/um/tenvo/pd/tenvoa@pdt39'
+MONTHS = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+FIELD = 'INCOMING SW RAD FLUX (TOA): ALL TSS'
+NMONTHS = len(MONTHS)
+
+for i, month in enumerate(MONTHS):
+    cube = iris.load_cube(FILESTART + month + '.nc', 
+                          'INCOMING SW RAD FLUX (TOA): ALL TSS')
+    cube_lat_globe = iris.util.squeeze(cube.collapsed('longitude', iris.analysis.MEAN))
+    cube_lat_mean = cube_lat_globe[0:15, :]
+    cube_insol_55N = cube_lat_globe.extract(iris.Constraint(latitude=55.0))
+    lats = cube_lat_mean.coord('latitude').points
+    nlats = len(lats)
+    if i == 0:
+        toa_incom = np.zeros((nlats, NMONTHS))
+        toa_55 = np.zeros(NMONTHS)
+
+    toa_incom[:,i] = cube_lat_mean.data
+    toa_55[i] = cube_insol_55N.data
+   
+
+# fraction of maximum insolation that occurs in that month
+toa_frac = np.zeros((nlats, NMONTHS))  
+monthly_mean = np.mean(toa_incom,axis=0)
+for j, lat in enumerate(lats):
+    toa_frac[j, :] = toa_incom[j, :] / np.sum(toa_incom[j, :])
+for i, month in enumerate(MONTHS):
+   # toa_frac[:, i] = toa_incom[:, i] / monthly_mean[i]
+    toa_frac[:, i] = toa_incom[:, i] / toa_55[i]
+
+
+print('np.mean axis 0',np.mean(toa_incom,axis=0))
+print('np.mean axis 1',np.mean(toa_incom,axis=1))
+print(toa_incom[:,0])
+
+# plot
+ax = plt.subplot(111)
+V = np.arange(0,2.2,0.2)
+#im = plt.pcolormesh(MONTHS, lats+1.25, toa_frac, vmin=0, vmax=2 ,cmap='RdYlBu_r')
+im = plt.imshow(toa_frac, vmin=0, vmax=1.2, cmap='PuBuGn',aspect='auto')
+cbar = plt.colorbar(im,orientation='horizontal')
+plt.title('Fraction of 55N insolation occuring at each latitude')
+plt.ylabel('latitude')
+plt.xlabel('month')
+ax.set_xticks(np.arange(0,12,1))
+ax.set_xticklabels(MONTHS)
+ax.set_yticks(np.arange(0,16,2))
+ax.set_yticklabels(['90N','85N','80N','75N','70N','65N','60N','55N'])
+#plt.xticks(MONTHS)
+#ax.xaxis.set_major_locator(ticker.IndexLocator(base=1.0,offset=0.5))
+#ax.yaxis.set_major_locator(ticker.IndexLocator(base=5.0,offset=1.25))
+#plt.yticks(lats[:-1]+0.5)
+plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/vegetation/NH_insolation.eps')
+plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/vegetation/NH_insolation.png')
+plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/vegetation/NH_insolation.pdf')
+plt.close()

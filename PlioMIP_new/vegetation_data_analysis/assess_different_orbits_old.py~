@@ -1,0 +1,500 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on September 2020
+#Updated January 2021 to produce a nicer figure
+# 
+#  This program will see whether the uncertainty in the orbit could 
+#  affect the data model mismatch at any of the locations.  
+#
+#
+#
+#import os
+import numpy as np
+import pandas as pd
+#import scipy as sp
+#import cf
+import iris
+#import iris.util
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+#import netCDF4
+from mpl_toolkits.basemap import Basemap, shiftgrid
+#from netCDF4 import Dataset, MFDataset
+#import iris.analysis.cartography
+#import iris.coord_categorisation
+import iris.quickplot as qplt
+import iris.plot as iplt
+#import cf_units as unit
+from iris.experimental.equalise_cubes import equalise_attributes
+import cartopy.crs as ccrs
+#import matplotlib.ticker as mticker
+#from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+#from mpl_toolkits.basemap import Basemap
+
+import sys
+
+ 
+def get_land_obs():
+    """
+    reads in the spredsheet from ulrich and returns 
+    the field, latitude and longitude from the required site. 
+    """
+
+    if SITE_REQUIRED == 'Meighen Island':
+        fielddata = np.nan
+        lat = 80.0
+        lon = -99.0
+    if SITE_REQUIRED == 'Beaver Pond':
+        fielddata = np.nan
+        lat = 79.0
+        lon = -82.0
+
+    dfs = pd.read_excel(LAND_DATAFILE)
+    found = 'n'
+    
+    if FIELD == 'NearSurfaceTemperature':
+        colreq = 9
+    if FIELD == 'TotalPrecipitation':
+        colreq = 11
+   
+    
+    for index, row in dfs.iterrows():
+        if row[0] == SITE_REQUIRED:
+            found = 'y'
+            fielddata = row[colreq]
+            lat = row[2]
+            lon = row[3]
+            pass
+            
+    
+    if found == 'n' and SITE_REQUIRED != 'Meighen Island':
+        print('couldnot find site in Ulrichs file')
+    #    sys.exit(0)
+        
+    if FIELD == 'TotalPrecipitation':
+       fielddata = fielddata / 365.
+    
+   
+    return fielddata, lat, lon
+
+
+
+
+def get_model_data(expt, lat, lon):
+    """
+    gets the model data for each month of the year for the site.
+    """
+    
+    lonreq=lon
+   
+    months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+    monthsalt = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+   
+    seas_field = np.zeros(len(months))
+  
+    for i, month in enumerate(months):
+        if expt == 'xogzb' or expt == 'xogzc' or expt == 'xogzd':
+            cubedays = iris.load_cube(FILESTART + expt + '/netcdf/' + expt + 
+                                      'a@pa_avg' + monthsalt[i] + '.nc',
+                                      'SURFACE TEMPERATURE AFTER TIMESTEP')
+            cube = cubedays.collapsed('t',iris.analysis.MEAN)
+   
+        else:
+            cube = iris.load_cube(FILESTART  + expt + '/database_averages/'
+                              + expt + '_Monthly_Average_' + month 
+                              + '_a@pd_Temperature.nc')
+        meancube = iris.util.squeeze(cube)
+       
+        lat_ix = (np.abs(meancube.coord('latitude').points - lat)).argmin()
+        lon_ix = (np.abs(meancube.coord('longitude').points - lonreq)).argmin()
+    
+        seas_field[i] = meancube.data[lat_ix, lon_ix]-273.15
+
+   
+    return seas_field
+
+
+
+def plot_seascyc_vs_proxy(proxyT, models_Tseas, lat, lon, subscript):
+    """
+    plots the temperature from the data vs the modelled seasonal cycle.
+
+    """
+    
+    ylab = {'NearSurfaceTemperature': 'degC',
+            'TotalPrecipitation': 'mm/day'}
+    
+    ax = plt.subplot(111)
+    for i, mod_data in enumerate(models_Tseas):
+        if i > 5:
+            ax.plot(mod_data, label=PERIOD.get(EXPTNAMES[i]), 
+                    linestyle='dotted')
+        else:
+            ax.plot(mod_data, label=PERIOD.get(EXPTNAMES[i]))
+        MAT = np.mean(mod_data)
+        ax.plot([-1.0,0], [MAT, MAT], color='blue')
+        print(EXPTNAMES[i], np.around(MAT - proxyT, 2))
+        
+        
+    if proxyT > -100:
+        print('proxy T', proxyT)
+        ax.axhline(y=proxyT)
+    title = SITE_REQUIRED + ' lat=' + np.str(np.around(lat)), ' lon='+np.str(np.around(lon))
+    plt.title(title)
+    plt.xlabel('month')
+    plt.ylabel(ylab.get(FIELD))
+    
+    
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+   
+    plt.savefig(FILEOUTSTART + 'seas_cyc_' + SITE_REQUIRED.replace(' ','_') + subscript + PLOTTYPE)
+    plt.close()
+   
+    
+
+def get_lsm_for_cube(cube):
+    """
+    get's the PI land sea mask and checks it is on the same grid as cube
+
+    """
+    LSMfile = ('/nfs/hera1/earjcti/ancil/preind2/qrparm.mask.nc')
+    lsm_pi_cube = iris.load_cube(LSMfile, 'LAND MASK (LOGICAL: LAND=TRUE)')
+    
+    for i, lsm in enumerate(lsm_pi_cube.coord('longitude').points):
+        if lsm != cube.coord('longitude').points[i]:
+            print('lsm lon error')
+            print(lsm, cube.coord('longitude').points[i])
+            sys.exit(0)
+       
+    for j, lsm in enumerate(lsm_pi_cube.coord('latitude').points):
+         if lsm != cube.coord('latitude').points[j]:
+            print('lsm lat error')
+            print(lsm, cube.coord('latitude').points[i])
+            sys.exit(0)
+            
+   
+        
+    return iris.util.squeeze(lsm_pi_cube)
+        
+#####################################################        
+  
+def locate_PI_with_plioJulyT(model, temp_req, lonreq, proxy_lat):
+    """
+    this subroutine will find locations in the preindustrial MAT file 
+    which have July temperature of temp_req
+    The site must be land and within 30deg of lonreq
+    temperature
+
+    """
+    
+    def get_near_tempreq(cube, tempreq, errormargin, mask, lsm):
+        
+        indexes= []
+        cube_loc = cube.copy(data = np.zeros(np.shape(cube.data)))
+        for index, temp in np.ndenumerate(cube.data):
+            if (tempreq - errormargin < temp < tempreq + errormargin):
+                if mask.data[index] == 1.0:
+                    cube_loc.data[index] = 1.0
+                    indexes.append(index)
+        
+        return indexes
+    
+    def get_mean_min():
+        """
+        gets the july temperature and the january temperature
+        from the pi cube for each index
+        """
+        jan_temps = []
+        mean_temps = []
+        lons = []
+        lats = []
+        
+        for ix in indexes:
+            jan = cube_janmean.data[ix[0], ix[1]]
+            mean = cube_allmean.data[ix[0], ix[1]]
+            jan_temps.append(jan - 273.15)
+            mean_temps.append(mean - 273.15)
+            lons.append(cube_allmean.coord('longitude').points[ix[1]])
+            lats.append(cube_allmean.coord('latitude').points[ix[0]])
+            
+        
+        return jan_temps, mean_temps, lons, lats
+    
+    # get data
+    filename = (FILESTART + 'xiboi/database_averages/'
+                + 'xiboi_Monthly_Average_July_a@pd_Temperature.nc')
+
+    cube = iris.load_cube(filename)
+    cube_julymean = iris.util.squeeze(cube)
+    lsm = get_lsm_for_cube(cube)
+    mask = get_lsm_for_cube(cube)
+    for i, lon in enumerate(lsm.coord('longitude').points):
+        if lon < lonreq - 30.:
+            mask.data[:,i] = 0
+        if lon > lonreq + 30.:
+            mask.data[:,i] = 0
+    for j, lat in enumerate(lsm.coord('latitude').points):
+        if lat < 0.:
+            mask.data[j,:] = 0
+   
+    # jan
+    filename = (FILESTART + 'xiboi/database_averages/'
+                + 'xiboi_Monthly_Average_January_a@pd_Temperature.nc')
+
+    cube = iris.load_cube(filename)
+    cube_janmean = iris.util.squeeze(cube)
+
+    # all
+    filename = (FILESTART + 'xiboi/database_averages/'
+                + 'xiboi_Monthly_Average_*_a@pd_Temperature.nc')
+
+    cubes = iris.load(filename)
+    equalise_attributes(cubes)
+    allcubes = cubes.concatenate_cube()
+    cube = allcubes.collapsed('time',iris.analysis.MEAN)
+    cube_allmean = iris.util.squeeze(cube)
+
+    indexes = get_near_tempreq(cube_julymean, temp_req, 1.0, mask, lsm)
+    meantemps, mintemps, lons, lats  = get_mean_min()
+    
+    return meantemps, mintemps, lons, lats
+
+
+  
+def plot_scatter_temperatures(temp_xaxis, temp_yaxis, modelname, i,
+                              temp_xplio, temp_yplio, titlename,
+                              yaxistitle, xaxistitle,
+                              fileout):
+    """
+    does a scatter plot of the temperatures on a multi subplot figure
+    temp_xaxis and temp_yaxis is the preindustrial temperatures that 
+    will be plotted in blue
+    temp_xplio and temp_yplio is the pliocene temperature at the site that 
+    will be plotted in red
+
+    """
+    
+    if i == 0:
+        fig = plt.figure(figsize=(11.0, 11.0))
+        fig.suptitle(titlename, fontsize=20)
+        fig.text(0, 0.5, yaxistitle, rotation=90, fontsize=20, verticalalignment = 'center')
+        fig.text(0.6, 0.0, xaxistitle, fontsize=20, horizontalalignment = 'center')
+    
+    xplot = 3
+    yplot = 3
+
+
+    plotpos = np.mod(i, xplot * yplot) + 1
+    plt.subplot(xplot, yplot, plotpos)
+    plt.scatter(temp_xaxis, temp_yaxis)
+    plt.scatter(temp_xplio, temp_yplio, color='red')
+    plt.title(PERIOD.get(modelname))
+        
+
+    if plotpos == (xplot * yplot) or i == len(EXPTNAMES) - 1:
+       
+        plt.subplots_adjust(left=0.05, bottom=0.05, right=1.00, top=0.9,
+                            wspace=0.3, hspace=0.3)
+        plt.savefig(fileout, bbox_inches='tight')
+        plt.close()
+      
+def plot_locations_match(modellons, modellats, proxylon, proxylat, 
+                         modeltemps, fileout):
+    """
+    this will plot the locations where the model has pi data the same as the 
+    pliocene site
+    """
+    def get_minmax(proxydata, modeldata):
+        """
+        gets the minimum or maximum of the model data or the proxy data
+        """
+        print(len(modeldata))
+        minval = proxydata
+        maxval = proxydata
+        for lons in modeldata:
+            if len(lons) > 0:
+                minval = np.min([minval, min(lons)])
+                maxval = np.max([maxval, max(lons)])
+           
+        return minval, maxval
+      
+             
+
+    fig = plt.figure(figsize=(11.0, 11.0))
+    fig.suptitle(SITE_REQUIRED + 'All sites have same july temperature: pliocene (red) matches pi (blue)', fontsize=15)
+      
+    lonmin, lonmax = get_minmax(proxylon, modellons)
+    latmin, latmax = get_minmax(proxylat, modellats)
+
+    for i, model in enumerate(EXPTNAMES):
+        lons = modellons[i]
+        lats = modellats[i]
+
+        left = False
+        right = False
+        top = False
+        bottom = False
+
+        if np.mod(i, 2) == 0:
+           left = True
+        if np.mod(i, 2) == 3:
+           right = True
+        if i > 4:
+           bottom = True
+       
+        plt.subplot(3,3,i+1)
+        m=Basemap(llcrnrlon=lonmin-1.,urcrnrlon=lonmax+1.,
+                  llcrnrlat=latmin -1.,
+                  urcrnrlat=latmax+1.,projection='cyl',resolution='c')
+        m.drawmapboundary
+        m.drawcoastlines()
+        parallels=np.arange(-90.,90.,20.)
+        m.drawparallels(parallels,labels=[left,right,top,bottom],fontsize=10) # labels right
+        meridians=np.arange(-180.,180.,20.)
+        m.drawmeridians(meridians,labels=[left,right,top,bottom],fontsize=10)
+    
+        m.scatter(proxylon, proxylat, c='red',marker='o', s=10)
+
+        m.scatter(lons, lats, c='blue',  marker='o', s=10)
+        plt.title(PERIOD.get(model) + ' ' + np.str(np.around(modeltemps[i])))
+
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.05, bottom=0.05, right=1.00, top=0.9,
+                            wspace=0.3, hspace=0.3)
+    plt.savefig(fileout, bbox_inches='tight')
+    plt.close()
+
+  
+def main():
+    """
+    calling structure
+    get info from ulrichs spreadsheet (this gives us the lat and the long
+    extract temperature at site
+    plot annual cycle
+    """
+ 
+#    #########################################
+#    # get data from Ulrichs spreadsheet
+    
+    proxy_temperature, proxy_lat, proxy_lon = get_land_obs()
+    if proxy_lon < 0: proxy_lon = proxy_lon + 360.
+    
+    #################################################
+    # get Pliocene model data for each month of the year.
+    model_Tseascyc = []
+    for expt in EXPTNAMES:
+        T_seascyc = get_model_data(expt, proxy_lat, proxy_lon)
+        model_Tseascyc.append(T_seascyc)
+   
+        
+    plot_seascyc_vs_proxy(proxy_temperature, model_Tseascyc,
+                          proxy_lat, proxy_lon ,'absolute')
+        
+    
+    #################################################
+    # get PI model data for each month of the year.
+    allmodel_TseascycPI = []
+    allmodel_Tseascycanom = []
+    T_seascyc = get_model_data('xiboi', proxy_lat, proxy_lon)
+    for i in range(0, len(EXPTNAMES)):
+        allmodel_Tseascycanom.append(model_Tseascyc[i] - T_seascyc)
+    
+   
+    plot_seascyc_vs_proxy(-999.999, allmodel_Tseascycanom,
+                          proxy_lat, proxy_lon, 'anom')
+    
+        
+    ##############################################################
+    # find the PI locations which have the same July as the
+    # Pliocene temperature for our site.  
+    
+    titlename = ('Red - Pliocene Jan/MAT temperatures at ' + SITE_REQUIRED +  
+                 ', \n Blue - Preindustrial Jan/MAT for PI sites which have the' + 
+                 ' same July temperature as ' + SITE_REQUIRED)
+    fileout = (FILEOUTSTART + SITE_REQUIRED.replace(' ','_')  + 
+               '_JanT_MAT_for_this_JulyT' + PLOTTYPE)
+    print('model july plio temp')
+    modellons = []
+    modellats = []
+    julytemp = []
+    for i, model in enumerate(EXPTNAMES):
+        july_plio_temp = np.max(model_Tseascyc[i][:]) # actuall warm month
+        mean_plio_temp = np.mean(model_Tseascyc[i][:])
+        julytemp.append(july_plio_temp)
+        
+        janT, MAT, lons, lats = locate_PI_with_plioJulyT(model, july_plio_temp + 273.15, proxy_lon, proxy_lat)
+        modellons.append(lons)
+        modellats.append(lats)
+       
+        plot_scatter_temperatures(janT, MAT, model, i,
+                                  model_Tseascyc[i][0],
+                                  mean_plio_temp,
+                                  titlename, 'MAT',
+                                  'January temperature', fileout)
+
+    plt.close()
+    # plot the locations where pi is same as plio.
+    fileout =  FILEOUTSTART + SITE_REQUIRED.replace(' ','_') + 'locations_with_same_julyT' + PLOTTYPE
+       
+    plot_locations_match(modellons, modellats, proxy_lon, proxy_lat, julytemp, 
+                         fileout)
+                        
+  
+        
+    print('got to end of program')
+##########################################################
+# main program
+
+
+LINUX_WIN = 'l'
+EXPTNAMES = ['xiboi', 'xibol', 'xozzc', 'xozzd', 'xozze', 'xozzf']
+
+#EXPTNAMES = ['xogzc', 'xogzb']
+PERIOD = {'xiboi' : 'pi (old)',
+          'xibol' : 'Km5c(old)',
+          'xozzc' : 'K1 (3.0560)',
+          'xozzd' : 'G17 (2.950)',
+          'xozze' : 'KM3 (3.155)',
+          'xozzf' : '    (3.053)'}
+
+ 
+
+if LINUX_WIN == 'l':
+    FILESTART = ('/nfs/hera1/earjcti/um/')
+    LAND_DATAFILE = ('/nfs/hera1/earjcti/PLIOMIP2/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+
+    FILEOUTSTART = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/vegetation/orbital/'
+    PLOTTYPE = '_'  + '.eps'
+else:
+    FILESTART = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+    PLOTTYPE = '_'  + '.png'
+    LAND_DATAFILE = (FILESTART + '/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+
+ 
+
+
+ABSOLUTE_ANOMALY_IND = 'absolute' # do we want to compare the absolute value or the anomaly value.
+FIELD = 'NearSurfaceTemperature'
+
+#SITE_REQUIRED = 'Lake Baikal'
+#SITE_REQUIRED = 'Beaver Pond'
+#SITE_REQUIRED = 'Lake Elgygytgyn'
+#SITE_REQUIRED = 'Meighen Island'
+SITE_REQUIRED = 'Lost Chicken Mine'
+#SITE_REQUIRED = 'James Bay Lowland'
+#SITE_REQUIRED = 'Pula Maar'
+#SITE_REQUIRED = 'Alpes-Maritimes'
+#SITE_REQUIRED = 'Tarragona'
+#SITE_REQUIRED = 'Rio Maior'
+#SITE_REQUIRED = 'Yallalie, Perth'
+
+main()

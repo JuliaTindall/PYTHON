@@ -1,0 +1,643 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_SEAICE
+#PURPOSE
+#    This program will plot the sea ice change in two experiments
+#
+# search for 'main program' to find end of functions
+# Julia 28/11/2018
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(region,plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,oplot_cntl,cntl_seaice):
+
+    if region == 'NP':
+        proj='npstere'
+        latbb=60.
+    if region == 'SP':
+        proj='spstere'
+        latbb=-60.
+    #proj='stere'
+
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+  
+    map=Basemap(projection=proj,resolution='c',lon_0=0,boundinglat=latbb,round=True,lat_0=90)
+  
+    #map.drawmapboundary(fill_color='green')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    print(V)
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    mycmap=mp.cm.get_cmap('Reds',len(V+2))
+                    newcolors=mycmap(np.linspace(0,1,len(V+2)))
+                    white=([1,1,1,1])
+                    newcolors[0:2,:]=white
+                    mycmap=ListedColormap(newcolors)
+                    cs = map.contourf(x,y,plotdata,V,cmap=mycmap)
+                   # map.drawparallels(np.arange(-80.,81.,20.))
+                   # map.drawmeridians(np.arange(-180.,181.,20.))
+                    map.fillcontinents()
+                  
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                    # overplot in contours where control sea ice was over 50% (or 0.5)
+                    if oplot_cntl == 'y':
+                        map.contour(x,y,cntl_seaice,[0,0.5],colors='lime',linestyles=[':','--'],linewidth=10)
+  
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=15)
+   
+
+
+#end def plotdata
+
+def seasmean(m1,m2,m3,figureno,seasname,control_expt,new_expt,extra,control_time,new_time):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # control
+
+    # read in temperature from a single file in order to get land mask
+    f=Dataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'76ja.nc')
+    temp=f.variables['temp'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+    mask=np.squeeze(mask)
+    f.close()
+ 
+   
+   
+    # read in data from multiple files
+    fa=MFDataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/'+control_expt+'/netcdf/'+control_expt+'o@pf'+extra+'*'+m3+'.nc')
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    atemp=fa.variables['iceconc'][:]
+    btemp=fb.variables['iceconc'][:]
+    ctemp=fc.variables['iceconc'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    ntimes,ny,nx=np.shape(atemp)
+   
+    
+    #average across the time dimension
+    cntl_atemp_avg=np.mean(atemp,axis=0)
+    cntl_btemp_avg=np.mean(btemp,axis=0)
+    cntl_ctemp_avg=np.mean(ctemp,axis=0)
+
+    #stdev across the time dimension
+    cntl_atemp_stdev=np.std(atemp,axis=0)
+    cntl_btemp_stdev=np.std(btemp,axis=0)
+    cntl_ctemp_stdev=np.std(ctemp,axis=0)
+    
+    
+
+    cntl_seaice=np.mean((cntl_atemp_avg,cntl_btemp_avg,cntl_ctemp_avg),axis=0)
+   
+    
+    cntl_seaice=cntl_seaice * mask
+    
+    plotdata('NP',cntl_seaice,0,lon,lat,control_expt+seasname,0,1.1,0.1,0,'n','fraction','y',cntl_seaice)
+    plotdata('SP',cntl_seaice,1,lon,lat,control_expt+seasname,0,1.1,0.1,0,'n','fraction','y',cntl_seaice)
+ 
+   
+
+    fa.close()
+    fb.close()
+    fc.close()
+   
+    print('j1')
+
+     #==============
+     # New_Expt
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/'+new_expt+'/netcdf/'+new_expt+'o@pf'+extra+'*'+m3+'.nc')
+    atemp=fa.variables['iceconc'][:]
+    btemp=fb.variables['iceconc'][:]
+    ctemp=fc.variables['iceconc'][:]
+    atemp=np.squeeze(atemp)
+    btemp=np.squeeze(btemp)
+    ctemp=np.squeeze(ctemp)
+    
+    new_atemp_avg=np.mean(atemp,axis=0)
+    new_btemp_avg=np.mean(btemp,axis=0)
+    new_ctemp_avg=np.mean(ctemp,axis=0)
+    
+    new_seaice=np.mean((new_atemp_avg,new_btemp_avg,new_ctemp_avg),axis=0)
+
+    
+    fa.close()
+    fb.close()
+    fc.close()
+   
+
+    print('j2')
+
+
+    # plot data
+    
+    #new_seaice=new_seaice * mask
+
+    plotdata('NP',new_seaice,2,lon,lat,new_expt+seasname,0,1.1,0.1,0,'n','fraction','n',cntl_seaice)
+    plotdata('SP',new_seaice,3,lon,lat,new_expt+seasname,0,1.1,0.1,0,'n','fraction','n',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+    
+
+    # New_Expt - control
+
+    perc_lost=((new_seaice-cntl_seaice)/cntl_seaice)*100.
+    titlename='Sea ice change '+new_time+'-'+control_time+':'+seasname
+    plotdata('NP',perc_lost,99,lon,lat,titlename,-100,105.,5.0,0,'a','%','y',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_NP_iceanom.eps' 
+    plt.savefig(fileout, bbox_inches='tight') 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_NP_iceanom.png' 
+    plt.savefig(fileout, bbox_inches='tight') 
+    plt.close()
+  
+
+    plotdata('SP',perc_lost,99,lon,lat,titlename,-100,105.,5.0,0,'a','%','y',cntl_seaice)
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/'+seasname+'_'+new_expt+'_SP_iceanom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+    
+    print('j4')
+    
+
+
+######################################################   
+def seascyc(expt_list,extra_list,names_list):
+
+# get seasonal cycle of sea ice
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    filestart='/nfs/hera1/earjcti/um/'
+    filemid='/netcdf/'
+  
+    # read in temperature from a single file in order to get land mask
+    # recommend putting control experiment (PI) in expt_list[0]
+    f=Dataset(filestart+expt_list[0]+filemid+expt_list[0]+'o@pf'+extra_list[0]+'76ja.nc')
+    temp=f.variables['temp'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+   
+    mask=np.ma.array(temp,mask=temp > 1E10)
+    mask=mask/mask
+
+    mask=np.squeeze(mask)
+    f.close()
+   
+   
+    # read in data from cntl and new_expt files
+    for expt in range(0,len(expt_list)):
+        exptname=expt_list[expt]
+        extra=extra_list[expt]
+        for mon in range(0,len(monthnames)):
+            fa=MFDataset(filestart+exptname+'/netcdf/'+exptname+'o@pf'+extra+'[7-9]*'+monthnames[mon]+'.nc')
+            lat = fa.variables['latitude'][:]
+            lon = fa.variables['longitude'][:]
+            atemp=fa.variables['iceconc'][:]
+            atemp=np.squeeze(atemp)
+            htemp=fa.variables['icedepth'][:]
+            htemp=np.squeeze(htemp)
+            fa.close()
+            atemp_avg=np.mean(atemp,axis=0)
+            htemp_avg=np.mean(htemp,axis=0)
+      
+            ny,nx=np.shape(atemp_avg)
+
+            if mon == 0 and expt ==0:
+                conc_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+                depth_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+               
+            conc_seaice[expt,mon,:,:]=atemp_avg
+            depth_seaice[expt,mon,:,:]=htemp_avg
+        
+   
+    #======================================================
+    # get average area of seaice
+
+    xres=lon[1]-lon[0]
+    yres=lat[1]-lat[0]
+    a=40075. # circumference of earth in km
+    onedeg=a/360.
+    gridbox_nonweight=xres * yres * onedeg * onedeg
+  
+    avg_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    avg_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    vol_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    vol_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    for expt in range(0,len(expt_list)):
+        for mon in range(0,len(monthnames)):
+            for j in range(0,ny):
+                coslat=np.cos(np.radians(lat[j]))
+                if lat[j] > 0 :
+                    for i in range(0,nx):
+                        avg_ice_nh[expt,mon]=(avg_ice_nh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_nh[expt,mon]=(vol_ice_nh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                if lat[j] < 0 :
+                    for i in range(0,nx):
+                  
+                        avg_ice_sh[expt,mon]=(avg_ice_sh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_sh[expt,mon]=(vol_ice_sh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                    
+       
+    # plot nh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_areal_extent.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+
+
+    # plot nh seasonal cycle vol
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_volume.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_volume.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+    retdata=[avg_ice_nh,avg_ice_sh,vol_ice_nh,vol_ice_sh]
+    return(retdata)
+
+# end def seascyc
+
+
+######################################################   
+def seascyc_region(expt_list,extra_list,names_list,latreq,lonreq,ngridboxes):
+
+# get seasonal cycle of sea ice over a given region
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    filestart='/nfs/hera1/earjcti/um/'
+    filemid='/netcdf/'
+  
+    # read in temperature from a single file in order to get land mask
+    # recommend putting control experiment (PI) in expt_list[0]
+    f=Dataset(filestart+expt_list[0]+filemid+expt_list[0]+'o@pf'+extra_list[0]+'76ja.nc')
+    temp=f.variables['temp'][:]
+    lon=f.variables['longitude'][:]
+    lat=f.variables['latitude'][:]
+    mask=temp/temp # ie temp is 1 everywhere except where it is masked
+   
+    mask=np.ma.array(temp,mask=temp > 1E10)
+    mask=mask/mask
+
+    mask=np.squeeze(mask)
+    print(mask)
+
+    # find index of required latitude and longitude
+
+    lonindex = (np.abs(lon-lonreq)).argmin()
+    latindex=(np.abs(lat-latreq)).argmin()
+   
+    # change the mask so that any values which are not within range are set 
+    # to zero
+
+    ny,nx=(np.shape(mask))
+    for j in range(0,ny):
+        if (j<latindex-ngridboxes) or (j > latindex+ngridboxes):
+            mask[j,:]=0
+        else:
+            for i in range(0,nx):
+                if (i<lonindex-ngridboxes) or (i > lonindex+ngridboxes):
+                    mask[j,i]=0
+   
+    print('there are ',np.sum(mask),'unmasked gridboxes')
+    #plotdata('NP',mask,99,lon,lat,'check mask',-1.,2.,0.1,0,'a','%','n',0)
+    #plt.show()
+    #plt.close()
+ 
+
+    f.close()
+       
+    # read in data from cntl and new_expt files
+    for expt in range(0,len(expt_list)):
+        exptname=expt_list[expt]
+        print('processing',exptname)
+        extra=extra_list[expt]
+        for mon in range(0,len(monthnames)):
+            fa=MFDataset(filestart+exptname+'/netcdf/'+exptname+'o@pf'+extra+'[7-9]*'+monthnames[mon]+'.nc')
+            lat = fa.variables['latitude'][:]
+            lon = fa.variables['longitude'][:]
+            atemp=fa.variables['iceconc'][:]
+            atemp=np.squeeze(atemp)
+            htemp=fa.variables['icedepth'][:]
+            htemp=np.squeeze(htemp)
+            fa.close()
+            atemp_avg=np.mean(atemp,axis=0)
+            htemp_avg=np.mean(htemp,axis=0)
+      
+            ny,nx=np.shape(atemp_avg)
+
+            if mon == 0 and expt ==0:
+                conc_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+                depth_seaice=np.zeros((len(expt_list),len(monthnames),ny,nx))
+               
+            conc_seaice[expt,mon,:,:]=atemp_avg*mask
+            depth_seaice[expt,mon,:,:]=htemp_avg*mask
+        
+   
+    #======================================================
+    # get average area of seaice
+
+    xres=lon[1]-lon[0]
+    yres=lat[1]-lat[0]
+    a=40075. # circumference of earth in km
+    onedeg=a/360.
+    gridbox_nonweight=xres * yres * onedeg * onedeg
+  
+    avg_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    mask_area_nh=0
+    avg_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    vol_ice_nh=np.zeros((len(expt_list),len(monthnames)))
+    vol_ice_sh=np.zeros((len(expt_list),len(monthnames)))
+   
+    for expt in range(0,len(expt_list)):
+        for mon in range(0,len(monthnames)):
+            for j in range(0,ny):
+                coslat=np.cos(np.radians(lat[j]))
+                if lat[j] > 0 :
+                    for i in range(0,nx):
+                        avg_ice_nh[expt,mon]=(avg_ice_nh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_nh[expt,mon]=(vol_ice_nh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                if lat[j] < 0 :
+                    for i in range(0,nx):
+                  
+                        avg_ice_sh[expt,mon]=(avg_ice_sh[expt,mon] + 
+                        (conc_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+                  
+                        vol_ice_sh[expt,mon]=(vol_ice_sh[expt,mon] + 
+                       (depth_seaice[expt,mon,j,i]*coslat * gridbox_nonweight))
+
+    for j in range(0,ny):
+        coslat=np.cos(np.radians(lat[j]))
+        if lat[j] > 0 :
+            for i in range(0,nx):
+                mask_area_nh=(mask_area_nh + 
+                        (mask[j,i]*coslat * gridbox_nonweight))
+                                 
+       
+    # plot nh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Areal extent',fontsize=12)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_areal_extent_region.png' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    # plot nh fractional coverage
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_nh[expt,:]/mask_area_nh,label=names_list[expt])
+    print(lon,lonindex-ngridboxes)
+   
+    print(np.str(lat[latindex-ngridboxes]))
+    print(np.str(lon[lonindex+ngridboxes]))
+    degree_sign= u'\N{DEGREE SIGN}' 
+    region=(np.str(lat[latindex-ngridboxes])+degree_sign+'N-'+
+            np.str(lat[latindex+ngridboxes])+degree_sign+'N, '+
+            np.str(lon[lonindex-ngridboxes])+degree_sign+'E-'+
+            np.str(lon[lonindex+ngridboxes])+degree_sign+'E')
+    plt.title('  Fraction of sea ice: \n ('+region+')',fontsize=15,loc='left')
+    plt.ylabel('fraction',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.tick_params(axis='both',labelsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_fraction_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_fraction_region.png' 
+    plt.savefig(fileout, bbox_inches='tight',dpi=300)  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),avg_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Areal extent',fontsize=15)
+    plt.ylabel('km^2',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_areal_extent_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+
+
+    # plot nh seasonal cycle vol
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_nh[expt,:],label=names_list[expt])
+    plt.title('Arctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_NH_volume_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+ 
+ # plot sh seasonal cycle
+    for expt in range(0,len(expt_list)):
+        plt.plot(np.arange(1,13),vol_ice_sh[expt,:],label=names_list[expt])
+    plt.title('Antarctic Sea Ice - Volume',fontsize=15)
+    plt.ylabel('km^3',fontsize=15)
+    plt.xlabel('month',fontsize=15)
+    plt.legend(fontsize=15)
+ 
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_seaice/allslices_SH_volume_region.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+   
+    retdata=[avg_ice_nh,avg_ice_sh,vol_ice_nh,vol_ice_sh]
+    return(retdata)
+
+# end def seascyc_region
+
+
+
+
+
+
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+
+control_expt=['xjplc','xjplc','xjplc','xiboi']
+control_time=['3.205Ma','3.205Ma','3.205Ma','PreInd']
+new_expt=['xjpld','xjple','xjplf','xibol']
+new_time=['K1','G17','KM3','KM5C']
+extra=['6','6','6','y']
+HadCM3='y'
+
+
+
+#plt.figure(figureno)
+figureno=0
+#for expt in range(0,len(new_expt)):
+    #djf mean
+#    seasmean('dc','ja','fb',figureno,'djf',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+     #mam mean
+#    seasmean('mr','ar','my',figureno,'mam',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+     #jja mean
+#    seasmean('jn','jl','ag',figureno,'jja',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+     #son mean
+#    seasmean('sp','ot','nv',figureno,'son',control_expt[expt],new_expt[expt],extra[expt],control_time[expt],new_time[expt])
+
+#####################################
+# plot annual cycle of sea ice loss
+
+
+expt_list=['xiboi','xjplc','xjpld','xjple','xjplf']
+extra_list=['y','6','6','6','6']
+names_list=['PreInd','KM5C','K1','G17','KM3']
+
+retdata=seascyc(expt_list,extra_list,names_list)
+#area_ice_nh_HadCM3=retdata[0]
+#area_ice_sh_HadCM3=retdata[1]
+#vol_nh_HadCM3=retdata[2]
+#vol_sh_HadCM3=retdata[3]
+#print('got HadCM3 data') 
+
+# plot seasonal cycle over a given region
+# it will get gridbox containing required value.  using argmin()
+# ngridboxes is how far away we are allowed to be 0 means use this gridbox only
+# 1 will allow one gridbox away to be used (ie 9 squares centred on the gridbox)
+
+latreq=80.15
+lonreq=6
+ngridboxes=2
+seascyc_region(expt_list,extra_list,names_list,latreq,lonreq,ngridboxes)
+#area_ice_nh_HadCM3=retdata[0]
+#area_ice_sh_HadCM3=retdata[1]
+#vol_nh_HadCM3=retdata[2]
+#vol_sh_HadCM3=retdata[3]
+#print('got HadCM3 data') 
+
+
+
+sys.exit(0)
+
+####
+

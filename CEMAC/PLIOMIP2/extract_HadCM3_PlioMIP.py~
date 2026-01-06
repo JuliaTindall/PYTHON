@@ -1,0 +1,160 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on Thu Mar 18 14:13:50 2019
+
+#@author: earjcti
+#
+# This program will extract the fields needed by Zhongshi Zhang for the
+# PlioMIP MOC paper.  It will extract the monthly averages from
+# steve hunters processed data 
+#
+#
+#
+
+import os
+import numpy as np
+import scipy as sp
+#import cf
+import iris
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import netCDF4
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.analysis.cartography
+from iris.experimental.equalise_cubes import equalise_attributes
+import sys
+
+#####################################
+def extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,
+                   fileoutstart,varnamein,varnameout):
+
+    # load required cubes
+    #cubes=iris.load(filename)
+    #print(cubes)
+    #sys.exit(0)
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    
+    
+    # loop over years
+    
+   
+    for year in range(startyear,endyear):
+        allcubes=iris.cube.CubeList([])
+        stringyear=np.str(year).zfill(2)
+        for mon in range(0,len(monthnames)):
+            print(mon)
+            filename=filestart+expt+filetype+extra+stringyear+monthnames[mon]+'.nc'
+            #initcube=iris.load(filename)
+            #print(initcube)
+            #sys.exit(0)
+            cube=iris.load_cube(filename,varnamein)
+            #print('j1')
+            cube.coord('t').points=mon+1
+            #print('j2')
+            allcubes.append(cube)
+            #print('j3')
+            if mon==11:
+                print(allcubes)
+           
+            
+        #make sure the metadata on all cubes are the same
+        equalise_attributes(allcubes)
+        catcube=allcubes.concatenate()[0]
+        print(np.shape(catcube))
+        
+        # if precipitation convert to mm/day
+        if varnameout=='TotalPrecipitation':
+            catcube.data=catcube.data * 60.*60.*24.
+            catcube.long_name='TOTAL PRECIPITATION RATE    MM/DAY'
+            catcube.units='mm/day'
+            
+        # if temperature convert to Celcius
+        print(varnameout)
+        if varnameout=='SurfaceTemperature':
+            print('convert to celcius')
+            catcube.convert_units('celsius')
+       
+    
+        stringyear=np.str(year).zfill(3)
+        print(stringyear)
+        fileout=fileoutstart+varnameout+'/'+timeperiod+'.'+varnameout+'.'+stringyear+'.nc'        
+        iris.save(catcube,fileout,netcdf_format='NETCDF3_CLASSIC',fill_value=2.0E20)
+     
+    
+   
+
+##########################################################
+# main program
+
+# this is regridding where all results are in a single file
+# create a dictionary with the long field names in and the field names we want
+# we are also using dictionaries so that we only have to change timeperiod name
+# when rerunning
+            
+shortname = {
+		"SURFACE TEMPERATURE AFTER TIMESTEP" : "SurfaceTemperature",
+        "TOTAL PRECIPITATION RATE     KG/M2/S" : "TotalPrecipitation",
+		"iphone 3GS" : "LargeScalePrecip",
+		"iphone 4" : "ConvectivePrecip",
+		"iphone 4S" : "TotalEvap",
+		"iphone 5" : "TotalCloudCover",
+        "iphone 3G" : "MinTemp",
+		"iphone 3GS" : "MaxTemp",
+		"iphone 4" : "Snowfall",
+		"iphone 4S" : "u",
+		"iphone 5" : "v",
+        "iphone 3G" : "w",
+		"iphone 3GS" : "q",
+		"iphone 4" : "T",
+		"iphone 4S" : "z",
+		"iphone 5" : "Taux",
+        "iphone 3G" : "Tauy",
+		"iphone 3GS" : "MSLP",
+		"iphone 4" : "SurfacePressure",
+		"iphone 4S" : "DownSWTOA",
+		"iphone 5" : "UpSWTOA",
+        "iphone 3G" : "OLR_TOA",
+		"iphone 3GS" : "ClearSkyOLR_TOA",
+		"iphone 3G" : "SurfSWUp",
+		"iphone 3GS" : "SurfSWDown",
+		"iphone 4" : "SurfLWUp",
+		"iphone 4S" : "SurfLWDown",
+        "iphone 3G" : "ClearSkySurfSWUp",
+        "iphone 3G" : "ClearSkySurfSWDown",
+        "iphone 3G" : "ClearSkySurfLWDown",
+		"iphone 3GS" : "LatentHeatFlux",
+		"iphone 4" : "SensibleHeatFlux"
+	}
+
+exptname = {
+        "e280" : "tenvo",
+        "eoi400" : "tenvj"}
+
+extraname = {
+        "e280" : "t",
+        "eoi400" : "o"}
+
+fieldname=['SURFACE TEMPERATURE AFTER TIMESTEP',
+           'TOTAL PRECIPITATION RATE     KG/M2/S']
+
+filetype='a@pd'
+startyear=0
+endyear=100
+timeperiod='e280'
+expt=exptname.get(timeperiod)
+extra=extraname.get(timeperiod)
+#filestart='C:\\Users\\julia\\OneDrive\\DATA\\HadCM3_DATA\\'
+#fileoutstart='C:\\Users\\julia\\OneDrive\\DATA\\HadCM3_DATA\\EOI400_2400_2499_Monthly_'
+
+filestart='/nfs/hera1/earjcti/um/'+expt+'/netcdf/'
+fileoutstart='/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/'+timeperiod+'/'
+
+for i in range(0,len(fieldname)):
+    varnamein=fieldname[i]
+    varnameout=shortname.get(varnamein)
+    extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,fileoutstart,varnamein,varnameout)
+
+#sys.exit(0)

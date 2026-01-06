@@ -1,0 +1,57 @@
+#NAME
+#    Database_Tmin.py
+#PURPOSE 
+#   Biome4 needs the minimum monthly averaged temperature for each month
+#   Steve P's script did this but it didn't seem to work very well so 
+#   I am doing it here
+#  (Need to run Database_temperature before we do this
+# Julia 8.2.2017
+
+
+# Import necessary libraries
+
+import os
+import iris
+import iris.quickplot as qplt
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+
+expt='xoorb'
+Monthnames = ['January','February','March','April','May','June',
+              'July','August','September','October','November','December']
+
+FILESTART = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+             expt + '_Monthly_Average_')
+FILEEND = '_a@pd_Temperature.nc'
+FILEOUT = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+             expt + '_Tmin.nc')
+vals = np.arange(-90, 30, 5)
+
+allcubes = iris.cube.CubeList([])
+for i, month in enumerate(Monthnames):
+    print(month)
+    cube = iris.load_cube(FILESTART + month + FILEEND)
+    if i == 0 or i == 7:
+        if i == 0: plt.subplot(1,3,1)
+        if i == 7: plt.subplot(1,3,2)
+        qplt.contourf(iris.util.squeeze(cube) - 273.15, levels=vals)
+        plt.title(month)
+        plt.gca().coastlines()
+
+        
+        
+    cube.coord('time').points = i
+    allcubes.append(cube)
+
+minval = np.zeros(allcubes[0].shape)
+allmonth_cube = allcubes.concatenate_cube()
+
+mincube = allmonth_cube.collapsed('time', iris.analysis.MIN)
+iris.save(mincube, FILEOUT, netcdf_format='NETCDF3_CLASSIC')
+plt.subplot(1,3,3)
+qplt.contourf(iris.util.squeeze(mincube) - 273.15, levels=vals)
+plt.title('min')
+plt.gca().coastlines()
+#plt.show()

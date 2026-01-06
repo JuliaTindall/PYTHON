@@ -1,0 +1,313 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_TOTAL_PRECIPITABLE_WATER
+#PURPOSE
+#    This program will try and plot the total precipitable water from the
+#    HadGEM2 simulations (using various methods). A quick google search suggests
+#    this should be up to 50mm in the tropics and less as we go further 
+#    polewards
+#
+# search for 'main program' to find end of functions
+# Julia 14/11/2018
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid, maskoceans
+
+
+#functions are:
+#  def plotdata
+#  def annmean_from_HadGEM_diags
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,mask_ind):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno !=99:
+        plt.subplot(2,2,fileno+1)
+
+
+    if mask_ind == 'l': # ;land mask
+        plotnew=maskoceans(lons,lats,plotdata)
+        plotdata=plotnew
+        if cbarname=='mm/day':
+            minval=minval/2.
+            maxval=maxval/2.
+            valinc=valinc/2.
+
+    if mask_ind =='t': # tropics mask
+        northlat=30.0
+        southlat=-30.0
+    else:
+        northlat=90.0
+        southlat=-90.0
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=southlat,urcrnrlat=northlat,projection='cyl',resolution='c')
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+
+    plotdata2=plotdata
+    #plotdata=maskoceans(x,y,plotdata)
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu',extend='both')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='ra':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=20)
+        cbar.ax.tick_params(labelsize=20)
+        plt.title(titlename,loc='left',fontsize=20)
+   
+
+    plotdata=plotdata2
+
+    if mask_ind == 'l':
+        map.drawmapboundary(fill_color='white')
+    else:
+        map.drawmapboundary
+
+#end def plotdata
+
+
+def annmean_from_HadGEM_diags(preind_expt,plio_expt,pliop2_expt,extra):
+#
+# we are assuming that this is wetmass-drymass.  The values and patterns
+# generally look correct for the PI
+#
+    #==============
+    # preindustrial
+
+
+    # read in data from multiple files
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/netcdf/'+preind_expt+'a@pd'+extra+'[7-9]*.nc')
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    drymass=f.variables['unspecified_1'][:]
+    wetmass=f.variables['unspecified_2'][:]
+    drymass=np.squeeze(drymass)
+    wetmass=np.squeeze(wetmass)
+    ntimes,ny,nx=np.shape(drymass)
+    drymass_avg=np.mean(drymass,axis=0)
+    wetmass_avg=np.mean(wetmass,axis=0)
+    f.close()
+
+    pi_precip_water=wetmass_avg-drymass_avg
+    pi_precip_water,lontemp = shiftgrid(180.,pi_precip_water,lon,start=False)
+    
+    plotdata(pi_precip_water,0,lontemp,lat,'PI-Ann_HadGEM2',0,60,1.0,0.0,'n','mm','b')
+
+ 
+     #==============
+     # Pliocene
+
+    print('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/netcdf/pdfiles/'+pliop2_expt+'a@pd'+extra+'[5-9]*.nc')
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/netcdf/pdfiles/'+pliop2_expt+'a@pd'+extra+'[5-9]*.nc')
+    drymass=f.variables['unspecified_1'][:]
+    wetmass=f.variables['unspecified_2'][:]
+    drymass=np.squeeze(drymass)
+    wetmass=np.squeeze(wetmass)
+    ntimes,ny,nx=np.shape(drymass)
+    drymass_avg=np.mean(drymass,axis=0)
+    wetmass_avg=np.mean(wetmass,axis=0)
+    f.close()
+
+    plio_precip_water=wetmass_avg-drymass_avg
+    plio_precip_water,lon = shiftgrid(180.,plio_precip_water,lon,start=False)
+    
+    plotdata(plio_precip_water,1,lon,lat,'Plio-Ann_HadGEM2',00,60,1.0,0.0,'n','mm','b')
+    
+
+
+    ##############################################
+    # plot the difference between the plio and the preind
+
+    precip_water_diff=plio_precip_water-pi_precip_water
+    precip_water_pcent_chg = (precip_water_diff / pi_precip_water)*100.
+    plotdata(plio_precip_water,2,lon,lat,'diff Ann_HadGEM2',-40,42,2.0,0.0,'a','mm','b')
+    plotdata(precip_water_pcent_chg,3,lon,lat,'diff Ann_HadGEM2 (%)',-0,50,2.0,0.0,'n','%','b')
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_total_precipitable_water/annmean_from_HadGEM_'+pliop2_expt+'_'+preind_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    plotdata(plio_precip_water,99,lon,lat,'diff Ann_HadGEM2',-20,22,2.0,0.0,'a','mm','b')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_total_precipitable_water/annmean_anom_from_HadGEM_'+pliop2_expt+'_'+preind_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+ 
+    
+
+#end def annmean
+
+
+def seasmean_from_HadGEM_diags(m1,m2,m3,preind_expt,plio_expt,pliop2_expt,extra,seasname):
+#
+# we are assuming that this is wetmass-drymass.  The values and patterns
+# generally look correct for the PI
+#
+    #==============
+    # preindustrial
+
+
+    # read in data from multiple files
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/netcdf/'+preind_expt+'a@pd'+extra+'[7-9]*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/netcdf/'+preind_expt+'a@pd'+extra+'[7-9]*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+preind_expt+'/netcdf/'+preind_expt+'a@pd'+extra+'[7-9]*'+m3+'.nc')
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    drymass_a=fa.variables['unspecified_1'][:]
+    wetmass_a=fa.variables['unspecified_2'][:]
+    drymass_b=fb.variables['unspecified_1'][:]
+    wetmass_b=fb.variables['unspecified_2'][:]
+    drymass_c=fc.variables['unspecified_1'][:]
+    wetmass_c=fc.variables['unspecified_2'][:]
+    drymass=(drymass_a+drymass_b+drymass_c)/3.0
+    wetmass=(wetmass_a+wetmass_b+wetmass_c)/3.0
+    drymass=np.squeeze(drymass)
+    wetmass=np.squeeze(wetmass)
+    ntimes,ny,nx=np.shape(drymass)
+    drymass_avg=np.mean(drymass,axis=0)
+    wetmass_avg=np.mean(wetmass,axis=0)
+    fa.close()
+    fb.close()
+    fc.close()
+
+    pi_precip_water=wetmass_avg-drymass_avg
+    pi_precip_water,lontemp = shiftgrid(180.,pi_precip_water,lon,start=False)
+    
+    plotdata(pi_precip_water,0,lontemp,lat,'PI-Ann_HadGEM2 '+seasname,0,60,1.0,0.0,'n','mm','b')
+
+ 
+     #==============
+     # Pliocene
+
+    print('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/netcdf/pdfiles/'+pliop2_expt+'a@pd'+extra+'[5-9]*.nc')
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/netcdf/pdfiles/'+pliop2_expt+'a@pd'+extra+'[5-9]*'+m1+'.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/netcdf/pdfiles/'+pliop2_expt+'a@pd'+extra+'[5-9]*'+m2+'.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+pliop2_expt+'/netcdf/pdfiles/'+pliop2_expt+'a@pd'+extra+'[5-9]*'+m3+'.nc')
+    drymass_a=fa.variables['unspecified_1'][:]
+    wetmass_a=fa.variables['unspecified_2'][:]
+    drymass_b=fb.variables['unspecified_1'][:]
+    wetmass_b=fb.variables['unspecified_2'][:]
+    drymass_c=fc.variables['unspecified_1'][:]
+    wetmass_c=fc.variables['unspecified_2'][:]
+    drymass=(drymass_a+drymass_b+drymass_c)/3.0
+    wetmass=(wetmass_a+wetmass_b+wetmass_c)/3.0
+    drymass=np.squeeze(drymass)
+    wetmass=np.squeeze(wetmass)
+    ntimes,ny,nx=np.shape(drymass)
+    drymass_avg=np.mean(drymass,axis=0)
+    wetmass_avg=np.mean(wetmass,axis=0)
+    fa.close()
+    fb.close()
+    fc.close()
+
+    plio_precip_water=wetmass_avg-drymass_avg
+    plio_precip_water,lon = shiftgrid(180.,plio_precip_water,lon,start=False)
+    
+    plotdata(plio_precip_water,1,lon,lat,'Plio-Ann_HadGEM2',00,60,1.0,0.0,'n','mm','b')
+    
+
+
+    ##############################################
+    # plot the difference between the plio and the preind
+
+    precip_water_diff=plio_precip_water-pi_precip_water
+    precip_water_pcent_chg = (precip_water_diff / pi_precip_water)*100.
+
+    plotdata(plio_precip_water,2,lon,lat,'diff Ann_HadGEM2',-40,42,2.0,0.0,'a','mm','b')
+    plotdata(precip_water_pcent_chg,3,lon,lat,'diff Ann_HadGEM2 (%)',-0,50,2.0,0.0,'n','%','b')
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_total_precipitable_water/'+seasname+'_from_HadGEM_'+pliop2_expt+'_'+preind_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+    titlename=('Diff '+seasname+' HadGEM2: precipitable water')
+    plotdata(plio_precip_water,99,lon,lat,titlename,-20,22,2.0,0.0,'a','mm','b')
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_total_precipitable_water/'+seasname+'_anom_from_HadGEM_'+pliop2_expt+'_'+preind_expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    plt.close()
+
+   
+    
+
+#end def seasmean
+
+#def annmean_from_q(preind_expt,plio_expt,pliop2_expt,extra):
+# note the drymass and wetmass diagnostics are set up in HadGEM2 in 
+# atmosphere/climate_diagnostics_eot_diag.f90
+
+# eot_diag.f90 tcm=vert_int_array(i,j,ip_dry_mass) * grid_factor
+#          total column dry mass = amount * weighting
+#
+# grid_factor=1/a^2 (where a is earths radius) = 6371229
+# vert_int_array from vert_eng_massq (in atmosphere/energy_correction)
+#
+# vert_int_array = sum(over levels) of tempd/tempw   (tempd dry, tempw wet)
+# tempd=rho_dry * delr_rho
+# tempw=rho_r2 * delr_rho
+#
+# delr_rho= r_theta_levels(k)-r_theta_levels(k-1)
+# rho_dry=rho_r2 * tempd (where tempd is some weighted sum of 1-q-qcl-qcf)
+#
+# rho_r2 is input from eot_diag (in eot_dig it is called rho) - this looks 
+# like it could be standard model levels (check section 30 1-7
+
+
+
+################################
+# main program
+
+# annual mean
+#figureno=0
+preind_expt='xkvje'
+plio_expt='xkvjf'
+pliop2_expt='xkvjg'
+extra='n'
+HadCM3='n'
+# this program will get the precipitable water from some diagnostics that are
+# only available in HadGEM2
+annmean_from_HadGEM_diags(preind_expt,plio_expt,pliop2_expt,extra)
+seasmean_from_HadGEM_diags('dc','ja','fb',preind_expt,plio_expt,pliop2_expt,extra,'djf')
+seasmean_from_HadGEM_diags('mr','ar','my',preind_expt,plio_expt,pliop2_expt,extra,'mam')
+seasmean_from_HadGEM_diags('jn','jl','ag',preind_expt,plio_expt,pliop2_expt,extra,'jja')
+seasmean_from_HadGEM_diags('sp','ot','nv',preind_expt,plio_expt,pliop2_expt,extra,'son')
+
+
+
+# okay so it is impossible to get HadCM3 and HadGEM2 precipitable water in the same way because of the way in which each program has saved the data. we will try and get HadCM3 water from q, qcl and qcf (If Alan thinks it is a good idea)
+####
+

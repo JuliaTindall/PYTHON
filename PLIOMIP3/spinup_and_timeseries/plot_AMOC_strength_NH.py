@@ -1,0 +1,362 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_AMOC strength NH
+#PURPOSE
+#    This program will do some plots on the MOC (which were calculated in the 
+#    ~earjcti/MOC directory
+# it will cobble toget
+#
+# search for 'main program' to find end of functions
+#
+# it is pretty much identical to plot_GMOC_strength_SH.  However we have
+# printed the values to a file so that we can produce a nice plot later
+# Julia April 2025
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import scipy.signal as sig
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#import sklearn.decomposition as sk
+#from sklearn.preprocessing import normalize
+
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+  
+def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,cbarname,plottype,ax,AMOC_PMOC_IND):
+    lats, depths = np.meshgrid(lat,dep)
+
+    if V ==0:
+        V=np.arange(minval,maxval,valinc)
+    cmapuse='RdBu_r'
+
+    labels=np.copy(V)
+    for i,label in enumerate(labels):
+        if label - int(label) == 0.0:
+            label = str(int(label))
+        else:
+            label = str(label)
+        labels[i]=label
+
+        
+    if plottype =='pc' or plottype =='diff':
+        print('here',uselog)
+        if uselog == 'la':
+            print(V)
+            cs = ax.contourf(lats,depths,plotdata,V,
+                             norm=mp.colors.SymLogNorm(linthresh=2.0,
+                                                       linscale=2.0,
+                                                       vmin=-32,vmax=32),
+                             cmap='RdBu_r')
+
+        else:
+            cs = ax.contourf(lats,depths,plotdata,V,cmap='RdBu_r')
+        #contourvals=[0]
+        #ax.contour(lats,depths,plotdata,contourvals)
+  
+    else:
+        print('normal plot')
+        cs = ax.contourf(lats,depths,plotdata,V,extend='max',cmap=cmapuse)
+        contourvals=[-16,-12,-8,-4,0,4,8,12,16]
+        #ax.contour(lats,depths,plotdata,contourvals)
+    if AMOC_PMOC_IND == 'AMOC' or AMOC_PMOC_IND == 'PMOC':
+        ax.set_xlim(-20,85)
+    if AMOC_PMOC_IND == 'GMOC':
+        ax.set_xlim(-85,85)
+    if AMOC_PMOC_IND == 'SMOC':
+        ax.set_xlim(-85,-50)
+
+    plt.gca().invert_yaxis()
+    plt.title(titlename)
+  
+    if plottype != 'n' or fileno >9:
+        cbar = plt.colorbar(cs,orientation="horizontal")
+        cbar.set_label(cbarname)
+        print(V)
+        print(labels)
+        #cbar.set_ticks(ticks=V,labels=labels)
+
+    plt.xlabel('latitude (degrees N)')
+    plt.ylabel('depth (m)')
+    #plt.show()
+    #sys.exit(0)
+
+
+    return
+
+#end def plotdata
+
+def plotmap(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for a NAO region
+   # map=Basemap(width=12000000,height=8000000,projection='stere',\
+   #                 resolution='c',lat_ts=50,lat_0=50,lon_0=0)
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='at':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(x),np.shape(y),np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotmap
+
+
+def indexplot(toplot,xdata,fileno,data_sm,xmin,xmax,expt,xlabel,ymin,ymax,titlename):
+    plt.subplot(4,2,fileno*2)
+    print(fileno)
+
+    plt.xlim([xmin,xmax])
+    plt.ylim([ymin,ymax])
+    datasize=len(toplot)
+
+    
+    # plot data
+    plt.plot(xdata,toplot)
+    plt.title(titlename)
+    plt.xlabel(xlabel)
+    # overplot smoothed data
+    plt.plot(xdata,data_sm,'-')
+    # overplot zero line and +-0.5deg line
+    plt.plot(xdata,np.zeros(datasize))
+    #bar_width=1.0/12.0
+    #plt.bar(xdata,elninoarr,bar_width,color='red',edgecolor="none")
+    #plt.bar(xdata,laninaarr,bar_width,color='blue',edgecolor="none")
+   
+# 
+
+# end def indexplot
+
+def get_AMOC_file(datasetname, field):
+    """
+    get AMOC from a single file
+    """
+    f=Dataset(datasetname)
+    lat_full = f.variables['latitude'][:]
+    depth = f.variables['depth'][:]
+    ndepth=len(depth)
+    nlatf=len(lat_full)
+    AMOC_full=f.variables[field][:]
+    AMOC_full=np.squeeze(AMOC_full)
+
+    nlat=0
+    AMOC_strength=0
+    AMOC_lat=0
+    AMOC_dep=0
+    for i, latitude in enumerate(lat_full):
+        if latitude > 20.:
+            for k,dep in enumerate(depth):
+                if AMOC_full[k,i] > AMOC_strength:
+                    AMOC_strength = AMOC_full[k,i]
+                    AMOC_lat = latitude
+                    AMOC_dep = dep
+    f.close()
+   
+    return (AMOC_full,lat_full,depth, AMOC_strength,AMOC_lat,AMOC_dep)
+
+##################################################
+def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
+    """
+    note use extra=# for new fileformats
+    This plots a longitude depth plot of the average AMOC
+    and also the AMOC strength through time
+    """
+
+    if startyear < 3000:
+        yearstart_1=startyear
+        yearstart_2=3000
+    else:
+        yearstart_1=startyear
+        yearstart_2=startyear
+
+    if endyear < 3000:
+        yearend_1=endyear
+        yearend_2=endyear
+    else:
+        yearend_1=3000
+        yearend_2=endyear
+
+
+
+    nyears=endyear-startyear
+
+    field = {'AMOC':'Merid_Atlantic','PMOC':'Merid_Pacific',
+             'GMOC': 'Merid_Global','SMOC':'Merid_Global'}
+
+    figcount=0
+    # get from experiment1
+    exp1='xpsi' + expt_name
+    for year in range(yearstart_1,yearend_1):
+        if extra == '#':
+            datasetname = '/uolstore/Research/a/hera1/earjcti/um/' + exp1 + '/pk2/' + exp1 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            print(datasetname)
+
+        (AMOC, lat, depth,
+         AMOC_strength,AMOC_lat,
+         AMOC_depth)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
+        ndepth,nlat=np.shape(AMOC)
+        
+        if year == yearstart_1:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+            latAMOC = np.zeros((nyears))
+            depAMOC = np.zeros((nyears))
+            
+        allAMOC[year-yearstart_1,:,:]=AMOC
+        maxAMOC[year-yearstart_1]=AMOC_strength
+        latAMOC[year-yearstart_1]=AMOC_lat
+        depAMOC[year-yearstart_1]=AMOC_depth
+       
+
+    # get from experiment2
+    print(yearstart_2,yearend_2)
+    if endyear > 3000:
+        exp2='xqbw' + expt_name
+    else:
+        exp2='xpsi' + expt_name
+    for year in range(yearstart_2,yearend_2):
+        if extra == '#':
+            datasetname = '/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/pk2/' + exp2 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            print(datasetname)
+
+        (AMOC, lat, depth,
+         AMOC_strength,AMOC_lat,
+         AMOC_depth)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
+        ndepth,nlat=np.shape(AMOC)
+        
+
+        if year == yearstart_1:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+            latAMOC = np.zeros((nyears))
+            depAMOC = np.zeros((nyears))
+
+      
+        allAMOC[year-yearstart_1,:,:]=AMOC
+        maxAMOC[year-yearstart_1]=AMOC_strength # this is the max value north
+                                                # of 20N
+        latAMOC[year-yearstart_1]=AMOC_lat
+        depAMOC[year-yearstart_1]=AMOC_depth
+      
+    avgAMOC=np.mean(allAMOC,axis=0)
+
+    fig = plt.figure()
+    ax1 = plt.subplot(2,1,1)
+    titlename=AMOC_PMOC_IND + ' avg: '+expt_name
+    plotdata(avgAMOC,-99,lat,depth,titlename,-30,32,2.0,0.0,'n','Sv','avg',ax1,
+             AMOC_PMOC_IND)
+        
+    ax2=plt.subplot(2,1,2)
+    yeararr=np.arange(startyear,endyear,1)
+    print(np.shape(yeararr),np.shape(maxAMOC))
+
+    ax2.plot(yeararr,maxAMOC)
+    plt.title('max AMOC north of 20N ' + AMOC_PMOC_IND)
+    meanmaxamoc = np.mean(maxAMOC)
+    
+    plt.tight_layout()
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/'+ AMOC_PMOC_IND +
+               '_' + exp2 + extra + 
+               str(int(yearstart_1)) + '_' + str(int(yearend_2)) + 
+               '_AMOC.eps')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+               '_' + exp2 + extra + str(int(yearstart_1)) + '_' + 
+               str(int(yearend_2)) + 
+               '_AMOC.png')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+               '_' + exp2 + extra + str(int(yearstart_1)) + '_' + 
+               str(int(yearend_2)) + 
+               '_AMOC.tex')
+
+    f= open(fileout,'w')
+    f.write("year,    max AMOC north of 20N \n")
+    for year in range(startyear,endyear):
+        string = (str(year) + ','+ 
+                  str(np.round(maxAMOC[year-startyear],2)) +','+ 
+                  str(np.round(latAMOC[year-startyear],2)) +','+ 
+                  str(np.round(depAMOC[year-startyear],2)) + '\n')
+        f.write(string)
+    f.close()
+
+    return(lat,depth,avgAMOC)
+    
+    
+
+################################
+# main program
+
+
+##################################
+# plot average of the MOC
+
+basin = 'AMOC'  # AMOC, PMOC,  GMOC  (global meridional overturning)
+                #              SMOC  (overturning in the southern ocean)
+
+##############################################
+#  plot_avg_moc will plot the lat-depth avg AMOC and also the maximum
+#  AMOC strength through time.
+# for pliomip we have the xpsi series which is followed by the xqbw series
+
+
+#EXPTNAMES = ['e']  # r1768
+#for EXPTNAME in EXPTNAMES:
+#    #try:
+#        retdata=plot_avg_moc(EXPTNAME,'#',basin) # extra is '#' or letter
+#    #except:
+#    #    print('failure on',EXPTNAME)#
+
+#sys.exit(0)
+
+
+
+EXPTNAME = 'j' # just give the name
+startyear=1991
+endyear=3999
+retdata=plot_avg_moc(EXPTNAME,'#',basin,startyear,endyear) 
+# extra is '#' or letter
+lat=retdata[0]
+depth=retdata[1]
+e_AMOC=retdata[2]
+

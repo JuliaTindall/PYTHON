@@ -1,0 +1,112 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on Monday June 3rd 2019
+
+#@author: earjcti
+#
+# phiul has asked if I can difference Xiaofangs orbital sensitivity
+# experiments over africa
+#
+########################################################
+# other notes are
+
+import os
+import numpy as np
+import scipy as sp
+import iris
+import matplotlib as mp
+import matplotlib.pyplot as plt
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+#import netCDF4
+#from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.analysis.cartography
+#from iris.experimental.equalise_cubes import equalise_attributes
+from iris.util import unify_time_units
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import cartopy as cart
+import cartopy.crs as ccrs
+#import cf_units as unit
+#from mpl_toolkits.basemap import Basemap, shiftgrid, maskoceans
+import sys
+
+
+
+# functions start here
+
+
+def get_mean_annual(expt,field,extra,startyear,endyear):
+    """
+    gets the mean annual averaged over 50 years
+    """
+
+    if field == 'temp':
+        long_field='TEMPERATURE AT 1.5M'
+    if field == 'precip':
+        long_field='TOTAL PRECIPITATION RATE     KG/M2/S'
+
+    filestart = ('/nfs/hera1/earjcti/um/' + expt + '/netcdf/' 
+                 + expt + 'a@pd' + extra)
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    cubes = CubeList([])
+    for year in range(startyear,endyear):
+        print(year)
+        for mon in monthnames:
+            filename = filestart + str(year) + mon + '.nc'
+            cube = iris.load_cube(filename,long_field)
+            cubes.append(cube)
+       
+    iris.util.equalise_attributes(cubes)
+    fieldcube = cubes.concatenate_cube()
+
+    avgcube = fieldcube.collapsed('t',iris.analysis.MEAN)
+    avgcube = iris.util.squeeze(avgcube)
+   
+    return avgcube
+
+
+def plotdata(cube,field):
+    """
+    plots the data
+    """
+
+    ax=plt.subplot(1,1,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+    # set for Africa
+    ax.set_extent([-30,60,-40,40],ccrs.PlateCarree())
+
+
+    print(field)
+    if field == 'temp':
+        print('here')
+        V=np.arange(-9,10,1)
+        cbar='RdBu_r'
+
+    qplt.contourf(cube,levels=V,cmap=cbar,extend='both')
+    plt.gca().coastlines()
+    plt.savefig(field + '.png')
+    
+
+#end def plotdata
+
+##########################################################
+# main program
+
+
+expt='xogzc'  #xogzc-EmaxPminOmax max-sh_summer insolation
+cntl='xogzf'  #xogzf-EmaxPmaxOmax max-nh_summer insolation
+field='temp'
+extra='w'
+startyear=50
+endyear=53
+
+expt_cube = get_mean_annual(expt,field,extra,startyear,endyear)
+cntl_cube = get_mean_annual(cntl,field,extra,startyear,endyear)
+
+
+cube_anom=expt_cube - cntl_cube
+plotdata(cube_anom,field)
+
+sys.exit(0)

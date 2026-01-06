@@ -1,0 +1,96 @@
+#!/usr/bin/env python2.7
+# -*- coding: utf-8 -*-
+"""
+#NAME
+#    orbit_forcing
+# NOTE
+#   before runing the program you will need to calendar correct the data
+#   you do this by running PYTHON/PROGRAMS/HadCM3/orbit_forcing.py
+#PURPOSE
+#   will do a difference in incoming shortwave raditaion for latitude
+#   and day (for looking at orbital forcing)
+
+"""
+
+import numpy as np
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import sys
+import cf_units
+
+
+
+
+################################
+# main program
+
+monthnames = ['ja', 'fb', 'mr', 'ar', 'my', 'jn', 'jl', 'ag', 'sp', 'ot', 'nv', 'dc']
+
+exptname = 'xogzb'
+cntlname = 'xogzc'
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c',
+#xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+# others are xogzb, xogzc, xogzd, xogze, xogzf
+
+
+# read in expt data
+filestart = '/nfs/hera1/earjcti/um/'
+exptcubes = CubeList([])
+
+f2 = (filestart + exptname + '/netcdf/' + exptname + 'a@pa')
+for i,month in enumerate(monthnames):
+    print(f2 + '_avg' + month + '.nc')
+    cube = iris.load_cube(f2 + '_avg' + month + '.nc','INCOMING SW RAD FLUX (TOA): ALL TSS')
+    cube.attributes = None
+    cube.data.mask = None
+    cube.coord('t').attributes = None
+    cube.coord('t').points = np.arange(i*30, (i+1)*30, 1) 
+    exptcubes.append(cube)
+
+exptyear_cube = exptcubes.concatenate_cube()
+exptyear_sw_cube = exptyear_cube[:,0,:,50]
+exptyear_sw_cube.coord('t').rename('day')
+exptyear_sw_cube.coord('day').attributes = None
+
+# read in cntl data
+filestart = '/nfs/hera1/earjcti/um/'
+cntlcubes = CubeList([])
+
+f2 = (filestart + cntlname + '/netcdf/' + cntlname + 'a@pa')
+for i,month in enumerate(monthnames):
+    print(f2 + '_avg' + month + '.nc')
+    cube = iris.load_cube(f2 + '_avg' + month + '.nc','INCOMING SW RAD FLUX (TOA): ALL TSS')
+    cube.attributes = None
+    cube.data.mask = None
+    cube.coord('t').attributes = None
+    cube.coord('t').points = np.arange(i*30, (i+1)*30, 1) 
+    cntlcubes.append(cube)
+
+cntlyear_cube = cntlcubes.concatenate_cube()
+cntlyear_sw_cube = cntlyear_cube[:,0,:,50]
+cntlyear_sw_cube.coord('t').rename('day')
+cntlyear_sw_cube.coord('day').attributes = None
+
+#fig = plt.figure()
+#fig.add_subplot(2,2,1)
+#cs=plt.contourf(exptyear_sw_cube.coord('day').points, exptyear_sw_cube.coord('la#titude').points, np.transpose(exptyear_sw_cube.data), extend='max')
+#plt.xticks(ticks=np.arange(15, (30*12)+15, 30),labels = monthnames)
+#cbar = plt.colorbar(cs)
+#fig.add_subplot(2,2,2)
+#cs=plt.contourf(cntlyear_sw_cube.coord('day').points, cntlyear_sw_cube.coord('la#titude').points, np.transpose(cntlyear_sw_cube.data), extend='max')
+#plt.xticks(ticks=np.arange(15, (30*12)+15, 30),labels = monthnames)
+#cbar = plt.colorbar(cs)
+
+#fig.add_subplot(2,2,3)
+
+V = np.arange(-120,130,10)
+cs=plt.contourf(exptyear_sw_cube.coord('day').points, exptyear_sw_cube.coord('latitude').points, np.transpose(exptyear_sw_cube.data - cntlyear_sw_cube.data), extend='both',cmap='RdBu_r', levels=V)
+plt.xticks(ticks=np.arange(15, (30*12)+15, 30),labels = monthnames)
+cbar = plt.colorbar(cs)
+outfile = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/anom_' + exptname + '-' + cntlname)
+plt.savefig(outfile + '.eps')
+plt.savefig(outfile + '.png')

@@ -1,0 +1,100 @@
+"""
+#NAME
+#    check_evaporation
+#PURPOSE 
+#
+#  I just want to check that the surface moisture flux to level one of the 
+#  boundary layer is the same as the evaporation from all the other sources
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+#import math
+#import scipy as sp
+#import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+#import cartopy.crs as ccrs
+#import cartopy.feature as cfeature
+#import matplotlib.ticker as mticker
+#from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+#import iris.plot as iplt
+#from netCDF4 import Dataset, MFDataset
+import sys
+#from netCDF4 import Dataset, MFDataset
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+def get_cube_data(fieldname):
+    """
+    gets the data
+    puts in a 2d array
+    remove unneccesary attributes
+    sets missing data to zero
+    puts from kg/m2/s to mm/day
+    """
+
+    cube = iris.load_cube(FILENAME,fieldname)
+    cube = iris.util.squeeze(cube)
+    del cube.attributes["valid_max"]
+    del cube.attributes["valid_min"]
+
+    cube = cube * 24. * 60. * 60.
+    cube.units='mm day-1'
+    cube.data = np.where(cube.data > 1.0E10,0.0,cube.data)
+
+    print(cube.data)
+    return cube
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+FILENAME = '/nfs/hera1/earjcti/um/xqbwc/datam/xqbwca#pd000003001ag+.nc'
+#print(iris.load(filename))
+
+# read in moitures flux
+moisture_flux_cube = get_cube_data('SURF & BL TOTL MOISTURE FLUX KG/M2/S')
+moisture_flux_cube.long_name='moisture flux'
+
+
+# read in all other fluxes  
+# I think evaporation from soil and transpiration are the same
+evap_sea_cube = get_cube_data('EVAPORATION FROM SEA (GBM)   KG/M2/S')
+evap_soil_cube = get_cube_data('EVAP FROM SOIL SURF : RATE   KG/M2/S')
+evap_canp_cube = get_cube_data('EVAP FROM CANOPY : RATE      KG/M2/S')
+sublim_cube = get_cube_data('SUBLIM. SURFACE (GBM) : RATE KG/M2/S')
+transp_cube = get_cube_data('TRANSPIRATION RATE           KG/M2/S')
+
+sum_fluxes_cube = (evap_sea_cube +   
+                   evap_canp_cube + sublim_cube + transp_cube)
+#sum_fluxes_cube = (evap_sea_cube +  evap_soil_cube +  
+#                   evap_canp_cube + sublim_cube)
+sum_fluxes_cube.long_name='sum fluxes (no transp'
+
+diff_cube_pcent = (((sum_fluxes_cube - moisture_flux_cube) * 100.) / 
+                     moisture_flux_cube)
+diff_cube_pcent.long_name='difference percentage change'
+diff_cube = sum_fluxes_cube - moisture_flux_cube
+diff_cube.long_name='diff'
+
+
+
+# plot
+plt.figure(figsize=[12,12])
+plt.subplot(2,2,1)
+qplt.contourf(moisture_flux_cube)
+plt.subplot(2,2,2)
+qplt.contourf(sum_fluxes_cube)
+plt.subplot(2,2,3)
+qplt.contourf((diff_cube))
+plt.subplot(2,2,4)
+qplt.contourf((transp_cube))
+plt.show()
+plt.close()
+
+

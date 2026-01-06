@@ -1,0 +1,18 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/basic_plots/avg_d18o.py", line 44, in <module>
+    cubeann16o = iris.load_cube(fileann16o)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 334, in load_cube
+    cubes = _load_collection(uris, constraints, callback).cubes()
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 271, in _load_collection
+    result = _CubeFilterCollection.from_cubes(cubes, constraints)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/cube.py", line 104, in from_cubes
+    for cube in cubes:
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 256, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 193, in load_files
+    all_file_paths = expand_filespecs(filenames)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 174, in expand_filespecs
+    raise IOError(msg)
+OSError: One or more of the files specified did not exist:
+    * "/nfs/hera1/earjcti/um/xozzb/d18op/means/d18op_16o_xozzb_Annual_Average_2450_2500.nc" didn't match any files

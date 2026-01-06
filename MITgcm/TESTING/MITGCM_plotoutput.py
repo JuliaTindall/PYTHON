@@ -1,0 +1,288 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a temporary script file.
+"""
+
+import xarray as xr
+import numpy as np
+import xgcm
+#import xmitgcm
+#import intake
+from matplotlib import pyplot as plt
+import cartopy.crs as ccrs
+
+
+import netCDF4
+import matplotlib as mpl
+import MITgcmutils as mit
+from MITgcmutils import cs as mitcs
+import iris
+import iris.plot as iplt
+import sys
+import os
+from iris.experimental.equalise_cubes import equalise_attributes
+
+plt.rcParams['figure.figsize'] = (10,6)
+#os.environ['PROJ_LIB'] = 'C:/Users/julia/Miniconda3/envs/py3/Library/share'
+os.environ['PROJ_LIB'] = '/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/share/proj'
+from mpl_toolkits.basemap import Basemap
+
+
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+def try_use_xgcm():
+    """
+    currently works for plotting a single file
+    """
+    
+    # plots a single tile
+    fname = (FILESTART + "grid.t001.nc")
+    
+    dsg = xr.open_dataset(fname)
+    print(dsg.coords)
+    print(dsg.exch2_nNeighbours)
+    print(dsg.XC)
+
+   
+    print('check dims',dsg.X)
+    grid = xgcm.Grid(dsg, coords={'X': {'center': 'X'}, 
+                              'Y': {'center': 'Y'}, 
+                              'Z': {'center': 'Z'}}, periodic=['X','Y'])
+
+    print('grid is',grid)
+    
+
+    fname = (FILESTART + "dynDiag.0000072000.t001.nc")
+    
+    dsf = xr.open_dataset(fname)
+    ds1 =  xr.DataArray(dsf.THETA[0,0,:,:],  dims=['y', 'x'],
+                    coords = {'lat': (('y', 'x'), dsg.YC),
+                           'lon': (('y', 'x'), dsg.XC)})
+    # 
+
+    #ax = plt.subplot(projection=ccrs.PlateCarree())
+    #ds1.plot.contourf('lon','lat', ax=ax)
+    #ax.coastlines(); ax.gridlines(draw_labels=True);
+    
+    # open all the datasets and add face as a dimsion
+    
+    for i in range(1,5):
+        dsg = xr.open_dataset(FILESTART + "grid.t00"+np.str(i)+".nc")
+        dsf = xr.open_dataset(FILESTART + "dynDiag.0000072000.t00"+np.str(i) + ".nc")
+    
+    
+        ds =  xr.DataArray(dsf.THETA[0,0,:,:],  dims=['y', 'x'],
+                    coords = {'lat': (('y', 'x'), dsg.YC),
+                           'lon': (('y', 'x'), dsg.XC)})
+                                                      
+        expanded  = ds.expand_dims('Face')
+       
+       
+        print(dsg.exch2_myFace)
+        print(expanded)
+        
+    sys.exit(0)
+        
+    
+    
+    # this is trying to open lots of datasets
+    
+    dsg2= xr.open_mfdataset("C:\\Users\\julia\\OneDrive\\WORK\\DATA\\" +
+        "MITgcm\\grid.t*[1-4].nc", concat_dim = 'Face')
+    print('dsg2',dsg2)
+    sys.exit(0)
+    
+    
+    dsf2 = xr.open_mfdataset("C:\\Users\\julia\\OneDrive\\WORK\\DATA\\" +
+                 "MITgcm\\dynDiag.0000072000.t0*[1-4].nc", concat_dim = 'Face')
+    
+    #dsf2.THETA[2,0,0,:,:].plot.contourf()
+    
+    ds2 =  xr.DataArray(dsf2.THETA[:, 0, 0, :, :],  dims=['Face','y', 'x'],
+                    coords = {'lat': (('Face','y', 'x'), dsg2.YC),
+                           'lon': (('Face','y', 'x'), dsg2.XC)})
+    
+    
+    ax1 = plt.subplot(2, 2, 1, projection=ccrs.PlateCarree())
+    ds2[1,:,:].plot.contourf('lon','lat', ax=ax1)
+    ax1.coastlines(); ax1.gridlines(draw_labels=True)
+    
+    ax2 = plt.subplot(2, 2, 2, projection=ccrs.PlateCarree())
+    ds2[2,:,:].plot.contourf('lon','lat', ax=ax2)
+    ax2.coastlines(); ax2.gridlines(draw_labels=True)
+    
+    ax3 = plt.subplot(2, 2, 3, projection=ccrs.PlateCarree())
+    ds2[3,:,:].plot.contourf('lon','lat', ax=ax3)
+    ax3.coastlines(); ax3.gridlines(draw_labels=True)
+    
+    ax4 = plt.subplot(2, 2, 4, projection=ccrs.PlateCarree())
+    ds2[4,:,:].plot.contourf('lon','lat', ax=ax4)
+    ax4.coastlines(); ax4.gridlines(draw_labels=True)
+ 
+def try_plot_netcdf_iris():
+    """
+    This seems to work okay but the coordinate system is very hard to merge
+    the cubes
+    """
+
+   
+    
+    level=0
+    # try and plot this seems to be working
+    fig = plt.figure();
+    mp = Basemap(projection='moll',lon_0 = 0.,
+             resolution = 'l')
+    for gridno in range(1,13):
+        filechar = np.str(gridno).zfill(2)
+        grid = (FILESTART + "/grid.t0" + filechar + ".nc")
+
+        XCcube = iris.load_cube(grid,'XC')
+        YCcube = iris.load_cube(grid,'YC')
+        depthcube = iris.load_cube(grid,'Depth')
+        
+        fname = (FILESTART + "/dynDiag.0000072000.t0" + filechar + ".nc")
+        
+   
+        THETAcube = iris.load_cube(fname,'THETA')
+        temp=THETAcube.data[0, level, :, :]
+       
+        depthdata=depthcube.data
+        thetadata = np.ma.masked_where(depthdata==0., temp)
+        
+        if gridno == 11:
+            
+            newdata = np.where(XCcube.data < 0., XCcube.data + 360., XCcube.data)
+            newdata2 = np.where(XCcube.data > 0., XCcube.data + 360., XCcube.data)
+           
+            XCcube.data = newdata
+            XCcube11 = XCcube.copy(data=newdata2)
+            
+        
+        
+        valmin=-5.0
+        valmax=35.
+        valdiff=1.0
+        mp.contourf(XCcube.data,YCcube.data, thetadata, 
+                     levels = np.arange(valmin,valmax,valdiff), latlon=True)
+        if gridno == 11:
+            mp.contourf(XCcube11.data,YCcube.data, thetadata, 
+                     levels = np.arange(valmin,valmax,valdiff), latlon=True)
+        
+    plt.colorbar()
+    plt.show()
+
+
+    
+def try_plot_glue():
+    """
+    try and plot the data that has been glued together
+    DOes not work very well because everything has been glued together badly
+    It does not work either if we plot things in iris
+    """
+    
+
+    gridfile = (FILESTART + "grid.nc")
+    
+    
+    file2read = netCDF4.Dataset(gridfile, 'r')
+    
+    xc = file2read.variables['XC'][:, :]
+    xg = file2read.variables['XG'][:, :]
+    yc = file2read.variables['YC'][:, :]
+    yg = file2read.variables['YG'][:, :]
+    zc = file2read.variables['RC'][:]
+    zf = file2read.variables['RF'][:]
+
+    print(xc)
+    print(np.shape(xc))
+    print(np.shape(yc))
+    #print(yc)
+    
+    mp = Basemap(projection='moll',lon_0 = 180.,
+             resolution = 'l')
+
+    plt.clf()
+    print(mit)
+    h = mitcs.pcol(xc, yc, xc, projection = mp)
+    #mp.fillcontinents(color = 'grey')
+    #mp.drawmapboundary()
+    mp.drawmeridians(np.arange(0, 360, 30))
+    mp.drawparallels(np.arange(-90, 90, 30))
+    
+  
+    plt.show()
+    plt.close()
+    sys.exit(0)
+
+        # for derivatives and integrals
+   
+
+    fname2 = ("C:\\Users\\julia\\OneDrive\\WORK\\DATA\\" +
+        "MITgcm\\dynDiag.0000072000.t*nc")
+        
+    
+    nc = mit.mnc_files(fname2, fpatt=fname)
+    print(nc)
+    XC=nc.variables['XC'][:]
+    YC=nc.variables['YC'][:]
+    nc2 = mit.mnc_files(fname2)
+    THETA = nc2.variables['THETA'][:]
+        
+    print('j')
+    print('j1',nc)
+    print('j2',XC)
+    print('j3',np.shape(XC))
+    print('j4',np.shape(THETA[0,0,:,:]))
+
+    nc.close()
+    nc2.close()
+
+def try_plot_xmitgcm():
+    """
+    try and plot with xmitgcm
+    """
+    fgrid = ("C:\\Users\\julia\\OneDrive\\WORK\\DATA\\" +
+        "MITgcm\\grid")
+    
+    cs32_extra_metadata = xmitgcm.utils.get_extra_metadata(domain='cs', nx=32)
+
+    # Then we read the grid from the input files
+    # cs is cube sphere
+    grid = xmitgcm.utils.get_grid_from_input(fgrid + 'grid_cs32.face001',
+                                         geometry='cs',
+                                         extra_metadata=cs32_extra_metadata)
+    print(grid)
+
+    fdata = ("C:\\Users\\julia\\OneDrive\\WORK\\DATA\\" +
+        "MITgcm\\data")
+    
+    print('here')
+
+    ds = xmitgcm.open_mdsdataset(fdata, fgrid, geometry='cs',
+                             prefix=['Eta'],
+                             iters='all',
+                             delta_t=3600,
+                             ref_date='1979-01-01 00:00:00',
+                             swap_dims = False,
+                             llc_method = 'smallchunks')
+    print('julia')
+    print(ds)
+#
+
+linux_win = 'L'
+
+if linux_win == 'L':
+    FILESTART = '/nfs/hera1/earjcti/MITgcm/mysetups/global_ocean.cs32x15/run/mnc_out_0002/'
+else:
+    FILESTART = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\MITgcm\\data"
+    
+try_plot_netcdf_iris() # works sort of
+#try_plot_glue()
+#try_plot_xmitgcm() # would be okay for llc but cube-sphere cs geometry not supported yet
+#try_use_xgcm()

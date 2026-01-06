@@ -1,0 +1,130 @@
+"""
+#NAME
+#    SST warming from database.py
+#PURPOSE 
+#
+#  This program will show the SAT warming in the last 30 years of each 
+#  experiment for the annual mean
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import math
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+import iris.plot as iplt
+from iris.cube import CubeList
+from netCDF4 import Dataset, MFDataset
+import sys
+#from netCDF4 import Dataset, MFDataset
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_data(jobid, startyear, endyear):
+    """
+    gets the average data fpr the field
+    """  
+
+    filename = ('/uolstore/Research/a/hera1/earjcti/um/' + jobid +
+                '/database_averages/' + 
+                jobid + '_Annual_Average_#pg_' + FIELD + '_' + STARTYEAR + 
+                '_' + ENDYEAR + '.nc')
+
+    longfield = {'Temperature' : 'TEMPERATURE AT 1.5M',
+                 'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
+                 'precipmm' : 'TOTAL PRECIPITATION RATE MM/DAY',
+                 'cloud_cover' : 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
+                 'mslp' : 'PRESSURE AT MEAN SEA LEVEL',
+                 'mslp_hPa' : 'PRESSURE AT MEAN SEA LEVEL hPa',
+                 'evapsea' : 'EVAPORATION FROM SEA (GBM)   KG/M2/S',
+                 'seaiceconc' : 'AICE : ICE CONCENTRATION',
+                 'icefrac' : 'SEA ICE FRACTION AFTER TIMESTEP',
+                 'oceansurftemp' : 'OCN TOP-LEVEL TEMPERATURE          K',
+                 'oceansurftempK' : 'OCN TOP-LEVEL TEMPERATURE K',
+                 'surfsalinity': 'SALINITY (OCEAN)       (PSU-35)/1000',
+                 'surfsalinitypsu': 'SALINITY (OCEAN) (PSU)',
+                 'MLD' : 'MIXED LAYER DEPTH (OCEAN)          M',
+                 'MLDm' : 'MIXED LAYER DEPTH (OCEAN) M',
+                 'AMOC' : 'Meridional Overturning Stream Function (Atlantic)'   
+                     }
+
+    cube = iris.load_cube(filename)
+    cube = iris.util.squeeze(cube)
+
+    # get the values for the seasons
+   
+    ann_cubelist = CubeList([])
+    ann_cubelist.append(cube)
+    ann_cube = ann_cubelist.collapsed(['time'],iris.analysis.MEAN)
+   
+    return ann_cube
+                   
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+
+
+LINUX_WIN='l'
+NYEARS = 100
+SEASON = 'ann'
+
+# data from new experiemnt
+MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
+
+EXPT = 'xqbwg'  # xsic PI,  xpsij-lp490  xpsik - lp560
+CNTL = 'xqbwj'  # xpsic pi, xpsid lp400
+STARTYEAR='3900'
+ENDYEAR='4000'
+
+FIELD = 'SST'
+
+expt_cube_ann = get_data(EXPT,STARTYEAR,ENDYEAR)
+cntl_cube_ann = get_data(CNTL,STARTYEAR,ENDYEAR)
+
+diff_cube_ann = expt_cube_ann - cntl_cube_ann
+
+#boundaries = [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0]
+boundaries = [0.0, 1.0, 2.0, 3.0,  4.0, 5.0, 6.0,7.0, 8.0,9.0, 10.0, 11.0, 12.0]
+cmap_use=plt.cm.get_cmap('Reds',len(boundaries))
+cmap_use.set_under('lightsteelblue')
+
+
+# plot ann
+try:
+    diff_cube_ann.coord('longitude').guess_bounds()
+    diff_cube_ann.coord('latitude').guess_bounds()
+except:
+    pass
+grid_areas = iris.analysis.cartography.area_weights(diff_cube_ann)
+meandiff_ann = diff_cube_ann.collapsed(['longitude','latitude'],
+                               iris.analysis.MEAN, weights=grid_areas)
+diffchar_ann = str(np.around(meandiff_ann.data,2))
+
+cs=iplt.pcolormesh(diff_cube_ann,cmap=cmap_use,
+                 norm=mp.colors.BoundaryNorm(boundaries, 
+                                             ncolors=len(boundaries)-1,
+                                             clip=False))
+cbar=plt.colorbar(cs,orientation='horizontal',extend='both')
+cbar.set_ticks(boundaries)
+cbar.set_label('degC')
+titlename = EXPT + '-' +  CNTL + '. Years:' + str(STARTYEAR) + '-' + str(ENDYEAR) + '.  ANN. Meandiff =' +  diffchar_ann
+plt.title(titlename, fontsize=10)
+plt.gca().coastlines()
+      
+print('about to write to file')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/ann_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/ann_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
+plt.close()

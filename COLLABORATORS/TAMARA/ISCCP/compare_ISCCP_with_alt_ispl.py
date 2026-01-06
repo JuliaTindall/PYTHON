@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on 21.12.2022 by Julia
+
+we have two ways of mapping the ipsl clouds onto ISCCP.  These are
+1. map_ipsl_to_ISCCP.py  which minimises the euclidean distance between
+   the histograms
+2. map_ipsl_to_ISCCP_alternative_williams_webb.py  which finds the centroids
+   of tcc, ctp, albedo and minimises the euclidean distance between the
+   centroids
+
+This program will read the westher states from both methods.
+It will write out
+1.  a map where they agree, with the appropriate weather state (disagreement
+    set to nan)
+2.  a map where the alternative version gives weather state 7.  (This is low
+    cloud amount and is much better represented by the alternative version).
+2.  a map where they agree or the alternative version has weather state 7.
+    (these are the locations we are happy with)
+3.  a map where they still disagree
+"""
+import numpy as np
+import iris
+import iris.plot as iplt
+from iris.cube import CubeList as CubeList
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import cartopy
+import cartopy.crs as ccrs
+import sys
+
+def get_weather_states():
+    """
+    reads in the weather states from the files
+    """
+    filestart = '/home/users/jctindall/cloud_regiemes/'
+    fileend = preind_plio_ind + '_' + str(day) + '.nc'
+    orig_ws_file = filestart + '/ISCCP/' + fileend
+    alt_ws_file = filestart + '/ISCCP_alternative/' + fileend
+
+    orig_cube = iris.load_cube(orig_ws_file,'ISCCP Cloud Area Fraction')
+    alt_cube = iris.load_cube(alt_ws_file,'ISCCP Cloud Area Fraction')
+
+    return orig_cube, alt_cube
+
+    
+########    START OF PROGRAM ########################
+
+preind_plio_ind = 'PLIO' #  optionS PREIND PLIO
+day = 180
+
+orig_ws, alt_ws = get_weather_states()
+
+# find where orig_ws and alt_ws agree
+orig_ws_data = orig_ws.data
+alt_ws_data = alt_ws.data
+agree_data = np.ma.where(orig_ws_data == alt_ws_data, orig_ws_data,-99999.)
+agree_cube = orig_ws.copy(data=agree_data)
+agree_cube.long_name = 'both_methods_agree'
+number_agree = np.sum(np.where(agree_data > 0, 1.0, 0.0))
+number_zero = np.sum(np.where(agree_data == 0, 1.0, 0.0))
+print('number in agreement',number_agree,'total=',144*143,'zero=',number_zero)
+print('percentage in disagreement',((144.*143.) - np.float64(number_agree) - np.float64(number_zero)) * 100. / (144.*143.))
+
+# find where they agree or where alt_ws is 7
+orig_7_data = np.ma.where(alt_ws_data==7, alt_ws_data,orig_ws_data)
+agree_or_7_data = np.ma.where(orig_7_data == alt_ws_data, alt_ws_data,-99999.)
+agree_or_7_cube = orig_ws.copy(data=agree_or_7_data)
+agree_or_7_cube.long_name = 'both_methods_agree or low_cloud_fraction'
+number_agree_7 = np.sum(np.where(agree_or_7_data > 0, 1.0, 0.0))
+print('number in agreementor 7',number_agree_7)
+print('percentage in disagreement excl 7',((144.*143.) - np.float64(number_agree_7) - np.float64(number_zero)) * 100. / (144.*143.))
+
+
+cubelist = [agree_cube, agree_or_7_cube]
+iris.save(cubelist,'temporary.nc',fill_value=-99999.,netcdf_format="NETCDF3_CLASSIC")
+sys.exit(0)
+
+#filestart = '/home/users/jctindall/cloud_regiemes/clisccp_CFday_IPSL-CM6A-LR_'
+#if preind_plio_ind == 'PREIND':
+#    filename = filestart + 'piControl_r1i2p1f1_gr_20750101-20981231.nc'
+#if preind_plio_ind == 'PLIO':
+#    filename = filestart + 'midPliocene-eoi400_r1i1p1f1_gr_20250101-20491231.nc#'
+
+#cubes = iris.load(filename)
+#cube = cubes[0]
+#ipsl_cube = cube[daystart:daystart + ndays,:,:,:,:]
+#cube = 0
+
+
+####################################################################
+# get the cloud regieme for each histogram and group the histograms
+# this program will also write them out to a file
+
+#get_all_cloud_regiemes(ipsl_cube, ISCCP_CR_cube)
+#sys.exit(0)
+
+##################################################################
+# plot the average histogram from the test data in each cloud regieme.
+# it uses the files written out in the previous steop
+
+#plot_avg_cloud_regieme()
+#plot_map_RFO_cloud_regieme()
+#plot_map_RFO_anomaly()

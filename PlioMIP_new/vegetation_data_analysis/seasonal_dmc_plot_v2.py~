@@ -1,0 +1,993 @@
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created January 2021 by Julia
+
+This program will produce a lat /lon dmc plot from Ulrichs spreadsheet
+The difference between this and version 1 is that we will group the data
+by dating / proxy
+
+"""
+
+import numpy as np
+import pandas as pd
+import iris
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.quickplot as qplt
+import iris.plot as iplt
+import cartopy.crs as ccrs
+import netCDF4
+
+import sys
+
+
+
+def get_MMM_data(latreq, lonreq):
+    """
+    read in MMM data from the pliocene and the preindustrial 
+    return the temperature at the list of sites
+    """
+
+    plio_cube = iris.load_cube(NSAT_MMM_FILE,
+                              'NearSurfaceTemperaturemean_mPWP')
+    pi_cube = iris.load_cube(NSAT_MMM_FILE,
+                              'NearSurfaceTemperaturemean_pi')
+   
+    nsites = len(latreq)
+    plio_mmm_array = np.zeros(nsites)
+    pi_mmm_array = np.zeros(nsites)
+
+    for i in range(0,nsites):
+        # modellon is whole numbers from 0-360
+        # lat is half numbers from -89.5 to 89.5
+
+        modlon = np.around(lonreq[i])
+        if modlon < 0: modlon = modlon + 360.
+
+
+        lat_ix = ((np.abs(plio_cube.coord('latitude').points 
+                         - latreq[i])).argmin())
+        lon_ix = ((np.abs(plio_cube.coord('longitude').points 
+                         - modlon)).argmin())
+    
+        plio_mmm_array[i] = plio_cube.data[lat_ix, lon_ix]
+        pi_mmm_array[i] = pi_cube.data[lat_ix, lon_ix]
+   
+    return plio_mmm_array, pi_mmm_array
+
+def get_lsm_names(model, period):
+    """
+    gets the names for each of the land sea masks
+    period 0 =e280, period 1 = eoi400
+    """
+    if model == 'CESM2':
+        lsm = [DATABASE + 'NCAR/b.e12.B1850.f09_g16.preind.cam.h0.LANDFRAC.0701.0800.nc', DATABASE + 'NCAR/b.e21.B1850.f09_g17.PMIP4-midPliocene-eoi400.001.cam.h0.LANDFRAC.1101.1200.nc']
+        fieldlsm = 'Fraction of sfc area covered by land'
+
+    if model == 'COSMOS':
+        lsm = ["/nfs/hera1/pliomip2/data/AWI/COSMOS/land_sea_masks/E280_et_al/E280.slf.atm.nc", "/nfs/hera1/pliomip2/data/AWI/COSMOS/land_sea_masks/Eoi400_et_al/Eoi400.slf.atm.nc"]
+        fieldlsm = "SLF"
+
+    if model == 'EC-Earth3.3':
+        lsm =  [DATABASE + 'EC-Earth3.3/EC-Earth3.3_PI_LSM.nc',
+                DATABASE + 'EC-Earth3.3/EC-Earth3.3_mPlio_LSM.nc']
+        fieldlsm = 'Land/sea mask'
+
+    if model == 'CESM1.2':
+        lsm = [DATABASE + 'NCAR/b.e12.B1850.f09_g16.preind.cam.h0.LANDFRAC.0701.0800.nc', DATABASE + 'NCAR/b.e12.B1850.f09_g16.PMIP4-pliomip2.cam.h0.LANDFRAC.1101.1200.nc']
+        fieldlsm = 'Fraction of sfc area covered by land'       
+  
+    if model   ==  'MIROC4m':
+        lsm = [DATABASE + 'MIROC4m/sftlf/MIROC4m_Exxx_fx_sftlf.nc', 
+               DATABASE + 'MIROC4m/sftlf/MIROC4m_Eoixxx_fx_sftlf.nc']
+        fieldlsm = "sftlf"
+
+    if model  == 'HadCM3':
+        lsm = [DATABASE+'LEEDS/HadCM3/e280/qrparm.mask.nc',
+               DATABASE+'LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc']
+        fieldlsm = 'LAND MASK (LOGICAL: LAND=TRUE)'
+
+    if model == 'CCSM4':
+        lsm = [DATABASE + 'NCAR/b40.B1850.f09_g16.preind.cam.h0.LANDFRAC.0081.0180.nc', DATABASE + 'NCAR/b40.B1850.f09_g16.PMIP4-pliomip2.LANDFRAC.1001.1100.nc']
+        fieldlsm = 'Fraction of sfc area covered by land'
+
+    if model == 'CCSM4-Utr':
+        lsm = [DATABASE + 'Utrecht/CESM1.0.5/E280/land_sea_mask_Amon_CESM1.0.5_b.PI_1pic_f19g16_NESSC_control_r1i1p1f1_gn.nc', DATABASE + 'Utrecht/CESM1.0.5/Eoi400/land_sea_mask_Amon_CESM1.0.5_b.PLIO_5Ma_Eoi400_f19g16_NESSC_control_r1i1p1f1_gn.nc']
+        fieldlsm = 'LANDMASK[D=1]'
+  
+    if model == 'CCSM4-UoT':
+        start = DATABASE + 'UofT/UofT-CCSM4/'
+        lsm = [start + 'for_julia/E_mask.nc', start + 'for_julia/Eoi_mask.nc']
+        fieldlsm = 'gridbox land fraction'
+      
+    if model == 'NorESM-L':
+       lsm = [DATABASE + 'NorESM-L/NorESM-L_E280_land_sea_mask.nc',
+              DATABASE + 'NorESM-L/NorESM-L_Eoi400_land_sea_mask.nc']
+       fieldlsm = 'Fraction of sfc area covered by land'
+
+
+    if model  == 'MRI2.3':
+        lsm = [DATABASE + 'MRI-CGCM2.3/sftlf.nc', 
+               DATABASE + 'MRI-CGCM2.3/sftlf.nc']
+        fieldlsm = 'landsea mask [0 - 1]'
+
+
+    if model  == 'GISS2.1G':
+        start = '/nfs/hera1/earjcti/PLIOMIP2/GISS2.1G/'
+        lsm = [start + 'e280/NASA-GISS_PIctrl_all_fland.nc',
+               start + 'eoi400/NASA-GISS_PlioMIP2_all_fland.nc']
+        fieldlsm = 'fland'
+
+    if model == 'NorESM1-F':
+        lsm = [DATABASE + 'NorESM1-F/NorESM1-F_E280_land_sea_mask.nc',
+               DATABASE + 'NorESM1-F/NorESM1-F_Eoi400_land_sea_mask.nc']
+        fieldlsm =  'Fraction of sfc area covered by land'
+
+        
+    if model == 'IPSLCM6A':
+        start = '/nfs/hera1/earjcti/PLIOMIP2/IPSLCM6A/'
+        lsm = [start + 'sftlf_fx_IPSL-CM6A-LR_piControl_r1i1p1f1_gr.nc',
+              start + 'sftlf_fx_IPSL-CM6A-LR_midPliocene-eoi400_r1i1p1f1_gr.nc']
+        fieldlsm = 'land_area_fraction'
+
+    if model == 'IPSLCM5A':
+        start = '/nfs/hera1/earjcti/PLIOMIP2/IPSLCM5A/'
+        lsm = [start + 'E280_LSM_IPSLCM5A.nc',start + 'Eoi400_LSM_IPSLCM5A.nc']
+        fieldlsm = ['Fraction ter', 'Fraction lic']
+   
+
+    if model == 'IPSLCM5A2':
+        start = '/nfs/hera1/earjcti/PLIOMIP2/IPSLCM5A/'
+        lsm = [start + 'E280_LSM_IPSLCM5A.nc',
+               start + 'Eoi400_LSM_IPSLCM5A.nc']
+        fieldlsm = ['Fraction ter', 'Fraction lic']
+
+    if model == 'HadGEM3':
+        start = '/nfs/hera1/pliomip2/data/HadGEM3_new/'
+        lsm = [start + 'hadgem3.mask.nc', start + 'hadgem3.mask.nc']
+        fieldlsm = 'land_binary_mask'
+            
+            
+    return lsm[period], fieldlsm
+
+
+def get_cru_temp(lats, lons):
+    """
+    get's the cru temperature at the given latitude and longitude
+    """
+    
+    crufile = ('/nfs/hera1/earjcti/regridded/CRUTEMP/' + 
+               'E280.NearSurfaceTemperature.mean_month.nc')
+    cube = iris.load_cube(crufile)
+    
+    
+    cru_min_temp = np.zeros(len(lats))
+    cru_max_temp = np.zeros(len(lats))
+    for i, lat in enumerate(lats):
+        if lons[i] > 180.:
+            lon = lons[i]-360.
+        else:
+            lon = lons[i]
+        lat_ix = (np.abs(cube.coord('latitude').points - lat)).argmin()
+        lon_ix = (np.abs(cube.coord('longitude').points - lon)).argmin()
+        
+   
+        cru_temp = cube.data[:, lat_ix, lon_ix]
+        if np.isfinite(cru_temp[0]):
+            pass
+        else:
+            # get an average of surrounding ones
+            surround = [cube.data[:, lat_ix + 1, lon_ix],
+                        cube.data[:, lat_ix - 1, lon_ix],
+                        cube.data[:, lat_ix, lon_ix + 1],
+                        cube.data[:, lat_ix, lon_ix -1],
+                        ]
+            cru_temp = np.ma.mean(surround, axis=0)
+            cru_max_temp[i] = np.max(cru_temp)
+        cru_min_temp[i] = np.min(cru_temp)
+      
+     
+    return cru_min_temp, cru_max_temp
+
+###########################
+def get_land_sea_mask(model, period):
+    """
+    the land mask is where the land_frac = 100% in both pliocene & pi
+    the sea mask is where the sea_frac = 100% in both pliocene & pi
+    returns land_mask and sea_mask as a cube
+    """
+
+    def get_ipsl_lsm(file, fieldnames):
+        # get's the ipsl lsm which is sum of terrestrial and land ice
+        cubes = iris.load(file, fieldnames)
+        cube = cubes[0] + cubes[1]
+        lsm_cube = cube.collapsed('time_counter', iris.analysis.MEAN)
+        return lsm_cube
+
+    def change_to_2d(cube):
+        # if cube is 3d then extract the first time dimension only
+        if cube.ndim == 2:
+            cube_2d = cube
+        else:
+            cube_2d = cube[0, :, :]
+       
+        return cube_2d
+
+
+    lsm, fieldlsm = get_lsm_names(model,period)
+
+    ############################################
+    if model == 'IPSLCM5A' or model == 'IPSLCM5A2':
+        lsm_cube = get_ipsl_lsm(lsm, fieldlsm)
+    elif model == 'HadGEM3':
+        f = netCDF4.Dataset(lsm, "r")
+        print(f.variables['longitude'])
+        longitude = iris.coords.DimCoord(f.variables['longitude'], 
+                             standard_name = 'longitude', units='degrees')
+        latitude = iris.coords.DimCoord(f.variables['latitude'], 
+                             standard_name = 'latitude', units='degrees')
+        lsm_cube = iris.cube.Cube(np.squeeze(f.variables['lsm'][:]),
+                             long_name='lsm', var_name='lsm', units=None, 
+                             attributes=None, cell_methods=None, 
+                             dim_coords_and_dims=[(latitude,0), (longitude,1)])
+     
+    else:
+        lsm_cube = iris.util.squeeze(iris.load_cube(lsm, fieldlsm))
+     
+    lsm_cube2 = change_to_2d(lsm_cube)
+   
+   
+    if model == 'IPSLCM6A':
+        lsm_cube2.data = lsm_cube2.data / 100.0
+       
+
+    # regrid
+    cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+    lsm_cube3 = lsm_cube2.regrid(cubegrid, iris.analysis.Linear())
+   
+
+    lsm_cube3.var_name = 'land_mask'
+    lsm_cube3.long_name = 'land_mask'
+    
+    return lsm_cube3
+
+def check_lsm(lsm_lons, lsm_lats, lsm_data, latrq, lonrq):
+    """
+    if our model is a sea point then set index to nan
+    """
+
+    lat_ix = (np.abs(lsm_lats - latrq)).argmin()
+    lon_ix = (np.abs(lsm_lons - lonrq)).argmin()
+       
+    if lsm_data[lat_ix, lon_ix] <  0.5:
+        # check to south, north, east, west
+#        print(lsm_data[lat_ix - 1, lon_ix],lsm_data[lat_ix + 1, lon_ix],lsm_data[lat_ix, lon_ix-1],lsm_data[lat_ix, lon_ix+1], lsm_data[lat_ix - 1, lon_ix - 1],lsm_data[lat_ix + 1, lon_ix+1 ],lsm_data[lat_ix + 1, lon_ix-1],lsm_data[lat_ix-1, lon_ix+1])
+#        if lsm_data[lat_ix - 1, lon_ix] >  0.5:
+#            lat_ix = lat_ix -1
+#        elif lsm_data[lat_ix + 1, lon_ix] >  0.5:
+#            lat_ix = lat_ix + 1
+#        elif lsm_data[lat_ix, lon_ix - 1] > 0.5:
+#            lon_ix = lon_ix - 1
+#        elif lsm_data[lat_ix, lon_ix + 1] > 0.5:
+#            lon_ix = lon_ix + 1
+#        elif lsm_data[lat_ix - 1, lon_ix + 1] > 0.5:
+#            lat_ix = lat_ix -1
+#            lon_ix = lon_ix + 1
+#        elif lsm_data[lat_ix - 1, lon_ix - 1] > 0.5:
+#            lat_ix = lat_ix -1
+#            lon_ix = lon_ix - 1
+#        elif lsm_data[lat_ix + 1, lon_ix + 1] > 0.5:
+#            lat_ix = lat_ix +1
+#            lon_ix = lon_ix + 1
+#        elif lsm_data[lat_ix + 1, lon_ix - 1] > 0.5:
+#            lat_ix = lat_ix +1
+#            lon_ix = lon_ix - 1
+       # elif lsm_data[lat_ix, lon_ix - 2] > 0.5:
+       #     lon_ix = lon_ix - 2
+       # elif lsm_data[lat_ix, lon_ix + 2] > 0.5:
+       #     lon_ix = lon_ix + 2
+       # elif lsm_data[lat_ix, lon_ix - 3] > 0.5:
+       #     lon_ix = lon_ix - 3
+       # elif lsm_data[lat_ix, lon_ix + 3] > 0.5:
+       #     lon_ix = lon_ix + 3
+       # elif lsm_data[lat_ix - 2, lon_ix] > 0.5:
+       #     lat_ix = lat_ix -2
+       # elif lsm_data[lat_ix + 2, lon_ix] > 0.5:
+       #     lat_ix = lat_ix + 2
+      
+       
+  #      else:
+            lat_ix = np.nan
+            lon_ix = np.nan
+            
+       # print('new',lsm_data[lat_ix, lon_ix], lat_ix, lon_ix, latrq, lonrq, lsm_lons[lon_ix], lsm_lats[lat_ix])
+       # sys.exit(0)
+
+            
+        
+
+    return lat_ix, lon_ix
+
+def get_single_model(model, latreq, lonreq, period):
+    """
+    read in the pliocene data from 'model'  return the temperatures
+    at the list of sites
+    """
+    # get lsm
+    if period == 'E280':
+        lsm_cube  = get_land_sea_mask(model, 0)
+    if period == 'EOI400':
+        lsm_cube  = get_land_sea_mask(model, 1)
+
+    filename = ('/nfs/hera1/earjcti/regridded100/' + model +
+                '/' + period + '.NearSurfaceTemperature.mean_month.nc')
+  
+    print(filename)
+    plio_cube = iris.load_cube(filename)
+   
+    nsites = len(latreq)
+    plio_minval_array = np.zeros(nsites)
+    plio_maxval_array = np.zeros(nsites)
+
+    plio_cube_lats = plio_cube.coord('latitude').points
+    plio_cube_lons = plio_cube.coord('longitude').points
+
+    lsm_cube_lats = lsm_cube.coord('latitude').points
+    lsm_cube_lons = lsm_cube.coord('longitude').points
+    lsm_cube_data = lsm_cube.data
+   
+  
+    if plio_cube_lats.any() != lsm_cube_lats.any():
+        print('data cube does not match lsm lat')
+    if plio_cube_lats.any() != lsm_cube_lons.any():
+        print('data cube does not match lsm lat')
+
+    for i in range(0,nsites):
+        # modellon is whole numbers from 0-360
+        # lat is half numbers from -89.5 to 89.5
+
+        modlon = np.around(lonreq[i])
+        if modlon < 0: modlon = modlon + 360.
+
+        (lat_ix, 
+         lon_ix) = check_lsm(lsm_cube_lons, lsm_cube_lats, 
+                                    lsm_cube_data, latreq[i], modlon)
+
+        if np.isfinite(lat_ix):
+            plio_array = plio_cube.data[:, lat_ix, lon_ix]
+        else:
+            plio_array = np.zeros(12)
+            plio_array[:] = np.nan
+        plio_minval_array[i] = np.min(plio_array)
+        plio_maxval_array[i] = np.max(plio_array)
+   
+    return plio_minval_array, plio_maxval_array
+
+def land_reformat(sitedata):
+    """
+    reformats the land data into different arrays
+    """
+    
+    sites = []
+    lats = []
+    lons = []
+    WMMT_data_min = []
+    WMMT_data_max = []
+    WMMT_modern_obs = []
+    CMMT_data_min = []
+    CMMT_data_max = []
+    CMMT_modern_obs = []
+    refs = []
+    
+    for info in sitedata:
+        sites.append(info[0])
+        lats.append(info[1])
+        lons.append(info[2])
+        WMMT_data_min.append(info[3])
+        WMMT_data_max.append(info[4])
+        CMMT_data_min.append(info[5])
+        CMMT_data_max.append(info[6])
+        WMMT_modern_obs.append(info[7])
+        CMMT_modern_obs.append(info[8])
+        refs.append(info[9])
+   
+    labels = []
+    deg= u'\N{DEGREE SIGN}'
+    for i, site in enumerate(sites):
+  #     label = ''.join([c for c in site if c.isupper()])
+        latstr = np.str(lats[i]) + deg + 'N'
+        if lons[i] >180:
+           lonstr = np.str((lons[i] - 360.) * -1.0) + deg +  'W'
+        else:
+           lonstr = np.str(lons[i]) + deg + 'E'
+         
+        label = site + ' (' +  latstr + ',' +  lonstr + ')'
+        labels.append(site)
+   
+    return  (labels, lats, lons, np.asarray(WMMT_data_min),
+             np.asarray(WMMT_data_max),  np.asarray(CMMT_data_min),
+             np.asarray(CMMT_data_max),  np.asarray(WMMT_modern_obs),
+             np.asarray(CMMT_modern_obs),refs)
+
+ 
+def get_land_km5c():
+    """
+    these have been obtained from various sources so I am just typing them in
+    """
+    sitedata = []
+    # site data is
+    # sitename, sitelat, sitelon, min WMMT veg, max WMMT veg,
+    # min WMMT beetle, max WMMT beetle, min CMMT veg, max CMMT veg
+    # min CMMT beetle, max CMMT beetle, modern obs WMMT, modern obs CMMT
+    # reference and date
+
+    # lake baikal is from what ulrich sent me.
+    # Lake E from Brigette-greeme mean july temp of +8 and average winter lows of 35degC
+
+    sitedata.append(['Lake El\'gygytgyn', 67, 172, 15.0, 16.0,
+                    -36.8, -30.4, 
+                     8.0, np.nan,'CMMT 3.199Ma - 3.209Ma; Pavel Tarasov (pers. comm) \n WMMT Brigham-Grette et al. 2013'])
+    sitedata.append(['Lake Baikal', 56, 108, 15.28, 17.52,
+                     -1.67, 1.07, 
+                     15.3, -17.4,'Km5c - unpublished \n (Method of Klage et al 2020)'])
+    
+   
+    (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs) = land_reformat(sitedata)
+
+    return (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs)
+
+def get_land_LP():
+    """
+    these have been obtained from various sources so I am just typing them in
+    LP means late pliocene
+    """
+    sitedata = []
+    # lake baikal is from demske 2002.
+    sitedata.append(['Lake Baikal', 56, 108, 13.0, 24.0, -15, 5,
+                     np.nan, np.nan,'Prior to 3.5Ma (Demske et al 2002)'])
+    # these are from popova et al 2012 using coexistence approach.
+  
+    sitedata.append(['Mirny', 55, 82, 18.8, 24.6, -0.3, 0.7,
+                     np.nan, np.nan,'Popova et al 2012'])
+    sitedata.append(['Merkutlinskiy', 56, 72, 17.3, 23.8, -3.8, 6.2,
+                     np.nan, np.nan,' --"--'])
+    sitedata.append(['Kabinet', 55, 80, 21.6, 24.4, -4.4, 4.6,
+                     np.nan, np.nan,' --"--'])
+    sitedata.append(['Delyankir', 63, 133, 18.9, 24.9, -6.9, 1.3,
+                     np.nan, np.nan,' --"--'])
+    sitedata.append(['Chernoluche', 55, 73, 19.6, 20.3, -5.9, 0.7,
+                     np.nan, np.nan,' --"--'])
+    sitedata.append(['Blizkiy', 64, 162, 15.6, 23.3, -12.8, 5.2,
+                     np.nan, np.nan,' --"--'])
+    sitedata.append(['42km', 55, 80, 21.6, 23.3, -4.4, 0.7,
+                     np.nan, np.nan,' --"--'])
+  
+    sitedata.append(['Lost Chicken Mine', 64, 218, 12.0, 12.0, 
+                     -2.0, -2.0, 15.3, -25.1, '2.9 +/- 0.4Ma: Ager et al. 1994'])
+  
+   
+    (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs) = land_reformat(sitedata)
+
+    return (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs)
+
+def get_land_EP():
+    """
+    these have been obtained from various sources so I am just typing them in
+    EP means early pliocene
+    """
+    sitedata = []
+    # these are from popova et al 2012 using coexistence approach.
+  
+    sitedata.append(['Tnekveem', 66, 177, 18.9, 25.6, -11.8, 5.8, 
+                     np.nan, np.nan,'Popova et al 2012'])
+    sitedata.append(['Hydzhak', 63, 147, 18.8, 24.9, -8.7, 1.3,
+                     np.nan, np.nan,' --"--'])
+
+   
+    (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs) = land_reformat(sitedata)
+
+    return (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs)
+
+def get_land_fletcher():
+    """
+    these have been obtained from various sources so I am just typing them in
+    """
+    sitedata = []
+    # site data is
+    # sitename, sitelat, sitelon, min WMMT data, max WMMT data,
+    # min CMMT data, max CMMT data
+    # modern obs WMMT, modern obs CMMT
+    # we think FLB is 3.8Ma, BP originally was 3.4 but has been redated
+   
+    # for TF data we are reporting here temperature of warmest month
+    # and temperature of warmest quater
+    
+    sitedata.append(['Near Meighen Island', 77.5, 261, [19.6, 12.8], 
+                     [20.5, 13.3],
+                    [-11.6, -6.8], [-11.4, -6.2],
+                     4.1, -42.5, 'Fletcher et al. 2017'])
+    sitedata.append(['Beaver Pond', 79, 278, [18.4, 12.4], [20.9, 13.1],
+                     [-12.2, -7.3], [-11.5, -6.8],
+                      7.1, -39.7, '3.9 +1.5 / -0.5Ma: Fletcher et al. 2017'])
+    sitedata.append(['Fyles Leaf Beds', 79, 277, [19.7, 12.6], [21.1, 13.4],
+                     [-12.8, -7.2], [-9.1, -5.5],
+                      np.nan, np.nan, '3.8 +1/-0.7Ma: Fletcher et al. 2017'])
+     
+    (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs) = land_reformat(sitedata)
+
+
+    
+   
+    return  (labels, lats, lons, WMMT_data_min,
+             WMMT_data_max,  CMMT_data_min,
+             CMMT_data_max,  WMMT_modern_obs,
+             CMMT_modern_obs,refs)
+
+def get_land_fletcher_ca():
+    """
+    these have been obtained from various sources so I am just typing them in
+    """
+    sitedata = []
+    # site data is
+    # sitename, sitelat, sitelon, min WMMT data, max WMMT data,
+    # min CMMT data, max CMMT data
+    # modern obs WMMT, modern obs CMMT
+    # we think FLB is 3.8Ma, BP originally was 3.4 but has been redated
+   
+    # for tf data we are reporting hwere temp of warmest month and
+    # warmest quater
+    
+    sitedata.append(['Near Meighen Island', 77.5, 261, [18.1, 10.6], 
+                     [22.8, 16.2],
+                    [-21.7,-16.3,], [-7.9, -2.7],
+                     4.1, -42.5,'Fletcher et al. 2017'])
+    sitedata.append(['Beaver Pond', 79, 278, [18.1, 11.3],[22.4, 16.3],
+                     [-21.7, -15.0], [-8.1, -3.5],
+                      7.1, -39.7,'3.9 +1.5 / -0.5Ma: Fletcher et al. 2017'])
+    sitedata.append(['Fyles Leaf Beds', 79, 277, [18.1, 10.9], [22.7, 15.0],
+                     [-16.9, -12.4], [-6.4, -2.3],
+                      np.nan, np.nan,'3.8 +1/-0.7Ma: Fletcher et al. 2017'])
+     
+    (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs) = land_reformat(sitedata)
+
+
+    
+   
+    return  (labels, lats, lons, WMMT_data_min,
+             WMMT_data_max,  CMMT_data_min,
+             CMMT_data_max,  WMMT_modern_obs,
+             CMMT_modern_obs,refs)
+
+def get_land_beetle():
+    """
+    these have been obtained from various sources so I am just typing them in
+    """
+    sitedata = []
+    # site data is
+    # sitename, sitelat, sitelon, min WMMT veg, max WMMT veg,
+    # min WMMT beetle, max WMMT beetle, min CMMT veg, max CMMT veg
+    # min CMMT beetle, max CMMT beetle, modern obs WMMT, modern obs CMMT
+
+    # all were reported in Elias and Matthews
+    # note Pliocene Tmin - modern Tmin varies between 2.3 degC and 20degC
+
+    sitedata.append(['Ballast Brook', 74, 237, 
+                     14.0, 14.5, -21.0, -19.5, 2.4, -41.4,'~3-5Ma: Flyes et al 1994'])
+    sitedata.append(['Strathcona Beaver Peat', 79, 278, 
+                     11.7, 12.2, -28.7, -27.2, 2.4, -41.4,'>3.3Ma: Matthews and Flyes 2000'])
+    sitedata.append(['Near Meighen Island', 77.5, 261, 
+                     11.5, 13.5, -33.0, -18.5, 4.1, -42.5,'~3Ma: Elias and Matthews 2002'])
+    sitedata.append(['Lost Chicken Mine', 64, 218,  
+                     13.5, 16.0, -27.75, -19.25, 15.3, -25.1,'~3Ma: Matthews and Telka 1997'])
+    sitedata.append(['Bluefish', 67, 221,  
+                     12.7, 15.0, -30.0, -20.5, 16.0, -29.0,'~LP: Matthews and Telka 1997'])
+   
+    (labels, lats, lons, WMMT_data_min, WMMT_data_max,  
+     CMMT_data_min, CMMT_data_max, WMMT_modern_obs,
+     CMMT_modern_obs,refs) = land_reformat(sitedata)
+
+
+    
+   
+    return  (labels, lats, lons, WMMT_data_min,
+             WMMT_data_max,  CMMT_data_min,
+             CMMT_data_max,  WMMT_modern_obs,
+             CMMT_modern_obs,refs)
+
+
+def plot_figure(WMMT_data_min, WMMT_data_max, 
+                CMMT_data_min, CMMT_data_max, 
+                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+                labels,titleinfo,ystart,refs):
+    """
+    this subroutine tries to plot the figure for the paper which shows a nice
+    DMC 
+    """
+
+    titlename = {'KM5c' : 'Near KM5c',
+                 'LPCA' : 'Late Pliocene',
+                 'EPCA' : 'Early Pliocene',
+                 'TF-CRACLE' : '< 3.9Ma (Coexistence Likelihood Estimation)',
+                 'TF-CA' : '<3.9Ma (Coexistence Approach)',
+                 'BA' : 'Beetle Assemblage data'
+        }
+    labelname = {0 : 'palaeodata WMMT',
+                 1 : 'palaeodata CMMT',
+                 2 : 'MMM WMMT',
+                 3 : 'MMM CMMT'}
+
+    WMMT_data_mean = (WMMT_data_min + WMMT_data_max) / 2.0
+ 
+    CMMT_data_mean = (CMMT_data_min + CMMT_data_max) / 2.0
+    
+    ax1 = plt.axes(frameon=False)
+     
+    if ystart == 0:
+        ax1.get_xaxis().tick_top()
+        ax1.axes.get_yaxis().set_visible(False)
+        ax1.set_ylim([0, 32])
+        plt.gca().invert_yaxis()
+        #ax.set_xlim([xmin, xmax])
+      
+
+   
+    nsites=len(WMMT_data_min)
+    yarray = np.arange(ystart+1.5, nsites+ystart+1, 1)
+    yend=ystart+nsites
+ 
+    # plot warm and cold month temperature anomalies
+
+    if titleinfo[0:2] != 'TF': # tamara fletchers data was not wmmt
+        ax1.hlines(y=yarray, xmin=WMMT_data_min, xmax= WMMT_data_max,color='tab:red')
+        ax1.hlines(y=yarray, xmin=CMMT_data_min, xmax= CMMT_data_max,color='tab:blue')
+   
+        plt.scatter(WMMT_data_mean, 
+                    yarray, color='tab:red', marker='^',
+                    label=labelname.get(ystart,None),s=60)
+        plt.scatter(CMMT_data_mean, 
+                    yarray, color='tab:blue', marker='^',
+                    label = labelname.get(ystart+1,None) ,s=60)
+    else:
+        print(WMMT_data_mean)
+        ax1.hlines(y=yarray, xmin=WMMT_data_min[:,0], xmax= WMMT_data_max[:,0],color='tab:red')
+        ax1.hlines(y=yarray, xmin=CMMT_data_min[:,0], xmax= CMMT_data_max[:,0],color='tab:blue')
+        ax1.hlines(y=yarray, xmin=WMMT_data_min[:,1], xmax= WMMT_data_max[:,1],color='tab:pink',linestyle='dashed')
+        ax1.hlines(y=yarray, xmin=CMMT_data_min[:,1], xmax= CMMT_data_max[:,1],color='tab:cyan',linestyle='dashed')
+        if titleinfo == 'TF-CRACLE':
+            plt.scatter(WMMT_data_mean[:,0], 
+                        yarray, color='tab:red', marker='v',
+                        label='max T warmest month',s=60)
+            plt.scatter(CMMT_data_mean[:,0], 
+                        yarray, color='tab:blue', marker='v',
+                        label =  'min T coldest month ',s=60)
+            plt.scatter(WMMT_data_mean[:,1], 
+                        yarray, color='tab:pink', marker='^',
+                        label='wamest quarter T',s=60)
+            plt.scatter(CMMT_data_mean[:,1], 
+                        yarray, color='tab:cyan', marker='^',
+                        label =  'coldest quarter T ',s=60)
+        else:
+            plt.scatter(WMMT_data_mean[:,0], 
+                        yarray, color='tab:red', marker='v',s=60)
+            plt.scatter(CMMT_data_mean[:,0], 
+                        yarray, color='tab:blue', marker='v',s=60)
+            plt.scatter(WMMT_data_mean[:,1], 
+                        yarray, color='tab:pink', marker='^',s=60)
+            plt.scatter(CMMT_data_mean[:,1], 
+                        yarray, color='tab:cyan', marker='^',s=60)
+
+    # put an arrow on LCM
+    for i, label in enumerate(labels):
+        if label[0:4] == 'Lost' and i > 4:
+            plt.arrow(CMMT_data_max[i], yarray[i], -10, 0, linestyle='dotted', 
+                  color='tab:blue', head_width=0.2, head_length=1.0)
+   
+    # try plotting axis
+  
+    for j in range(0, nsites):
+        plt.text(-40.0, yarray[j], labels[j], ha='right')
+#        if ystart == 0:
+#            plt.text(27.0, yarray[j], refs[j], ha='left')
+#        else:
+#            plt.text(35.0, yarray[j], refs[j], ha='left')
+
+     
+
+    
+    plt.scatter(mmm_WMT, yarray + 0.2, color='black', s=60)
+    plt.scatter(mmm_WMT, yarray + 0.2, color='tab:red', 
+                s=25, label=labelname.get(ystart+2,None))
+    plt.scatter(mmm_CMT, yarray + 0.2, color='black', s=60)
+    plt.scatter(mmm_CMT, yarray + 0.2, color='tab:blue', 
+                s=25, label=labelname.get(ystart+3,None))
+  
+  
+    # plot individual models for pliocene
+    for i in range(0, len(MODELNAMES)):
+        if i == 0 and ystart==0:
+            plt.scatter(all_models_plio_WMT[:, i], yarray+0.2, color='tab:red', 
+                        marker = 'x', s=15, label='models WMMT')
+            plt.scatter(all_models_plio_CMT[:, i], yarray+0.2, color='tab:blue', 
+                        marker = 'x', s=15, label='models CMMT')
+        else:
+            plt.scatter(all_models_plio_WMT[:, i], yarray+0.2, color='tab:red', 
+                        marker = 'x',s=15)
+            plt.scatter(all_models_plio_CMT[:, i], yarray+0.2, color='tab:blue', 
+                        marker = 'x', s=15)
+        
+    plt.hlines(y=ystart, xmin=-50., xmax=30., linewidth=0.5)
+    plt.text(-30.0, -1.75, 'Cold Month Temperature (degC)', ha='left', color='tab:blue',fontsize=12)
+    plt.text(5.0, -1.75, 'Warm Month Temperature (deg C)', ha='left', color='tab:red',fontsize=12)
+    plt.text(-35.0,ystart+0.5,titlename.get(titleinfo),fontsize=12)
+       
+    
+    #plt.legend(bbox_to_anchor=(0.5, -0.04), loc='lower center', ncol=3,
+    #               prop = {'size':12})
+    if ystart > 23:
+        handles, labels = plt.gca().get_legend_handles_labels()
+        order = [2, 3, 4, 5, 0,6,8,1,7,9]
+        print(labels)
+        print(ystart)
+        plt.legend([handles[idx] for idx in order],
+                   [labels[idx] for idx in order],
+               bbox_to_anchor=(0.5, -0.04), loc='lower center', ncol=3,
+               prop = {'size':12})
+   
+   
+ 
+    return ax1,yend+2
+
+  
+def get_model_data(land_lats, land_lons):
+    """
+    get the model data for these latitude and longitudes
+    """
+    
+    all_models_plio_WMT = np.zeros((len(land_lons), len(MODELNAMES)))
+    all_models_plio_CMT = np.zeros((len(land_lons), len(MODELNAMES)))
+    all_models_pi_WMT = np.zeros((len(land_lons), len(MODELNAMES)))
+    all_models_pi_CMT = np.zeros((len(land_lons), len(MODELNAMES)))
+    all_models_seas_cyc_anom = np.zeros((len(land_lons),len(MODELNAMES)))
+    all_models_CMMT_anom = np.zeros((len(land_lons),len(MODELNAMES)))
+    all_models_WMMT_anom = np.zeros((len(land_lons),len(MODELNAMES)))
+    for i, model in enumerate(MODELNAMES):
+        (ind_CMT, ind_WMT) = get_single_model(model, land_lats, 
+                                              land_lons, 'EOI400')
+        all_models_plio_WMT[:, i] = ind_WMT
+        all_models_plio_CMT[:, i] = ind_CMT
+
+        (ind_CMT, ind_WMT) = get_single_model(model, land_lats, 
+                                              land_lons, 'E280')
+        all_models_pi_WMT[:, i] = ind_WMT
+        all_models_pi_CMT[:, i] = ind_CMT
+
+        all_models_seas_cyc_anom[:, i] = (
+            (all_models_plio_WMT[:, i] - all_models_plio_CMT[:, i]) -
+            (all_models_pi_WMT[:, i] - all_models_pi_CMT[:, i]))
+        
+        all_models_CMMT_anom[:, i] = (all_models_plio_CMT[:, i] -
+                                      all_models_pi_CMT[:, i])
+
+        all_models_WMMT_anom[:, i] = (all_models_plio_WMT[:, i] -
+                                      all_models_pi_WMT[:, i])
+
+
+
+    mmm_WMT = np.nanmean(all_models_plio_WMT, axis=1)
+    mmm_CMT = np.nanmean(all_models_plio_CMT, axis=1)
+    mmm_WMT_pi = np.nanmean(all_models_pi_WMT, axis=1)
+    mmm_CMT_pi = np.nanmean(all_models_pi_CMT, axis=1)
+
+
+    return  (all_models_plio_WMT, all_models_plio_CMT,
+     all_models_pi_WMT, all_models_pi_CMT, 
+     all_models_CMMT_anom, 
+     all_models_WMMT_anom, mmm_WMT, mmm_CMT, mmm_WMT_pi, mmm_CMT_pi)
+
+def main():
+    """
+    calling structure
+    a) get's model data
+    b) get's proxy data
+    c) plots model data with proxy data on top
+    d) plots change in seasonal cycle at MI, BP and LB
+    """
+
+   
+    # get land observations and cru temperature at km5c points 
+    (sites, land_lats, land_lons, WMMT_data_min, WMMT_data_max,
+     CMMT_data_min, CMMT_data_max, 
+     WMMT_modern_obs, CMMT_modern_obs,refs) =  get_land_km5c()
+
+    cru_min_temp, cru_max_temp = get_cru_temp(land_lats, land_lons)
+    (all_models_plio_WMT, all_models_plio_CMT,
+     all_models_pi_WMT, all_models_pi_CMT, 
+     all_models_CMMT_anom,  all_models_WMMT_anom,  mmm_WMT, mmm_CMT, 
+     mmm_WMT_pi, mmm_CMT_pi) = get_model_data(land_lats, land_lons)
+
+
+   
+    fig1 = plt.figure(figsize=[11.7, 11.7])
+  
+    ax1,ystart = plot_figure(WMMT_data_min, WMMT_data_max, 
+                CMMT_data_min, CMMT_data_max, 
+                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+                sites,'KM5c',0,refs)
+
+   
+    #####################################################################
+    # get land observations and cru temperature at lp points 
+    (sites, land_lats, land_lons, WMMT_data_min, WMMT_data_max,
+     CMMT_data_min, CMMT_data_max, 
+     WMMT_modern_obs, CMMT_modern_obs,refs) =  get_land_LP()
+
+    cru_min_temp, cru_max_temp = get_cru_temp(land_lats, land_lons)
+    (all_models_plio_WMT, all_models_plio_CMT,
+     all_models_pi_WMT, all_models_pi_CMT, 
+     all_models_CMMT_anom,  all_models_WMMT_anom,  mmm_WMT, mmm_CMT, 
+     mmm_WMT_pi, mmm_CMT_pi) = get_model_data(land_lats, land_lons)
+
+    # plot data
+    ax1,ystart = plot_figure(WMMT_data_min, WMMT_data_max, 
+                CMMT_data_min, CMMT_data_max, 
+                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+                sites,'LPCA',ystart,refs)
+   
+   
+    #####################################################################
+    # get land observations and cru temperature at ep points 
+    (sites, land_lats, land_lons, WMMT_data_min, WMMT_data_max,
+     CMMT_data_min, CMMT_data_max, 
+     WMMT_modern_obs, CMMT_modern_obs,refs) =  get_land_EP()
+
+    cru_min_temp, cru_max_temp = get_cru_temp(land_lats, land_lons)
+    (all_models_plio_WMT, all_models_plio_CMT,
+     all_models_pi_WMT, all_models_pi_CMT, 
+     all_models_CMMT_anom,  all_models_WMMT_anom,  mmm_WMT, mmm_CMT, 
+     mmm_WMT_pi, mmm_CMT_pi) = get_model_data(land_lats, land_lons)
+
+
+   
+
+    # plot data
+    ax1,ystart = plot_figure(WMMT_data_min, WMMT_data_max, 
+                CMMT_data_min, CMMT_data_max, 
+                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+                sites,'EPCA',ystart,refs)
+   
+
+    ####################################################################
+    # get land observations and cru temperature at early pliocene points 
+    (sites, land_lats, land_lons, WMMT_data_min, WMMT_data_max,
+     CMMT_data_min, CMMT_data_max, 
+     WMMT_modern_obs, CMMT_modern_obs,refs) =  get_land_fletcher()
+
+    cru_min_temp, cru_max_temp = get_cru_temp(land_lats, land_lons)
+    (all_models_plio_WMT, all_models_plio_CMT,
+     all_models_pi_WMT, all_models_pi_CMT, 
+     all_models_CMMT_anom,  all_models_WMMT_anom,  mmm_WMT, mmm_CMT, 
+     mmm_WMT_pi, mmm_CMT_pi) = get_model_data(land_lats, land_lons)
+
+    # plot data
+
+    ax1,ystart = plot_figure(WMMT_data_min, WMMT_data_max, 
+                CMMT_data_min, CMMT_data_max, 
+                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+                sites,'TF-CRACLE',ystart,refs)
+
+     ####################################################################
+    # get land observations and cru temperature at early pliocene points 
+    (sites, land_lats, land_lons, WMMT_data_min, WMMT_data_max,
+     CMMT_data_min, CMMT_data_max, 
+     WMMT_modern_obs, CMMT_modern_obs,refs) =  get_land_fletcher_ca()
+
+    cru_min_temp, cru_max_temp = get_cru_temp(land_lats, land_lons)
+    (all_models_plio_WMT, all_models_plio_CMT,
+     all_models_pi_WMT, all_models_pi_CMT, 
+     all_models_CMMT_anom,  all_models_WMMT_anom,  mmm_WMT, mmm_CMT, 
+     mmm_WMT_pi, mmm_CMT_pi) = get_model_data(land_lats, land_lons)
+
+    # plot data
+
+    for i,site in enumerate(sites):
+        print('warm',site, WMMT_data_min[i], WMMT_data_max[i],mmm_WMT[i])
+        print('cold',site, CMMT_data_min[i], CMMT_data_max[i],mmm_CMT[i])
+        print(' ')
+ #       for j, model in enumerate(MODELNAMES):
+ #           print(model, all_models_plio_CMT[i,j], all_models_plio_CMT[i,j] - all_models_plio_CMT[1,j])
+  #  sys.exit(0)
+
+  
+    ax1,ystart = plot_figure(WMMT_data_min, WMMT_data_max, 
+                CMMT_data_min, CMMT_data_max, 
+                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+                sites,'TF-CA',ystart,refs)
+
+
+
+     ####################################################################
+    # get land observations and cru temperature at early pliocene points 
+#    (sites, land_lats, land_lons, WMMT_data_min, WMMT_data_max,
+#     CMMT_data_min, CMMT_data_max, 
+#     WMMT_modern_obs, CMMT_modern_obs,refs) =  get_land_beetle()
+
+#    cru_min_temp, cru_max_temp = get_cru_temp(land_lats, land_lons)
+#    (all_models_plio_WMT, all_models_plio_CMT,
+#     all_models_pi_WMT, all_models_pi_CMT, 
+#     all_models_CMMT_anom,  all_models_WMMT_anom,  mmm_WMT, mmm_CMT, 
+#     mmm_WMT_pi, mmm_CMT_pi) = get_model_data(land_lats, land_lons)
+
+    # plot data
+
+#    ax1,ystart = plot_figure(WMMT_data_min, WMMT_data_max, 
+#                CMMT_data_min, CMMT_data_max, 
+#                all_models_plio_WMT, all_models_plio_CMT, mmm_WMT, mmm_CMT,
+#                sites,'BA',ystart,refs)
+#    ax1.set_ylim(None,0)    
+    
+
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/' + 
+               'vegetation/seasonal_dmc_plot_v2.eps')
+    plt.savefig(fileout)
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/' + 
+                   'vegetation/seasonal_dmc_plot_v2.pdf')
+    plt.savefig(fileout)
+    fileout = ('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/' + 
+                   'vegetation/seasonal_dmc_plot_v2.png')
+    plt.savefig(fileout)
+    plt.close()
+
+ 
+##########################################################
+# main program
+
+
+LINUX_WIN = 'l'
+FILESTART = '/nfs/hera1/earjcti/'
+DATABASE = '/nfs/hera1/pliomip2/data/'
+
+MODELNAMES = [
+               'HadGEM3', 'CESM2',
+              'IPSLCM6A', 
+              'COSMOS', 
+              'EC-Earth3.3', 'CESM1.2', 'IPSLCM5A',
+              'MIROC4m', 'IPSLCM5A2', 'HadCM3',
+              'GISS2.1G', 
+               'CCSM4', 
+              'CCSM4-Utr', 'CCSM4-UoT', 
+              'NorESM-L',  'NorESM1-F'
+           #  ,  'MRI2.3'
+              ]
+
+#MODELNAMES = ['IPSLCM6A']
+
+NSAT_MMM_FILE = (FILESTART + 
+                 'regridded100/NearSurfaceTemperature_multimodelmean.nc')
+
+LAND_DATAFILE = ('/nfs/hera1/earjcti/PLIOMIP2/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+
+main()
+
+#sys.exit(0)

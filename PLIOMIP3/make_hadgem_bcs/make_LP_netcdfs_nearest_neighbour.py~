@@ -1,0 +1,576 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created July 2023 by Julia
+
+This program will Check the Early Pliocene boundary conditions
+"""
+
+import numpy as np
+import cartopy.crs as ccrs
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import matplotlib
+import matplotlib.pyplot as plt
+from iris.cube import CubeList
+#import matplotlib.ticker as mticker
+#import netCDF4
+#from datetime import date
+#import cmocean to use topo colormap
+#import sys
+
+def plot_cube_diff(cube1, cube2, title1, title2, titleanom):
+    """
+    plots two cube1 and the anomaly between them over the globe
+    """
+
+    plt.figure(figsize=[12.0, 8.0])
+    diff_cube = cube1.copy(cube2.data - cube1.data)
+    print('number of non zero points',np.sum(np.where((diff_cube.data) != 0.0, 1.0, 0.0)))
+    print('number of positive points',np.sum(np.where((diff_cube.data) > 0.5, 1.0, 0.0)))
+    print('number of negative points',np.sum(np.where((diff_cube.data) < -0.5, 1.0, 0.0)))
+    vals=np.arange(-1.1,1.3,0.2)  
+    plt.subplot(2,2,1)
+    qplt.contourf(cube1,cmap='bwr',levels=vals)
+    plt.gca().coastlines()
+    plt.title(title1)
+    plt.subplot(2,2,2)
+    qplt.contourf(cube2,cmap='bwr',levels=vals)
+    plt.gca().coastlines()
+    plt.title(title2)
+    plt.subplot(2,2,3)
+    qplt.contourf(diff_cube,cmap='bwr',levels=vals)
+    plt.gca().coastlines()
+    plt.title(titleanom)
+    plt.show()
+    sys.exit(0)
+
+
+def plot_cmesh(cube1, cube2, cube3, title1, title2, title3):
+    """
+    plots two cube1 and the anomaly between them over the globe
+    """
+    boundaries=np.arange(-1.1,1.3,0.2)  
+  
+    plt.figure(figsize=[12.0, 8.0])
+    vals=np.arange(-1.1,1.3,0.2)  
+  
+    cmap_bwr = plt.cm.get_cmap('bwr',len(boundaries))
+  
+
+    ax=plt.subplot(2,2,1,projection=ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cube1, cmap=cmap_bwr,
+                       norm = matplotlib.colors.BoundaryNorm(boundaries, 
+                                              ncolors=len(boundaries)-1, 
+                                              clip=False))
+  #  cbar=plt.colorbar(cs,orientation='vertical', extend='min')
+    cbar=plt.colorbar(cs,orientation='vertical')
+    cbar.set_ticks(boundaries)
+    ax.gridlines(xlocs=cube1.coord('longitude').points-358.125, ylocs=cube1.coord('latitude').points-1.25)
+    ax.coastlines()
+    plt.title(title1)
+   
+  
+    ax=plt.subplot(2,2,2,projection=ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cube2, cmap=cmap_bwr,
+                       norm = matplotlib.colors.BoundaryNorm(boundaries, 
+                                              ncolors=len(boundaries)-1, 
+                                              clip=False))
+    cbar=plt.colorbar(cs,orientation='vertical')
+    cbar.set_ticks(boundaries)
+    ax.gridlines(xlocs=cube2.coord('longitude').points-0.5, ylocs=cube2.coord('latitude').points-0.5)
+    ax.coastlines()
+    plt.title(title2)
+   
+    ax=plt.subplot(2,2,3,projection=ccrs.PlateCarree())
+    cs=iplt.pcolormesh(cube3, cmap=cmap_bwr,
+                       norm = matplotlib.colors.BoundaryNorm(boundaries, 
+                                              ncolors=len(boundaries)-1, 
+                                              clip=False))
+  #  cbar=plt.colorbar(cs,orientation='vertical', extend='min')
+    cbar=plt.colorbar(cs,orientation='vertical')
+    cbar.set_ticks(boundaries)
+    ax.gridlines(xlocs=cube3.coord('longitude').points-358.125, ylocs=cube3.coord('latitude').points-1.25)
+    ax.coastlines()
+    plt.title(title1)
+ 
+   
+    plt.show()
+
+
+def make_lsmfrac_LP_1():
+    """
+    this program will 
+    1. read in the preindustrial ancil file from HadGEM2
+        (/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/mask_frac_l32161_n96_ref.nc)
+    2. read in the preindustrial and Late Pliocene mask files
+        (/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/
+        Modern_std_exp_data/Modern_std_LSM_v1.0.nc
+        LP_exp_data/LP_LSM_v1.0.nc
+    3.  Put both the pliomip3 boundary conditions on the HadGEM grid and
+        find out which gridboxes have changed (Use linear interpolation)
+    4.  For the gridboxes that have changed, change them in the mask_frac file
+        cube. 
+    5.  Partially correct.  Over Hudson Bay, Australia, CAA 
+    6.  write out to a file.    
+    """
+
+    # 1. 2. 3 read in files and regrid as necessary  
+    # also read in the preindustrial ancil files because we want to see
+    # what has changed between the pliocene and the preindustrial
+
+    # PI HadGEM2 put on a 0-360 deg grid
+    filename = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/mask_frac_l32161_n96_ref.nc'
+    PI_cube = iris.load_cube(filename)
+    PI_cube.coord('longitude').guess_bounds()
+    PI_cube.coord('latitude').guess_bounds()
+    
+  
+    
+    # PLIOMIP3 boundary conditions for mask and regrid
+    startPL2 = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/'
+    mod = 'Modern_std/Modern_std/Modern_std_'
+    P2 = 'Plio_enh/Plio_enh/Plio_enh_'
+    mask_ungridded_pi_cube = iris.load_cube(startPL2 + mod + 'LSM_v1.0.nc')
+    mask_ungridded_p2_cube = iris.load_cube(startPL2 + P2 + 'LSM_v1.0.nc')
+    mask_ungridded_pi_cube.coord('longitude').circular = True
+    mask_ungridded_p2_cube.coord('longitude').circular = True
+  
+    mask_ungridded_pi_cube.coord('longitude').guess_bounds()
+    mask_ungridded_pi_cube.coord('latitude').guess_bounds()
+    mask_ungridded_p2_cube.coord('longitude').guess_bounds()
+    mask_ungridded_p2_cube.coord('latitude').guess_bounds()
+
+    mask_pliomip2_pi_cube = mask_ungridded_pi_cube.regrid(PI_cube,iris.analysis.AreaWeighted(mdtol=0.5))
+    mask_pliomip2_p2_cube = mask_ungridded_p2_cube.regrid(PI_cube,iris.analysis.AreaWeighted(mdtol=0.5))
+    masklin_pliomip2_pi_cube = mask_ungridded_pi_cube.regrid(PI_cube,iris.analysis.Linear())
+    masklin_pliomip2_p2_cube = mask_ungridded_p2_cube.regrid(PI_cube,iris.analysis.Linear())
+    masklin_pliomip2_p2_cube.long_name = 'P2 regridded linear interpolation'
+    mask_diff_p2_and_hg2 = PI_cube - mask_pliomip2_pi_cube
+    outfile = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/diffmaskfrac_pi_lsm.nc'
+   
+    # which gridboxes changed
+    diff_cube = mask_pliomip2_p2_cube - mask_pliomip2_pi_cube
+    diff_cube.long_name = 'gridded_p2-pi from PlioMIP'
+    ungridded_diff_cube = mask_ungridded_p2_cube - mask_ungridded_pi_cube
+    ungridded_diff_cube.long_name = 'ungridded p2-pi from PlioMIP'
+    iris.save([mask_ungridded_pi_cube, mask_ungridded_p2_cube,
+               ungridded_diff_cube,
+                mask_pliomip2_pi_cube,mask_pliomip2_p2_cube, 
+                PI_cube,mask_diff_p2_and_hg2,diff_cube,
+               masklin_pliomip2_p2_cube],
+              outfile, netcdf_format='NETCDF3_CLASSIC')
+  
+
+    #4. add difference onto the PI  
+    diff_data = diff_cube.data
+    hg_data = np.copy(PI_cube.data + diff_data)
+
+    # corrections
+
+    # fractions > 1.0 or < 0.0fractions
+    hg_data = np.where(hg_data <  0.0, 0.0, hg_data)
+    hg_data = np.where(hg_data > 1.0, 1.0, hg_data)
+    cube_int1_boundscorr = PI_cube.copy(data=hg_data)
+    outfile = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/P4_maskfrac_unfixed.nc'
+    iris.save(cube_int1_boundscorr,outfile)
+
+
+    linear_pliomip2_data = masklin_pliomip2_p2_cube.data
+    # manual corrections
+   
+    lats = cube_int1_boundscorr.coord('latitude').points
+    lons = cube_int1_boundscorr.coord('longitude').points
+
+    # move fractional lsm to edge in Northern hemisphere
+    # this will also partially fix the husdson bay
+  
+    for j,lat in enumerate(lats):    
+        # set points to land if they are fractional and mid continent
+        if 40<lat<85:   
+            for i,lon in enumerate(lons):
+              if 5 <lon < 350:
+                if 0.0 < hg_data[0,0,j,i] < 1.0: # if frac lsm
+             
+                    # if land below and above set to land
+                    if hg_data[0,0,j+1,i] == 1.0 and hg_data[0,0,j-1,i] == 1.0:
+                        hg_data[0,0,j,i]=1.0
+                    # if to right and left set to land
+                    if hg_data[0,0,j,i+1] == 1.0 and hg_data[0,0,j,i-1] == 1.0:
+                        hg_data[0,0,j,i]=1.0
+
+    for j,lat in enumerate(lats):    
+        # if points are between land and ocean set to 0.5
+        if 40<lat<85:   
+            for i,lon in enumerate(lons):
+              if 5 <lon < 350:
+                if hg_data[0,0,j,i] ==1.0: # if land
+                    # if two gridboxes below are land and two above 
+                    # are ocean set to 0.5
+                    if (hg_data[0,0,j+1,i] == 1.0 and 
+                        hg_data[0,0,j+2,i] == 1.0 and 
+                        hg_data[0,0,j-1,i] == 0.0 and 
+                        hg_data[0,0,j-2,i] == 0.0): 
+                        hg_data[0,0,j,i]=0.5
+
+                    if (hg_data[0,0,j-1,i] == 1.0 and 
+                        hg_data[0,0,j-2,i] == 1.0 and 
+                        hg_data[0,0,j+1,i] == 0.0 and 
+                        hg_data[0,0,j+2,i] == 0.0): 
+                        hg_data[0,0,j,i]=0.5
+                    # if two gridboxes to right are land and two left 
+                    # are ocean set to 0.5
+                    if (hg_data[0,0,j,i+1] == 1.0 and 
+                        hg_data[0,0,j,i+2] == 1.0 and 
+                        hg_data[0,0,j,i-1] == 0.0 and 
+                        hg_data[0,0,j,i-2] == 0.0): 
+                        hg_data[0,0,j,i]=0.5
+
+                    if (hg_data[0,0,j,i-1] == 1.0 and 
+                        hg_data[0,0,j,i-2] == 1.0 and 
+                        hg_data[0,0,j,i+1] == 0.0 and 
+                        hg_data[0,0,j,i+2] == 0.0): 
+                        hg_data[0,0,j,i]=0.5
+
+    
+    for j,lat in enumerate(lats):
+    
+        # correct bering strait
+        if 63<lat<68:   
+            for i,lon in enumerate(lons):
+                if 180<lon<190:
+                    # if fractional lsm set to 1
+                    if hg_data[0,0,j,i] > 0.0:
+                        hg_data[0,0,j,i]=1.0
+
+        # correct canadian arctic archipelago and other values in hudson bay
+        if lat>75:   
+            for i,lon in enumerate(lons):
+                if 280<lon<310:
+                    hg_data[0,0,j,i] = mask_pliomip2_p2_cube.data[j,i]
+        if 62 <lat < 77:
+            for i,lon in enumerate(lons):
+                if 260<lon<300:        
+                    if hg_data[0,0,j,i] < 1.0: # if frac lsm or zero
+             
+                    # if land below and above set to land
+                        if (hg_data[0,0,j+1,i] == 1.0 and 
+                            hg_data[0,0,j-1,i] == 1.0):
+                            hg_data[0,0,j,i]=1.0
+                    # if to right and left set to land
+                            if (hg_data[0,0,j,i+1] == 1.0 and 
+                                hg_data[0,0,j,i-1] == 1.0):
+                                hg_data[0,0,j,i]=1.0
+
+  
+        # correct a couple of points near california
+        if 28 <lat < 35:
+            for i,lon in enumerate(lons):
+                if 240<lon<250:        
+                    if hg_data[0,0,j,i] < 1.0: # if frac lsm or zero
+             
+                    # if land below and above set to land
+                        if (hg_data[0,0,j+1,i] == 1.0 and 
+                            hg_data[0,0,j-1,i] == 1.0):
+                            hg_data[0,0,j,i]=1.0
+                    # if to right and left set to land
+                            if (hg_data[0,0,j,i+1] == 1.0 and 
+                                hg_data[0,0,j,i-1] == 1.0):
+                                hg_data[0,0,j,i]=1.0
+
+        # near australia if fract point between two land points set to land
+
+        if -40. <lat < 18.:
+            # do 2 sweeps at Australis
+            for sweep in range(0,2):
+                for i,lon in enumerate(lons):
+                    if 90<lon<160:  
+                        if lat == -7.5 and lon == 138.75:
+                            print('found',sweep,hg_data[0,0,j,i],
+                                  hg_data[0,0,j,i-1],hg_data[0,0,j,i+1])
+                        if 0.0 < hg_data[0,0,j,i] < 1.0: # if frac lsm or zero
+                            # if land below and above set to land
+                            if (hg_data[0,0,j+1,i] == 1.0 and 
+                                hg_data[0,0,j-1,i] == 1.0):
+                                hg_data[0,0,j,i]=1.0
+                            # if to right and left set to land
+                            if (hg_data[0,0,j,i+1] == 1.0 and 
+                                    hg_data[0,0,j,i-1] == 1.0):
+                                    hg_data[0,0,j,i]=1.0
+        # manual correction near australia
+        if -17<lat<-10:
+            for i,lon in enumerate(lons):
+                if 133 < lon < 138:
+                    hg_data[0,0,j,i]=1.0
+                  
+
+    
+    P2_maskfrac_cube = PI_cube.copy(data=hg_data)
+    
+    #qplt.contourf(P2_maskfrac_cube[0,0,:,:])
+    outfile = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/P4_maskfrac_partfixed.nc'
+    iris.save(P2_maskfrac_cube,outfile,netcdf_format='NETCDF3_CLASSIC')
+    
+
+
+   
+def make_lsmfrac_LP_2():
+    """
+    this program will 
+    1. read in the partially corrected land sea mask produced in make_lsmfrac_LP_1
+    2. read in the regridded pliocene mask
+    2. Correct over antarctica
+    """
+
+    lsm_cube = iris.load_cube('/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/P4_maskfrac_partfixed.nc')
+    lsm_p2_cube = iris.load_cube('/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/diffmaskfrac_pi_lsm.nc','p4_lsm_0')
+    lsm_p2linint_cube = iris.load_cube('/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/diffmaskfrac_pi_lsm.nc','P2 regridded linear interpolation')
+
+  
+    # overwrite Antarctica with the P2 data
+    lons = lsm_cube.coord('longitude').points
+    lats = lsm_cube.coord('latitude').points
+    lsm_cube_data = lsm_cube.data
+    lsm_p2_cube_data = lsm_p2_cube.data
+
+    for j,lat in enumerate(lats):
+        if lat < -60.:
+            lsm_cube_data[0,0,j,:] = lsm_p2_cube_data[j,:]
+
+    # fill in some very isolated ocean gridboxes in east antarctica
+    for j,lat in enumerate(lats):
+        if -75. <lat < -65.:
+            # do 2 sweeps at Australis
+            for sweep in range(0,2):
+                for i,lon in enumerate(lons):
+                    if 103<lon<140:  
+                        #if lat == -7.5 and lon == 138.75:
+                        #    print('found',sweep,lsm_cube_data[0,0,j,i],
+                        #          lsm_cube_data[0,0,j,i-1],lsm_cube_data[0,0,j,i+1])
+                        if lsm_cube_data[0,0,j,i] < 1.0: # if frac lsm or zero
+                            # if land below and above set to land
+                            if (lsm_cube_data[0,0,j+1,i] == 1.0 and 
+                                lsm_cube_data[0,0,j-1,i] == 1.0):
+                                lsm_cube_data[0,0,j,i]=1.0
+                            # if to right and left set to land
+                            if (lsm_cube_data[0,0,j,i+1] == 1.0 and 
+                                    lsm_cube_data[0,0,j,i-1] == 1.0):
+                                    lsm_cube_data[0,0,j,i]=1.0
+        
+    #diff_cube = lsm_cube[0,0,:,:] - lsm_p2_cube
+    #qplt.contourf(diff_cube)
+    #plt.show()
+
+    #write out difference in land fraction for HadGEM3 vs 
+    #linearly interpolated land fraction from pliomip2
+
+
+    diffcube = lsm_cube[0,0,:,:] - lsm_p2linint_cube
+    qplt.contourf(diffcube)
+    plt.show()
+
+    # put some hig values in for plotting
+    for j,lat in enumerate(lats):
+        if 0. <lat < 10.:
+            for i,lon in enumerate(lons):
+                if 180<lon<190: 
+                    lsm_cube_data[0,0,j,i]=2.0
+  
+        
+    
+    outfile = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/P4_maskfrac.nc'
+    iris.save(lsm_cube,outfile,netcdf_format='NETCDF3_CLASSIC')
+
+
+def make_lsm_LP():
+    """
+    this program will 
+    1. read in the preindustrial ancil file from HadGEM2
+        (/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/qrparm.mask.nc)
+    2. read in the preindustrial and Late Pliocene mask files
+        (/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/
+        Modern_std_exp_data/Modern_std_LSM_v1.0.nc
+        LP_exp_data/LP_LSM_v1.0.nc
+    3.  Put both the pliomip3 boundary conditions on the HadGEM grid and
+        find out which gridboxes have changed
+    4.  For the gridboxes that have changed, change them in the qrparm.mask 
+        cube.  You also need to change the runoff
+    5.  write out to a file.    
+    """
+
+    # 1. 2. 3 read in files and regrid as necessary  
+    # also read in the preindustrial ancil files because we want to see
+    # what has changed between the pliocene and the preindustrial
+
+    # PI HadGEM2
+    filename = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/00.0k/qrparm.mask.nc'
+    PI_lsm_cube = iris.load_cube(filename,'LAND MASK (No halo) (LAND=TRUE)')
+    PI_river_cube = iris.load_cube(filename,'RUNOFF COASTAL OUTFLOW POINT')
+    
+    # PLIOMIP3 boundary conditions for mask and regrid
+    startPL2 = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/'
+    mod = 'Modern_std/Modern_std/Modern_std_'
+    P2 = 'Plio_enh/Plio_enh/Plio_enh_'
+    mask_ungridded_pi_cube = iris.load_cube(startPL2 + mod + 'LSM_v1.0.nc')
+    mask_ungridded_p2_cube = iris.load_cube(startPL2 + P2 + 'LSM_v1.0.nc')
+    mask_pliomip2_pi_cube = mask_ungridded_pi_cube.regrid(PI_lsm_cube,iris.analysis.Linear())
+    mask_pliomip2_p2_cube = mask_ungridded_p2_cube.regrid(PI_lsm_cube,iris.analysis.Linear())
+    mask_diff_p2_and_hg2 = PI_lsm_cube - mask_pliomip2_pi_cube
+    outfile = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/diff_pi_lsm.nc'
+    iris.save([mask_ungridded_pi_cube, mask_ungridded_p2_cube, PI_lsm_cube,mask_diff_p2_and_hg2],
+              outfile, netcdf_format='NETCDF3_CLASSIC')
+  
+    # which gridboxes changed
+    diff_cube = mask_pliomip2_p2_cube - mask_pliomip2_pi_cube
+
+    #4.  If diff_cube == 1.0 then this is land in pliocene but ocean in pi
+    #    if diff_cube == -1.0 this is ocean in pliocene but land in pi
+    diff_data = diff_cube.data
+    hg_data = np.copy(PI_lsm_cube.data)
+
+    hg_data = np.where(diff_data > 0.9, 1.0, hg_data)
+    hg_data = np.where(diff_data < -0.9, 0.0, hg_data)
+    P2_lsm_cube = PI_lsm_cube.copy(data=hg_data)
+    qplt.contourf(P2_lsm_cube[0,0,:,:])
+    outfile = '/nfs/hera1/earjcti/UM_ANCIL/HadGEM/PLIOMIP3/P4_qrparm.mask.nc'
+    iris.save(P2_lsm_cube,outfile,netcdf_format='NETCDF3_CLASSIC')
+    
+
+
+    sys.exit(0)
+    P2_lsm_cube = iris.load_cube(filename,'LAND MASK (LOGICAL: LAND=TRUE)')
+    P2_lsm_data = np.squeeze(P2_lsm_cube.data)
+    P2_river_cube = iris.load_cube(filename,'RUNOFF COASTAL OUTFLOW POINT')
+
+    filename = '/nfs/hera1/earjcti/ancil/preind2/qrparm.mask.nc'
+    PI_lsm_cube = iris.load_cube(filename,'LAND MASK (LOGICAL: LAND=TRUE)')
+    P2_anom_data = np.squeeze(P2_lsm_cube.data - PI_lsm_cube.data)
+    PI_river_cube = iris.load_cube(filename,'RUNOFF COASTAL OUTFLOW POINT')
+
+    # change the lsm in the CAS region
+    P2_lsm_latitudes = P2_lsm_cube.coord('latitude').points
+    P2_lsm_longitudes = P2_lsm_cube.coord('longitude').points
+    EP_lsm_data = np.copy(P2_lsm_cube.data)
+    EP_river_data = np.copy(P2_river_cube.data)
+
+    for j,lat in enumerate(P2_lsm_latitudes):
+        if 7. < lat < 13.:
+            for i,lon in enumerate(P2_lsm_longitudes):
+                if 270. < lon < 285.:
+                    latlon = '['+np.str(lat) + ',' + np.str(lon) + ']'
+                    # change if required otherwise don't
+                    EP_lsm_data[0,0,j,i] = gridbox_lsm.get(latlon,EP_lsm_data[0,0,j,i])
+                    EP_river_data[0,0,j,i] = gridbox_missing.get(latlon,EP_river_data[0,0,j,i])
+    EP_lsm_HCM3_cube = P2_lsm_cube.copy(data=EP_lsm_data)
+    EP_river_HCM3_cube = P2_river_cube.copy(data=EP_river_data)
+
+    #===================================================================
+    # the rest of the subroutine is just checks and balances
+
+    # read in the EP file (and preindustrial file) and put onto same grid
+
+    filename = '/nfs/hera1/earjcti/PlioMIP3_Boundary_conds/EP_exp_data/EP_LSM_v1.0.nc'
+    EP_LSM_origgrid_cube = iris.load_cube(filename)
+    gridcube = iris.util.squeeze(P2_lsm_cube)
+    EP_LSM_cube = EP_LSM_origgrid_cube.regrid(gridcube,iris.analysis.Linear())
+  
+    filename = '/nfs/hera1/earjcti/PlioMIP3_Boundary_conds/Modern_std_exp_data/Modern_std_LSM_v1.0.nc'
+    Mod_LSM_origgrid_cube = iris.load_cube(filename)
+    Mod_LSM_cube = Mod_LSM_origgrid_cube.regrid(gridcube,iris.analysis.Linear())
+    EP_LSM_anom_data = EP_LSM_cube.data - Mod_LSM_cube.data
+  
+    # difference the PlioMIP2 ancil file with the regridded EP file and plot
+    # global mean
+    #plot_cube_diff(iris.util.squeeze(P2_lsm_cube - PI_lsm_cube),EP_LSM_cube - Mod_LSM_cube,'PlioMIP2 hadcm3','Pliomip3 all groups','Pliomip3 - pliomip2')
+
+
+    # regional mean near CAS
+   # print(P2_lsm_cube.coord('longitude').points)
+   # print(P2_lsm_cube.coord('latitude').points)
+    P2_lsm_reg_cube = P2_lsm_cube.extract(iris.Constraint(latitude = lambda cell: 4.0< cell < 17.0, longitude = lambda cell: 265 < cell < 290))
+    EP_lsm_HCM3_reg_cube = EP_lsm_HCM3_cube.extract(iris.Constraint(latitude = lambda cell: 4.0< cell < 17.0, longitude = lambda cell: 265 < cell < 290))
+
+    EP_lsm_reg_cube = EP_LSM_origgrid_cube.extract(iris.Constraint(latitude = lambda cell: 4.0< cell < 17.0, longitude = lambda cell: -95 < cell < -70))
+
+    #plot_cmesh(iris.util.squeeze(P2_lsm_reg_cube),EP_lsm_reg_cube,iris.util.squeeze(EP_lsm_HCM3_reg_cube),'PlioMIP2 LP','PlioMIP3 EP','EP HadCM3')
+
+    
+    # save the new file
+    iris.save(CubeList([EP_lsm_HCM3_cube,EP_river_HCM3_cube]),'EP_qrparm.LSM.nc',fill_value= 2.0E20)
+    
+
+def make_other_ancil_EP():
+    """
+    make all the other ancils.  (Done LSM and rivers in earlier program)
+    """
+    filestart = '/nfs/hera1/earjcti/ancil/P4_enh/'
+    pft_file = filestart + 'P4_enh_mb_qrparm.pft.nc'
+    soil_file = filestart + 'P4_enh_mb_qrparm.soil.nc'
+    slt_file = filestart + 'P4_enh_mb_qrclim.slt.nc'
+    smow_file = filestart + 'P4_enh_mb_qrclim.smow.nc'
+    disturb_file = filestart + 'P4_enh_qrfrac.disturb.nc'
+    fractype_file = filestart + 'P4_enh_mb_qrfrac.type.nc'
+    orogtype_file = filestart + 'P4_enh_qrparm.orog.nc'
+    filename_dict = {'pft':pft_file,   'soil':soil_file, 'slt':slt_file,
+                     'smow':smow_file,  'disturb':disturb_file,
+                     'frac':fractype_file, 'orog':orogtype_file}
+    fileout_dict = {'pft':'EP_pft.nc',   'soil':'EP_soil.nc', 
+                    'slt': 'EP_slt.nc', 'smow':'EP_smow.nc', 
+                    'disturb':'EP_disturb.nc', 'frac':'EP_frac.nc', 
+                    'orog':'EP_orog.nc'}
+    missingdata_dict = {'pft':2.0E20,   'soil':2.0E20, 'slt':2.0E20,
+                     'smow':2.0E20,  'disturb':2.0E20,
+                     'frac':2.0E20, 'orog':0.0}
+
+    #filestochg = ['pft','soil','slt','smow','disturb','frac','orog']
+    filestochg = ['frac','orog']
+    
+    for file in filestochg:
+        cubelist_out = CubeList([])
+        cubes = iris.load(filename_dict.get(file))
+        missing = missingdata_dict.get(file)
+
+        for cube in cubes:
+            # change the CAS
+            latitudes = cube.coord('latitude').points
+            longitudes = cube.coord('longitude').points
+            data = np.copy(cube.data)
+            
+            for j,lat in enumerate(latitudes):
+                if 7. < lat < 13.:
+                    for i,lon in enumerate(longitudes):
+                        if 270. < lon < 285.:
+                            latlon = '['+np.str(lat) + ',' + np.str(lon) + ']'
+                            # change if required otherwise don't
+                            changereq = gridbox_missing.get(latlon)
+                            if changereq != None:
+                                data[:,:,j,i] = missing
+
+            EPcube = cube.copy(data)
+            cubelist_out.append(EPcube)
+
+            if file == 'orog':
+                iris.save(cubelist_out,fileout_dict.get(file))
+            else:
+                iris.save(cubelist_out,fileout_dict.get(file),
+                          fill_value=missing)
+
+
+            
+    sys.exit(0)
+    
+
+    
+##########################################################################
+# setup what to change
+
+# this is what needs changing (lat,lon)
+
+# check all the files have the same land sea mask
+make_lsmfrac_LP_1()
+make_lsmfrac_LP_2()
+#make_other_ancil_EP()
+#check_lsm('EP_mbiome_v1.0.nc','veg', 'm')
+#check_lsm('EP_soil_v1.0.nc','soil', 'm')
+#check_lsm('EP_lake_v1.0.nc','lake', 'm')

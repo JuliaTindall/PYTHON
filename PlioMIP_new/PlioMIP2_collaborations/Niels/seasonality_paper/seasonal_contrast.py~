@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+# He wondered whether this was a global signal or just a local signal.
+# This program is to see what the models show
+#
+#
+#
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import numpy as np
+
+       
+
+
+#################
+# MAIN PROGRAM
+################
+
+
+# read in multimodel mean monthly SST data (EOI400-E280)
+
+anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SST_multimodelmean_month.nc',
+                           'SSTplio - pi')
+#anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
+#                           'NearSurfaceTemperatureplio - pi')
+jan_cube = anom_cube.extract(iris.Constraint(time=1))
+jul_cube = anom_cube.extract(iris.Constraint(time=7))
+
+summer_min_winter_cube = jul_cube - jan_cube
+summer_min_winter_cube.long_name='(mPWP_July - mPWP_Jan) - (PI_July - PI_Jan)'
+print(summer_min_winter_cube)
+
+#vals=np.arange(-5.0,6.0,1.0)
+#qplt.contourf(summer_min_winter_cube,cmap='RdBu_r',levels=vals,extend='both')
+#plt.gca().coastlines()
+#plt.savefig('summer_minus_winter_SST.png')                             
+
+levels=np.arange(0,6.0,0.5)
+ax=plt.subplot(1,2,1,projection=ccrs.Orthographic(45,90))
+#ax.set_extent([-180,180,45,90])
+qplt.contourf(jan_cube,levels=levels,extend='both')
+plt.title('January')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.Orthographic(45,90))
+qplt.contourf(jul_cube,levels=levels,extend='both')
+plt.title('July')
+plt.gca().coastlines()
+plt.savefig('summer_and_winter_orth.png')
+plt.savefig('summer_and_winter_orth.eps')
+
+ax=plt.subplot(1,2,1,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(jan_cube,levels=levels,extend='both')
+plt.title('January (mPWP-PI)')
+plt.gca().coastlines()
+ax=plt.subplot(1,2,2,projection=ccrs.PlateCarree(central_longitude=0.0))
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+qplt.contourf(jul_cube,levels=levels,extend='both')
+plt.title('July (mPWP - PI)')
+plt.gca().coastlines()
+plt.savefig('summer_and_winter_NA.png')
+plt.savefig('summer_and_winter_NA.eps')

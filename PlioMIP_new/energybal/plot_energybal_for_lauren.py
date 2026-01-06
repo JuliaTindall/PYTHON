@@ -1,0 +1,394 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_ENERGYBAL
+#PURPOSE
+#    This program will plot the energy balance for the pliocene simulations
+#
+# search for 'main program' to find end of functions
+# Julia 11/1/2018
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+import iris
+import iris.plot as iplt
+import iris.quickplot as qplt
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def global_enbal
+#  def seasmean
+
+
+def global_enbal(exptid):
+    """
+    this looks to be a check that the temperature contribution from all the different sources is equal to the modelled temperature
+    """
+
+    def mean_data(filename):
+        """
+        gets the mean data from the file"
+        """
+        
+        f = open(filename,"r")
+        lines = f.readlines()
+        avgs = lines[2]
+        mean, sd = avgs.split(',')
+       
+        return mean
+
+    #===================================================================
+    # read in data from  average temperature files produced for Dan
+
+    T_mean = np.float(mean_data(FILESTART + '/' + exptid + '.NearSurfaceTemperature.data.txt'))
+
+    # get upward and downward sw radiation at the top of the atmosphere
+    # remember alpha = sw_up_toa / sw_down_toa (rsut / rsdt)
+    # incoming sw
+
+    rsut_mean = np.float(mean_data(FILESTART + '/' + exptid + '.rsut.data.txt'))
+    rsdt_mean = np.float(mean_data(FILESTART + '/' + exptid + '.rsdt.data.txt'))
+    rsut_cube = iris.load_cube(FILESTART + '/' + exptid + '.rsut.allmean.nc')
+    rsdt_cube = iris.load_cube(FILESTART + '/' + exptid + '.rsdt.allmean.nc')
+
+
+    # get terms for effctive longwave emissivity e = lw_up_toa / lw_up_surf
+    # = rlut / rlus
+    
+    rlut_mean = np.float(mean_data(FILESTART + '/' + exptid + '.rlut.data.txt'))
+    rlut_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlut.allmean.nc')
+
+    if MODELNAME == 'HadCM3':
+        # lw upward surface = lw_down_surf - netdown_surf I think.  
+        rlds_mean = np.float(mean_data(FILESTART + '/' + exptid + '.rlds.data.txt'))
+        rlds_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlds.allmean.nc')
+        flns_mean = np.float(mean_data(FILESTART + '/' + exptid + '.flns.data.txt'))
+        flns_cube = iris.load_cube(FILESTART + '/' + exptid + '.flns.allmean.nc')
+        rlus_mean = rlds_mean - flns_mean
+        rlus_cube = rlds_cube - flns_cube
+    else:
+        rlus_mean = np.float(mean_data(FILESTART + '/' + exptid + '.rlus.data.txt'))
+        rlus_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlus.allmean.nc')
+
+    # ====================================
+    # get alpha and epsilon
+
+    mean_alpha=rsut_mean/rsdt_mean
+    alpha_cube = rsut_cube / rsdt_cube
+
+    mean_epsilon=rlut_mean/rlus_mean
+    epsilon_cube = rlut_cube / rlus_cube
+
+  
+    #============================================
+    # calculate terms in equation
+    So=1367 # solar constant
+    sigma=5.67 * (10.0 ** (-8.))
+
+    print('alphas',mean_alpha)
+    print('epsilon',mean_epsilon)
+
+    #t4=So / 4.0 * (1.0-alpha) / (epsilon * sigma)
+    #t=t4 ** (1./4.)
+
+    # calculate t_mean using average values of globe
+    t4_mean=(So / 4.0) * (1.0-mean_alpha) / (mean_epsilon * sigma)
+    t_mean_formula=t4_mean ** (1./4.)
+
+    # calculate t_mean at every point of the globe and average afterwards
+    t4_data=(So / 4.0) * (1.0-alpha_cube.data) / (epsilon_cube.data * sigma)
+    t_mean_data=t4_data ** (1./4.)
+    t_mean_cube = alpha_cube.copy(data=t_mean_data)
+
+    t_mean_cube.coord('latitude').guess_bounds()
+    t_mean_cube.coord('longitude').guess_bounds()
+   
+    grid_areas = iris.analysis.cartography.area_weights(t_mean_cube)
+    t_mean_avg_cube = t_mean_cube.collapsed(['latitude', 'longitude'],
+                              iris.analysis.MEAN, weights=grid_areas)
+    
+    
+    print('globvals',So/4.0,mean_alpha,mean_epsilon,sigma)
+
+
+
+    print('    ')
+    print(exptid)
+    print('=========')
+    print('t obs=',T_mean,' degC')
+    print('t mean formula=',t_mean_formula-273.15,' degC')
+    print('t mean from average=',t_mean_avg_cube.data - 273.15)
+
+   
+#end def global_enbal
+
+### LAUREN START
+def split_gge(whatever you want your input_cube to be called):
+   """
+   Lauren this is the new section you need to write.
+   1. Read in the Pliocene topography and check it is on the correct grid
+   2. Read in the Preindustrial topography and check it is on the correct grid
+   3. delta_T_topo=(topo_plio-topo_pi) * (-5.5) / 1000.
+   4. delta_T_gge_only = input_cube - deltaT_topo   
+   5. return deltaT topo and deltaT gge only to the calling routing
+   6, (In calling program change what you are plotting to plot ghg and orog seperately). 
+   """
+
+   
+
+
+####LAUREN END
+################################################
+def dh_zonal_enbal(exptid):
+
+   
+    #==============
+    # read in data from  average temperature files produced for Dan
+
+    T_cube = iris.load_cube(FILESTART + '/' + exptid + '.NearSurfaceTemperature.allmean.nc')
+ 
+    # get upward and downward sw radiation at top of atmos
+    rsut_cube = iris.load_cube(FILESTART + '/' + exptid + '.rsut.allmean.nc')
+    rsdt_cube = iris.load_cube(FILESTART + '/' + exptid + '.rsdt.allmean.nc')
+  
+    # get upward sw radiation at toa clear sky (downwards same as rsdt)
+    rsutcs_cube = iris.load_cube(FILESTART + '/' + exptid + '.rsutcs.allmean.nc')
+   # outgoing lw  (toa) rlut and clear sky rlutcs
+    rlutcs_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlutcs.allmean.nc') 
+    rlut_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlut.allmean.nc')
+
+
+    # outgoing lw  (surface) rlus and clear sky rluscs
+    if MODELNAME == 'HadCM3':
+        # lw upward surface = lw_down_surf - netdown_surf I think.  
+        rlds_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlds.allmean.nc')
+        flns_cube = iris.load_cube(FILESTART + '/' + exptid + '.flns.allmean.nc')
+        rlus_cube = rlds_cube - flns_cube
+    else:
+        rlus_cube = iris.load_cube(FILESTART + '/' + exptid + '.rlus.allmean.nc')
+    if MODELNAME == 'COSMOS':
+        rlus_cube = rlus_cube * -1.0
+        rsut_cube = rsut_cube * -1.0
+
+    # rluscs = tested using rlus
+    # test using -1 * rldscs
+    #rluscs_cube = iris.load_cube(FILESTART + '/' + exptid + '.rluscs.allmean.nc')
+    rluscs_cube = rlus_cube
+    
+    # ====================================
+    # get the zonal average fields
+
+
+    alpha_cube = rsut_cube / rsdt_cube
+    alpha_cube_cs = rsutcs_cube / rsdt_cube
+    epsilon_cube = rlut_cube / rlus_cube
+    epsilon_cube_cs = rlutcs_cube / rluscs_cube
+
+
+    sigma=5.67 * (10.0 ** (-8.))
+
+    #============================================
+    # calculate terms in equation
+    H_cube=(-1.0) * ((rsdt_cube - rsut_cube) -(rlut_cube))
+   
+    components=[epsilon_cube, epsilon_cube_cs, alpha_cube, alpha_cube_cs, 
+                H_cube, T_cube, rsdt_cube]
+    return(components)
+
+#end def dh_zonal_enbal
+
+
+
+
+##########################
+def main_dh_zonal(preind_expt,plio_expt):
+    """
+    performs the energy baland calculation as detailed in dan hills paper
+    """
+    # get all the fields needed for the energy balance
+    components=dh_zonal_enbal(preind_expt)
+    emis_pi_cube=components[0]
+    emis_pi_cs_cube=components[1]
+    alpha_pi_cube=components[2]
+    alpha_pi_cs_cube=components[3]
+    H_pi_cube=components[4]
+    temp_pi_cube=components[5]
+    sw_down_pi_cube=components[6]
+    
+    components=dh_zonal_enbal(plio_expt)
+    emis_plio_cube = components[0]
+    emis_plio_cs_cube = components[1]
+    alpha_plio_cube = components[2]
+    alpha_plio_cs_cube = components[3]
+    H_plio_cube = components[4]
+    temp_plio_cube = components[5]
+    sw_down_plio_cube = components[6]
+   
+    sigma=5.67 * (10.0**-8)
+
+    # do energy balance.  
+
+    # greenhouse gas and topography
+    t4 = ((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_plio_cs_cube.data * sigma)
+    t_1=t4 ** (1./4.)
+    t4 = ((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_pi_cs_cube.data * sigma)
+    t_2 = t4 ** (1./4.)
+
+    deltaT_gge_cube = alpha_plio_cube.copy(data = t_1 - t_2)
+    deltaT_gge_lat_cube= deltaT_gge_cube.collapsed(['longitude'],
+                              iris.analysis.MEAN)
+   
+    lat = deltaT_gge_lat_cube.coord('latitude').points
+
+### LAUREN  : Here you want to split deltaT_gge_lat_cube into GHG and topography
+###           You might have to rename things
+
+    (deltaT_topo, deltaT_gge_only) = split_gge(deltaT_gge_lat_cube)
+
+
+##### END LAUREN
+
+    plt.plot(lat,deltaT_gge_lat_cube.data,label='GHG+ topography',color="blue")
+  
+    # cloud emisivity
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_1=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_plio_cs_cube.data * sigma)
+    t_2=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_pi_cube.data * sigma)
+    t_3=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_pi_cs_cube.data * sigma)
+    t_4=t4 ** (1./4.)
+
+    deltaT_ce_cube = alpha_plio_cube.copy(data = (t_1-t_2) - (t_3 - t_4))
+    deltaT_ce_lat_cube= deltaT_ce_cube.collapsed(['longitude'],
+                              iris.analysis.MEAN)
+   
+    plt.plot(lat,deltaT_ce_lat_cube.data, 
+             label='cloud emissivity',color="orange")
+
+  
+    # cloud albedo
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_1=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cs_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_2=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_pi_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_3=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_pi_cs_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_4=t4 ** (1./4.)
+
+    deltaT_ca_cube = alpha_plio_cube.copy(data = (t_1-t_2) - (t_3 - t_4))
+    deltaT_ca_lat_cube= deltaT_ca_cube.collapsed(['longitude'],
+                              iris.analysis.MEAN)
+   
+    plt.plot(lat,deltaT_ca_lat_cube.data, label='cloud albedo',color="purple")
+   
+   
+    # clear sky albedo
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cs_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_1=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_pi_cs_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_2=t4 ** (1./4.)
+
+    print('t1 components',sw_down_plio_cube.data[178,0],alpha_plio_cs_cube.data[178,0],H_plio_cube.data[178,0],emis_plio_cube.data[178,0])
+    print('t2 components',sw_down_plio_cube.data[178,0],alpha_pi_cs_cube.data[178,0],H_plio_cube.data[178,0],emis_plio_cube.data[178,0])
+
+    deltaT_csa_cube = alpha_plio_cube.copy(data = t_1-t_2)
+    deltaT_csa_lat_cube= deltaT_csa_cube.collapsed(['longitude'],
+                              iris.analysis.MEAN)
+
+    for i, latval in enumerate(deltaT_csa_lat_cube.coord('latitude').points):
+        if latval == 88.5:
+            print('j2',i,latval,deltaT_csa_lat_cube.data[i],t_1[i,0],t_2[i,0],t_1[i,0] - t_2[i,0])
+    
+  
+    plt.plot(lat,deltaT_csa_lat_cube.data,label='clear sky albedo',color="chocolate",linestyle="dashdot")
+   
+    # heat transport
+
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_plio_cube.data) / (emis_plio_cube.data * sigma)
+    t_1=t4 ** (1./4.)
+    t4=((sw_down_plio_cube.data * (1.0-alpha_plio_cube.data)) + H_pi_cube.data) / (emis_plio_cube.data * sigma)
+    t_2=t4 ** (1./4.)
+
+    deltaT_H_cube = alpha_plio_cube.copy(data=t_1-t_2)
+    deltaT_H_lat_cube= deltaT_H_cube.collapsed(['longitude'],
+                              iris.analysis.MEAN)
+  
+    plt.plot(lat,deltaT_H_lat_cube.data,label='heat transport',color="red")
+   
+    # compare with total temperature change
+    deltaT_cube=temp_plio_cube-temp_pi_cube
+    deltaT_lat_cube= deltaT_cube.collapsed(['longitude'],
+                              iris.analysis.MEAN)
+  
+    plt.plot(lat,deltaT_lat_cube.data,label='actual temperature change')
+
+
+    # sum of all energy balance terms
+    deltaT_sum = (deltaT_gge_lat_cube.data +  deltaT_ce_lat_cube.data + 
+                  deltaT_ca_lat_cube.data + deltaT_csa_lat_cube.data + 
+                  deltaT_H_lat_cube.data)
+    plt.plot(lat,deltaT_sum, color='black',linestyle='dotted',
+             label='sum EB terms')
+
+
+    for i,latind in enumerate(lat):
+        if latind == 75.5:
+            print('found totals',deltaT_sum[i], deltaT_lat_cube.data[i])
+            print('comps',deltaT_gge_lat_cube.data[i],deltaT_ce_lat_cube.data[i],
+                  deltaT_ca_lat_cube.data[i], deltaT_csa_lat_cube.data[i],
+                  deltaT_H_lat_cube.data[i])
+  #          sys.exit(0)
+        
+   
+
+    plt.legend()
+    plt.ylim(-8.0,15.0)
+    mp.pyplot.axhline(y=0,xmin=-90,xmax=90,color='black')
+    plt.title('Energy balance: '+ MODELNAME+ ' - Dan Hill')
+    plt.xlabel('latitude')
+    plt.ylabel('pliocene warming')
+    
+    filestart='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/energybal/DH_energybal_'+MODELNAME + '_' + EXPT + '_' + CNTL
+    plt.savefig(filestart + '.eps', bbox_inches='tight')  
+    plt.savefig(filestart + '.png', bbox_inches='tight')  
+
+    plt.close()
+    sys.exit(0)
+
+# end of main part of Dan Hills energy balance
+
+
+
+
+
+################################
+# main program
+
+# annual mean
+
+MODELNAME = 'NorESM1-F'
+FILESTART = '/nfs/hera1/earjcti/regridded/' + MODELNAME
+CNTL = 'E280'
+EXPT = 'E400'
+
+# check to see if Dan Hills global energy balance equation is correct
+#global_enbal(CNTL)
+#global_enbal(EXPT)
+#sys.exit(0)
+
+
+# Dan Hills energy balance
+main_dh_zonal(CNTL,EXPT)
+
+

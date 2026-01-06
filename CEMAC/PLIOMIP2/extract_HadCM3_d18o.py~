@@ -1,0 +1,219 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on Thu Mar 18 14:13:50 2019
+
+#@author: earjcti1
+#
+# This program will extract the fields needed for the PlioMIP2 database
+#  It will extract the monthly averages from
+# steve hunters processed data 
+#
+#
+#
+
+import os
+import numpy as np
+import scipy as sp
+#import cf
+import iris
+from iris.cube import CubeList
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import netCDF4
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.analysis.cartography
+import sys
+import warnings
+
+warnings.filterwarnings("ignore")
+
+
+def get_d18osw(filename_):
+    """
+    will convert to d18osw from 18o/16o ratio
+    """
+    varname = "OCN EXTRACER  1: CONVEN TCO2"
+    
+    cubefull = iris.load_cube(filename_,varname)
+    print(cubefull.coord('depth_1').points)
+    cube=cubefull.extract(iris.Constraint(depth_1=5.0))
+    cube = ((cube - 2005.2E-6) / 2005.2E-9) 
+    cube.long_name = 'd18osw'
+     
+    return cube
+
+def get_d18op(filename_):
+    """
+    will convert to d18op using the following formula
+    get stash code 338
+    tot160 = lev1 + lev4 + lev7 + lev 10
+    tot18o = lev2 + lev5 + lev 8 + lev 11
+    d18op = ((tot18o / tot16o) - 2005.2E-6) / 2005.2E-9
+    """
+
+    varname = "Stash code = 338"
+    
+    cube = iris.load_cube(filename_,varname)
+    cube.coord('level-1').rename('zdim')
+               
+              
+    cube16o= (cube.extract(iris.Constraint(zdim=1.))+
+              cube.extract(iris.Constraint(zdim=4.))+
+              cube.extract(iris.Constraint(zdim=7.))+
+              cube.extract(iris.Constraint(zdim=10.)))
+    cube16o.long_name = '16o'
+    cube18o= (cube.extract(iris.Constraint(zdim=2.))+
+              cube.extract(iris.Constraint(zdim=5.))+
+              cube.extract(iris.Constraint(zdim=8.))+
+              cube.extract(iris.Constraint(zdim=11.)))
+    cube18o.long_name = '18o'
+
+              
+    cubed18o = ((cube18o / cube16o) - 2005.2E-6) / 2005.2E-9
+    cubed18o.long_name = 'd18op'
+     
+    return cubed18o, cube16o, cube18o
+
+#####################################
+def extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,
+                   fileoutstart,varnamein,varnameout):
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    yearextra = {'0':'00', '1':'01','2':'02', '3':'03','4':'04', '5':'05',
+                 '6':'06', '7':'07','8':'08', '9':'09','a':'10', 'b':'11',
+                 'c':'12', 'd':'13','e':'14', 'f':'15','g':'16', 'h':'17',
+                 'i':'18', 'j':'19','k':'20', 'l':'21','m':'22', 'n':'23',
+                 'o':'24', 'p':'25','q':'26', 'r':'27','s':'28', 't':'29',
+                 'u':'30', 'v':'31','w':'32', 'x':'33','y':'34', 'z':'35'}
+
+    if varnamein == 'd18osw': atm_ocn_ind = 'o'
+    if varnamein == 'd18op': atm_ocn_ind = 'a'
+    
+
+    
+    # loop over years
+    
+   
+    for year in range(startyear,endyear):
+        allcubes=CubeList([])
+        allcubes16o=CubeList([])
+        allcubes18o=CubeList([])
+        stringyear=np.str(year).zfill(2)
+        for mon in range(0,len(monthnames)):
+            print(mon)
+            if format == '#':
+                filename=(filestart + expt + filetype + 
+                      extra + stringyear + monthnames[mon] + '+.nc')
+            else:
+                print(filestart,expt,filetype, extra, stringyear,monthnames[mon])
+                filename=(filestart + expt + atm_ocn_ind + '@' + filetype + 
+                      extra + stringyear + monthnames[mon] + '.nc')
+
+            if varnamein == 'd18osw':
+                cube = get_d18osw(filename)
+            if varnamein == 'd18op':
+                cube, cube16o, cube18o = get_d18op(filename)
+                allcubes16o.append(cube16o)
+                allcubes18o.append(cube18o)
+            allcubes.append(cube)
+            if mon==11:
+                print(allcubes)
+            
+        #make sure the metadata on all cubes are the same
+        iris.util.equalise_attributes(allcubes)
+        catcube=allcubes.concatenate()[0]
+        
+        # if salinity convert to psu
+        if varnamein=='d18op':
+            iris.util.equalise_attributes(allcubes16o)
+            catcube16o=allcubes16o.concatenate()[0]
+            iris.util.equalise_attributes(allcubes18o)
+            catcube18o=allcubes18o.concatenate()[0]
+            catcubelist = CubeList([catcube, catcube16o, catcube18o])
+        else:
+            catcubelist = CubeList([catcube])
+    
+        stringyear=np.str(year).zfill(2)
+#        stringyear=np.str(year).zfill(3)
+        print(stringyear)
+#        fileout=fileoutstart+varnameout+'/'+timeperiod+'.'+varnameout+'.'+stringyear+'.nc'        
+        fileout=fileoutstart+varnameout+'/'+timeperiod+'.'+varnameout+'.'+yearextra.get(extra) + stringyear+'.nc'        
+        iris.save(catcubelist,fileout,netcdf_format='NETCDF3_CLASSIC',fill_value=2.0E20)
+     
+    
+   
+
+##########################################################
+# main program
+
+# this is regridding where all results are in a single file
+# create a dictionary with the long field names in and the field names we want
+# we are also using dictionaries so that we only have to change timeperiod name
+# when rerunning
+            
+fileextra = {
+    "d18op" : "pd",
+    "d18osw" : "pf"}
+
+
+exptname = {
+        "e280" : "tenvo",
+        "e400" : "tenvq",
+        "e560":"tenvs",
+        "eoi400" : "tenvj",
+        "eoi350" : "tenvk",
+        "eoi450" : "tenvl",
+        "eoi280" : "tenvm",
+        "e280_corr" : "xozzz"
+      
+}
+
+extraname = {
+        "e280" : "t",
+        "e400" : "t",
+        "eoi400" : "o",
+        "eoi350" : "o",
+        "eoi450" : "o",
+        "eoi280" : "o",
+        "e280_corr" : "s",
+        "e560" : "v",
+        "xozza" : "p",
+        "xozzb" : "o",
+        "xozzc" : "o",
+        "xozzd" : "o",
+        "xozze" : "o",
+        "xozzf" : "o",
+        "xozzz" : "t",
+        "xozzb" : "p",
+        "xpkma" : "00000",
+        "xpkmb" : "00000",
+        "xpkmc" : "00000"}
+
+#fieldname = ['d18op','d18osw']
+	       
+fieldname=['d18osw']
+
+linux_win='l'
+startyear=0
+endyear=100
+timeperiod='xozzb'   
+expt=exptname.get(timeperiod,timeperiod)
+extra=extraname.get(timeperiod)
+format = '@'  # is the filename xxxxx#pd or xxxxx@pd
+
+
+for i in range(0,len(fieldname)):
+    varnamein=fieldname[i]
+    varnameout=varnamein
+    filestart='/nfs/hera1/earjcti/um/'+expt+'/'+fileextra.get(varnamein)+'/'
+    fileoutstart='/nfs/hera1/earjcti/um/'+expt + '/'
+    #ileoutstart='/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/'+timeperiod+'/'
+
+    filetype=fileextra.get(varnamein,'a'+ format+ 'pd')
+
+    extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,fileoutstart,varnamein,varnameout)
+
+#sys.exit(0)

@@ -1,0 +1,98 @@
+0
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00ja.nc U COMPNT OF WIND ON PRESSURE LEVELS
+1
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00fb.nc U COMPNT OF WIND ON PRESSURE LEVELS
+2
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00mr.nc U COMPNT OF WIND ON PRESSURE LEVELS
+3
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00ar.nc U COMPNT OF WIND ON PRESSURE LEVELS
+4
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00my.nc U COMPNT OF WIND ON PRESSURE LEVELS
+5
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00jn.nc U COMPNT OF WIND ON PRESSURE LEVELS
+6
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00jl.nc U COMPNT OF WIND ON PRESSURE LEVELS
+7
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00ag.nc U COMPNT OF WIND ON PRESSURE LEVELS
+8
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00sp.nc U COMPNT OF WIND ON PRESSURE LEVELS
+9
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00ot.nc U COMPNT OF WIND ON PRESSURE LEVELS
+10
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00nv.nc U COMPNT OF WIND ON PRESSURE LEVELS
+11
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco00dc.nc U COMPNT OF WIND ON PRESSURE LEVELS
+0: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+1: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+2: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+3: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+4: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+5: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+6: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+7: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+8: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+9: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+10: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+11: U COMPNT OF WIND ON PRESSURE LEVELS / (m s-1) (t: 1; p: 17; latitude: 72; longitude: 96)
+ua
+000
+0
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco01ja.nc U COMPNT OF WIND ON PRESSURE LEVELS
+1
+/nfs/hera1/earjcti/um/tenvk/netcdf/tenvka@pco01fb.nc U COMPNT OF WIND ON PRESSURE LEVELS
+Traceback (most recent call last):
+  File "extract_HadCM3_PlioMIP.py", line 299, in <module>
+    extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,fileoutstart,varnamein,varnameout)
+  File "extract_HadCM3_PlioMIP.py", line 111, in extract_fields
+    cube=iris.load_cube(filename,varnamein)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/__init__.py", line 373, in load_cube
+    cubes = _load_collection(uris, constraints, callback)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/__init__.py", line 313, in _load_collection
+    result = iris.cube._CubeFilterCollection.from_cubes(cubes, constraints)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/cube.py", line 145, in from_cubes
+    for cube in cubes:
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/__init__.py", line 300, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/io/__init__.py", line 210, in load_files
+    for cube in handling_format_spec.handler(fnames, callback):
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/fileformats/netcdf.py", line 712, in load_cubes
+    cube = _load_cube(engine, cf, cf_var, filename)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/fileformats/netcdf.py", line 540, in _load_cube
+    engine.activate(_PYKE_RULE_BASE)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/knowledge_engine.py", line 297, in activate
+    for rb_name in rb_names: self.get_rb(rb_name).activate()
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/rule_base.py", line 159, in activate
+    self.run_fc_rules(current_rb)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/rule_base.py", line 147, in run_fc_rules
+    for fc_rule in rb.fc_rules: fc_rule.run()
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fc_rule.py", line 90, in run
+    self.rule_fn(self)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/fileformats/_pyke_rules/compiled_krb/fc_rules_cf_fc.py", line 958, in fc_default_coordinate
+    rule.pattern(2).as_data(context),)),
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/knowledge_engine.py", line 289, in assert_
+    .assert_(entity_name, args)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 113, in assert_
+    self.add_case_specific_fact(fact_name, args)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 110, in add_case_specific_fact
+    self.get_entity_list(fact_name).add_case_specific_fact(args)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 226, in add_case_specific_fact
+    fc_rule.new_fact(args, foreach_index)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fc_rule.py", line 103, in new_fact
+    self.rule_fn(self)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/fileformats/_pyke_rules/compiled_krb/fc_rules_cf_fc.py", line 958, in fc_default_coordinate
+    rule.pattern(2).as_data(context),)),
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/knowledge_engine.py", line 289, in assert_
+    .assert_(entity_name, args)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 113, in assert_
+    self.add_case_specific_fact(fact_name, args)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 110, in add_case_specific_fact
+    self.get_entity_list(fact_name).add_case_specific_fact(args)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 226, in add_case_specific_fact
+    fc_rule.new_fact(args, foreach_index)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fc_rule.py", line 103, in new_fact
+    self.rule_fn(self)
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/iris/fileformats/_pyke_rules/compiled_krb/fc_rules_cf_fc.py", line 944, in fc_default_coordinate
+    for dummy in gen_0:
+  File "/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/lib/python3.7/site-packages/pyke/fact_base.py", line 186, in gen
+    yield
+KeyboardInterrupt

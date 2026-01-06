@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on 08/09/2020
+
+@author: Katya
+
+This is katyas program for eofs
+
+"""
+import numpy as np
+import numpy.ma as ma
+from netCDF4 import Dataset
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import matplotlib.ticker as mticker
+from matplotlib import colors
+
+import cartopy
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cartopy.crs as ccrs
+
+#import eofs
+import iris
+import iris.quickplot as qplt 
+import iris.plot as iplt
+import iris.coord_categorisation
+from eofs.iris import Eof
+
+# Upload Eoi400
+sst_constraint = iris.Constraint(cube_func=lambda cube: cube.var_name == 'temp')
+sst_constraint1 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'tos')
+sst_constraint2 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'THO')
+sst_constraint3 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'TS')
+sst_constraint4 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'sst')
+temporary = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.2001-2501_timeseries_HadCM3_no_ann_cycle.nc', sst_constraint)
+HadCM3_Eoi400_SST = temporary[0:500,:,:]
+
+
+
+# Upload E280
+temporary = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.2411-2911_timeseries_HadCM3_no_ann_cycle.nc', sst_constraint)
+HadCM3_E280_SST = temporary[0:500,:,:]
+
+
+# Delimt the region for the cube
+min_lat = -10.0
+max_lat = 10.0
+min_lon = 150.0
+max_lon = 280.0
+
+# Functions to identify latitudes and longitudes we want to subset to
+def nino_lat(input):
+    return min_lat  <= input <= max_lat 
+def nino_lon(input):
+    return min_lon  <= input <= max_lon 
+
+nino_con = iris.Constraint(latitude = nino_lat, longitude = nino_lon)
+# Subset the cube to the location of interest
+MODELNAMES_MP = [HadCM3_Eoi400_SST]
+MODELNAMES_PI = [HadCM3_E280_SST]
+
+nino_mp_subset = []
+for i in MODELNAMES_MP:
+    nino_mp_sub = nino_con.extract(i)
+    nino_mp_subset.append(nino_mp_sub)
+    
+nino_pi_subset = []
+for j in MODELNAMES_PI:
+    nino_pi_sub = nino_con.extract(j)
+    nino_pi_subset.append(nino_pi_sub)
+    
+## Calculate EOFs
+
+eof_plot_mp = []
+for mod in range(1):
+    solver = Eof(nino_mp_subset[mod], weights=None, center=True)
+    eofs = solver.eofsAsCovariance(neofs=1)
+    pcs  = solver.pcs(npcs=1, pcscaling=1)
+
+    print(pcs)
+    print(eofs)
+    sys.exit(0)
+    #eigs = solver.eigenvalues(neigs=1)
+    varF = solver.varianceFraction(neigs=1)
+    eof_std = eofs.collapsed(('eof_number', 'latitude','longitude'), iris.analysis.STD_DEV)
+    eof_n = eofs/eof_std
+    eof_plot_mp.append(eof_n)
+
+    
+eof_plot_pi = []
+for mod in range(7):
+    solver = Eof(nino_pi_subset[mod], weights=None, center=True)
+    eofs = solver.eofsAsCovariance(neofs=1)
+    pcs  = solver.pcs(npcs=1, pcscaling=1)
+    #eigs = solver.eigenvalues(neigs=1)
+    varF = solver.varianceFraction(neigs=1)
+    eof_std = eofs.collapsed(('eof_number', 'latitude','longitude'), iris.analysis.STD_DEV)
+    eof_n = eofs/eof_std
+    eof_plot_pi.append(eof_n)
+    
+# Function to plot EOFs according to Power et al (2015) used in in Brierley (2015)
+def plot_eofs(n, model_name):
+    fig = plt.figure(figsize=(12, 10))
+    ax1 = fig.add_subplot(1,1,1, projection=ccrs.PlateCarree(central_longitude=180.0, globe=None))
+    ax1.coastlines()
+    # Add country borders
+    ax1.add_feature(cartopy.feature.BORDERS, linewidth = 0.5)
+    # Add coastline
+    ax1.add_feature(cartopy.feature.COASTLINE)
+    # Format lat tick marks
+    ax1.set_yticks(np.arange(min_lat, max_lat, 5))
+    ax1.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+    # Format lon tick marks
+    xticks = np.arange(120,280+20,20)
+    ax1.set_xticks(xticks, crs=ccrs.PlateCarree())
+    lon_formatter = LONGITUDE_FORMATTER
+    ax1.xaxis.set_major_formatter(lon_formatter)
+
+    orig_cmap = plt.cm.get_cmap('RdYlBu')
+    reversed_colors = orig_cmap(np.linspace(1, 0, 256))
+    reversed_cmap = orig_cmap.from_list('Reversed', reversed_colors)
+
+    im = iplt.contourf(eof_plot_mp[n][0], axes = ax1, cmap = reversed_cmap, extend = 'both')
+    cbar = plt.colorbar(im, ax = ax1, orientation = 'horizontal', shrink=0.8, pad = 0.05)
+    plt.title(' EOF Eoi$^{400}$ SST anomalies '+model_name, fontsize=17) 
+    #plt.savefig('/nfs/see-fs-01_teaching/ee22kvcs/Task2/spatial_structure_MP_'+model_name+'.png', bbox_inches = 'tight', dpi=300, format='png')
+    plt.show()
+    
+## Plot EOFs MP
+all_models = ['HadCM3', 'CCSM4Utr', 'COSMOS', 'IPSLCM6A', 'MIROC4m', 'NorESML','CESM-1.2']
+for m, n in zip( range(7), all_models):
+    plot_eofs(m, n)

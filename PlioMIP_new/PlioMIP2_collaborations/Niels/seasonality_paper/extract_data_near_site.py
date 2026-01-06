@@ -1,0 +1,165 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#Updated for JH on 17th May 2021
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the SST data from near Niels site and
+#   write to a netcdf
+#
+#
+# This program has been ammended from 
+#PlioMIP2/large_scale_features/extract_data_locations.py
+#
+#
+
+#from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import iris
+#import xlwt
+#from xlwt import Workbook
+import os
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+from iris.cube import CubeList
+import sys
+
+
+
+
+    
+def extract_lon_lat(cube):
+    """
+    extracts the points near LON_REQ and LAT_REQ
+    """ 
+
+    
+    #cubelats = cube.coord('latitude').points
+    #cubelons = cube.coord('longitude').points
+
+    # find nearest latitude and lontiude to the value
+    #latix = (np.abs(cubelats - LAT_REQ)).argmin()
+    #lonix = (np.abs(cubelons - LON_REQ)).argmin()
+
+    lonmin = LON_REQ - 10.0
+    lonmax = LON_REQ + 10.0
+    latmin = LAT_REQ - 10.0
+    latmax = LAT_REQ + 10.0
+    lon_constraint = iris.Constraint(longitude = lambda cell: 
+                                     lonmin < cell < lonmax)
+    lat_constraint = iris.Constraint(latitude = lambda cell: 
+                                     latmin < cell < latmax)
+
+    lon_slice  =  cube.extract(lon_constraint)
+    data_slice = lon_slice.extract(lat_constraint)
+   
+    return data_slice
+
+def extract_data():
+    """
+    extracts the data within ??deg of the required lat and long
+    """
+   
+    eoi400_allcubes = CubeList([])
+    e280_allcubes = CubeList([])
+    anom_allcubes = CubeList([])
+
+    for i, model in enumerate(MODELNAMES):
+        filestart = '/nfs/hera1/earjcti/regridded/' + model + '/'
+        eoi400_cube = iris.load_cube(filestart + 'EOI400.'+ FIELD + '.mean_month.nc')
+        print(eoi400_cube.coord('longitude'))
+        print(eoi400_cube.coord('longitude').units)
+        print(eoi400_cube.coord('longitude').coord_system)
+        print(eoi400_cube.coord('longitude').metadata)
+        print(eoi400_cube.coord('longitude').attributes)
+        print(eoi400_cube.coord('longitude').points)
+        eoi400_cube_slice = extract_lon_lat(eoi400_cube)
+        print(eoi400_cube_slice)
+        sys.exit(0)
+        name = model + '_' + FIELD + '_EOI400'
+        eoi400_cube_slice.long_name = name
+        eoi400_cube_slice.data = np.ma.where(eoi400_cube_slice.data.mask == 1.0, -99999, eoi400_cube_slice.data)
+        eoi400_cube_slice.data.mask = np.where(eoi400_cube_slice.data == -99999, 1.0, 0.0)
+        if model == 'NorESM1-F' or model == 'NorESM-L':
+            eoi400_cube_slice.coord('time').rename('month')
+        try:
+            eoi400_cube_slice.remove_coord('time')
+        except:
+            pass
+        try:
+            eoi400_cube_slice.remove_coord('year')
+        except:
+            pass
+        eoi400_cube_slice.cell_methods=None
+        eoi400_allcubes.append(eoi400_cube_slice)
+        
+
+        e280_cube = iris.load_cube(filestart + 'E280.'+ FIELD+ '.mean_month.nc')
+        e280_cube_slice = extract_lon_lat(e280_cube)
+        name = model + '_' + FIELD + '_E280'
+        e280_cube_slice.long_name = name
+        e280_cube_slice.data = np.ma.where(e280_cube_slice.data.mask == 1.0, -99999, e280_cube_slice.data)
+        e280_cube_slice.data.mask = np.where(e280_cube_slice.data == -99999, 1.0, 0.0)
+        if model == 'NorESM1-F' or model == 'NorESM-L':
+            e280_cube_slice.coord('time').rename('month')
+        try:
+            e280_cube_slice.remove_coord('time')
+        except:
+            pass
+        try:
+            e280_cube_slice.remove_coord('year')
+        except:
+            pass
+        e280_cube_slice.cell_methods=None
+        e280_allcubes.append(e280_cube_slice)
+
+         
+        anom_data = eoi400_cube_slice.data - e280_cube_slice.data
+        print(eoi400_cube_slice.data.mask)
+        anom_data.mask = np.maximum(eoi400_cube_slice.data.mask,
+                                e280_cube_slice.data.mask)
+        anom_data = np.where(anom_data.mask == 1.0, -99999, anom_data)
+        anom_cube = e280_cube_slice.copy(data=anom_data)
+        name = model + '_' + FIELD + '_EOI400-E280'
+        anom_cube.long_name = name
+      
+        anom_allcubes.append(anom_cube)
+                            
+    
+    return eoi400_allcubes, e280_allcubes,anom_allcubes    
+        
+
+
+#################
+# MAIN PROGRAM
+################
+
+###################################
+# get initial data including the lats and longs we require
+
+linuxwin = 'l'
+LAT_REQ = 52.5 # 51.2N, 4.4E
+LON_REQ = 3.0
+test ='y'
+#FIELD = 'NearSurfaceTemperature'
+FIELD = 'SST'
+#FIELD = 'Salinity'
+
+if test == 'y':
+     MODELNAMES = ['CESM2','NorESM1-F','HadCM3']
+else:
+     MODELNAMES = ['CCSM4', 'CCSM4-UoT', 'CCSM4-Utr',  'CESM1.2','CESM2',
+                   'COSMOS', 'EC-Earth3.3', 'GISS2.1G', 'HadCM3','HadGEM3',
+                   'IPSLCM6A', 'IPSLCM5A2', 'IPSLCM5A', 'MIROC4m', 'MRI2.3',
+                   'NorESM-L', 'NorESM1-F'
+                               ]
+eoi400_alldata, e280_alldata, anom_alldata = extract_data()
+fileoutstart = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/Collaborators/Niels/'
+iris.save(eoi400_alldata,fileoutstart + 'EOI400_' + FIELD + '.nc', netcdf_format = "NETCDF3_CLASSIC",fill_value = -99999)
+iris.save(e280_alldata,fileoutstart + 'E280_' + FIELD + '.nc', netcdf_format = "NETCDF4", fill_value = -99999)
+iris.save(anom_alldata,fileoutstart + 'EOI400-E280_anom_' + FIELD + '.nc', netcdf_format = "NETCDF4", fill_value=-99999)

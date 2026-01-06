@@ -1,0 +1,810 @@
+#all!/usr/bin/env python2.7
+#NAME
+#    PLOT_Arctic_Osc
+#PURPOSE
+#    This program will attempt to use principal component analysis to 
+#    calculate the arctic oscillation (Northern Annular Mode) and
+#    its  associated teleconnections
+#
+#    It is very strongly based on plot_NAO.py
+#
+# search for 'main program' to find end of functions
+# Julia 6/1/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from  matplotlib.mlab import PCA 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+import glob
+import sklearn.decomposition as sk
+from sklearn.preprocessing import normalize
+
+#functions are:
+#  def plotdata   plot data (on a x-y grid)
+#  def indexplot  plot AO index on a line graph
+#  def fullprint  print full array for debugging
+#  get_PC_allmonths   gets principal components and plots them (all data)
+#  get_pc_seas  gets principal components for a given season
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for a NAO region
+   # map=Basemap(width=12000000,height=8000000,projection='stere',\
+   #                 resolution='c',lat_ts=50,lat_0=50,lon_0=0)
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                print(np.shape(x),np.shape(y),np.shape(plotdata))
+                cs = map.contourf(x,y,plotdata,V,extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotdata
+
+#===============================================================
+def plotquiver(udata,vdata,lon,lat,fileno,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    # quiver plot every nth arrow
+    n=5
+    qv = map.quiver(x[::n,::n],y[::n,::n],udata[::n,::n],vdata[::n,::n],pivot='mid')
+    plt.title(titlename)
+
+#end def plotquiver
+
+
+
+def indexplot(toplot,fileno,data_sm,elninoarr,
+              laninaarr,xmin,xmax,expt):
+    plt.subplot(2,2,fileno+1)
+
+    plt.xlim([xmin,xmax])
+    plt.ylim([-2.0,2.0])
+    datasize=len(toplot)
+    xdata=np.arange(datasize)
+    
+    # plot data
+    plt.plot(xdata,toplot)
+    if fileno==0:
+        titlename='AO index '+expt
+        plt.title(titlename)
+    # overplot smoothed data
+    plt.plot(xdata,data_sm,'-')
+    # overplot zero line and +-0.5deg line
+    plt.plot(xdata,np.zeros(datasize))
+    #bar_width=1.0/12.0
+    #plt.bar(xdata,elninoarr,bar_width,color='red',edgecolor="none")
+    #plt.bar(xdata,laninaarr,bar_width,color='blue',edgecolor="none")
+   
+# 
+
+# end def indexplot
+
+def fullprint(printarr):
+  from pprint import pprint
+  opt = np.get_printoptions()
+  np.set_printoptions(threshold='nan')
+  pprint(printarr)
+  np.set_printoptions(**opt)
+#end def fullprint
+
+
+
+#===============================================
+def get_PC_allmonths(exptname):
+# this subroutine will use the Hurrell method. 
+# PC analysis SLP anomalies 20-80N, 90-40E
+
+
+    dirname='/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/mslp_data/'
+    os.chdir(dirname)
+    full_file_paths =  glob.glob("*a@pd*")
+    nfiles=len(full_file_paths)
+    nyears=np.ceil(nfiles/12.)
+    nmonths=12
+    ntimes=nfiles
+    if nfiles==0:
+        print('there are no files in directory',dirname)
+        sys.exit(0)
+
+
+    # get the information from the files
+    count=0
+    for fname in full_file_paths:
+        # extract year and month from file
+
+        # read in data from file
+        f=Dataset(fname,mode='r')
+        if count == 0:
+            lat = f.variables['latitude'][:]
+            latsize=len(lat)
+            lon = f.variables['longitude'][:]
+            lonsize=len(lon)
+            lontemp=lon
+
+        mslp=f.variables['p'][:] 
+        mslp=np.squeeze(mslp)
+       
+# mask out all data so that we just have the mslp from 20-80N and 90W-40E
+
+        lon=lontemp
+        mslp,lon = shiftgrid(180.,mslp,lon,start=False)
+
+        ix1=lon
+        ix2=(lat >=20) & (lat <=80)
+        lats_reg=lat[ix2]
+        lons_reg=lat[ix1]
+        
+        SLPint=mslp[ix2]
+        MSLP=SLPint[:,ix1]
+
+        MSLP=np.squeeze(MSLP)
+        MSLP=MSLP/100. # convert to millibars
+        
+        latsize=len(lats_reg)
+        lonsize=len(lons_reg)
+        
+
+        if count == 0:  # arrays for storing all data
+           all_MSLP = np.empty((ntimes,latsize,lonsize)) #storing all data
+           month_ss = np.zeros(ntimes)  # month indicator for all_MSLP
+           month_MSLP=np.zeros((12,latsize,lonsize)) # for storing average month
+           monthcount=np.zeros(12) # no of years for each month
+ 
+
+        # from filename obtain year and month
+        year=int(float(fname[10:12]))
+        month=fname[12:14]
+        extra=fname[9:10]
+        
+        choices = {'a': 10, 'b': 11, 'c': 12, 'd': 13, 'e': 14, 
+                   'f': 15, 'g': 16, 'h': 17, 'i': 18, 'j': 19, 
+                   'k': 20, 'l': 21, 'm': 22, 'n': 23, 'o': 24, 
+                   'p': 25, 'q': 26, 'r': 27, 's': 28, 't': 29, 
+                   'u': 30, 'v': 31, 'w': 32, 'x': 33, 'y': 34, 
+                   'z': 35}
+
+        century=choices.get(extra,extra) # the second extra is the default v
+                                         # value for if it is not found in
+                                         # the choices list
+       
+
+        choices = {'ja': 0, 'fb': 1, 'mr': 2, 'ar': 3, 'my': 4, 
+                   'jn': 5, 'jl': 6, 'ag': 7, 'sp': 8, 'ot': 9, 
+                   'nv': 10, 'dc': 11}
+
+        monthno=choices.get(month,-99) # the second extra is the default v
+                                         # value for if it is not found in
+                                         # the choices list
+       
+        year=(century * 100) + year
+        if count == 0:
+            yearstart=year
+            monthstart=11 # assumed first month is december.  Will need
+                          # to recode if not the case
+
+        time=((year-yearstart)*12)+monthno-monthstart
+        all_MSLP[time,:,:]=MSLP
+        month_ss[time]=monthno
+        month_MSLP[monthno,:,:]=month_MSLP[monthno,:,:]+MSLP
+        monthcount[monthno]=monthcount[monthno]+1
+        count=count+1
+
+
+    # get all the averages
+ 
+    # average annual cycle
+    month_MSLP=month_MSLP/monthcount[:,np.newaxis,np.newaxis]
+
+
+    # remove annual average from all_MSLP
+    for t in range(0,ntimes):
+        subscript=month_ss[t]
+        all_MSLP[t,:,:]=all_MSLP[t,:,:]-month_MSLP[subscript,:,:]
+    # subtract mean from each point
+    for i in range(0,lonsize):
+        for j in range(0,latsize):
+            all_MSLP[:,j,i]=all_MSLP[:,j,i]-np.mean(all_MSLP[:,j,i])
+
+    # multiply by a weighting factor because all of the gridboxes are a 
+    # different size
+    for j in range(0,latsize):
+        all_MSLP[:,j,:]=all_MSLP[:,j,:] * np.cos(np.radians(lats_reg[j]))
+
+    # reshape and transpose the data to the correct dimension
+    rs_MSLP_nt=np.reshape(all_MSLP,(ntimes,latsize*lonsize))
+    lons, lats = np.meshgrid(lon_reg,lat_reg)
+    lons=np.reshape(lons,latsize*lonsize)
+    lats=np.reshape(lons,latsize*lonsize)
+
+    # have a go at pcanalysis using sklearn
+
+    neofs=2
+    altpca=sk.PCA(n_components=neofs)
+    altpca.fit(rs_MSLP)
+    expl_var=altpca.explained_variance_ratio_
+    EOFs=altpca.transform(rs_MSLP)
+    print(np.shape(EOFs))
+    print('b4 pc shape',np.shape(rs_MSLP),np.shape(EOFs))
+
+    # scale so each EOF has a unit length
+    EOFs=normalize(EOFs,axis=0)
+
+    #if EOFs[j,0] < 0.0:
+
+    PCs=np.mat(rs_MSLP_nt) * np.mat(EOFs)
+    print('pc shape',np.shape(PCs),np.shape(rs_MSLP),np.shape(EOFs))
+
+   
+    for i in range(0,2):
+        EOF_temp=EOFs[:,i]
+        EOF_plot=np.reshape(EOF_temp,(latsize,lonsize))
+        stdevpc=np.std(PCs[:,i])
+        PCs[:,i]=PCs[:,i]/stdevpc
+        EOF_plot=EOF_plot * stdevpc
+
+        titlename='PC v2 '+str(np.ceil(expl_var[i]*100.))+'%'
+        plotdata(EOF_plot,(i*2),lons_reg,lats_reg,titlename,-4.0,4.0,1.0,0,'n',titlename)
+
+        toplot=PCs[:,i]
+        indexplot(toplot,(2*i)+1,toplot,toplot,toplot,0,ntimes,exptname)
+    plt.show()
+    
+
+
+#===============================================
+def get_PC_seas(exptname,monthnames,extra,startyear,endyear):
+# this subroutine will use the Hurrell method. 
+# PC analysis SLP anomalies 20-80N, 90-40E
+
+    nmonths=len(monthnames)
+    seasname=''  # get seasonname by using first letter of each month
+    for mon in monthnames:
+        seasname=seasname+mon[0]
+
+    if nmonths > 4:
+        print('check that you have accurately accounted for winter season overlap')
+        sys.exit()
+
+    dirname='/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/mslp_data/'
+    os.chdir(dirname)
+    nyears=endyear-startyear+1
+    ntimes=nyears
+
+    for year in range (startyear,endyear+1):
+        for monthno in range (0,nmonths):
+            yearuse=year
+            extrause=extra
+            month=monthnames[monthno]
+            if month == 'dc' and nmonths > 1:
+                yearuse=year-1
+            if month == 'nv' and nmonths > 2:
+                yearuse=year-1
+            if month == 'ot' and nmonths > 3:
+                yearuse=year-1
+            if month == 'sp' and nmonths > 4:
+                yearuse=year-1
+            if yearuse >= 100:
+                yearuse=yearuse-100
+                extrause=chr(ord(extra)+1)
+
+            if yearuse < 0:
+                yearuse=yearuse+100
+                extrause=chr(ord(extra)-1)
+
+            yearfname=str(yearuse)
+
+            if yearuse < 10:
+                yearfname='0'+str(yearuse)
+
+            fname=dirname+exptname+'a@pd'+extrause+yearfname+month+'_mslp.nc'
+            print(fname)
+            f=Dataset(fname,mode='r')
+            lat = f.variables['latitude'][:]
+            latsize=len(lat)
+            lon = f.variables['longitude'][:]
+            lonsize=len(lon)
+            lontemp=lon
+
+            mslp=f.variables['p'][:] 
+            mslp=np.squeeze(mslp)
+       
+# mask out all data so that we just have the mslp north of 20N
+
+            lon=lontemp
+            mslp,lon = shiftgrid(180.,mslp,lon,start=False)
+
+            ix2=(lat >=20)
+            ix1=(lon > -1000)  # use all lons
+            lats_reg=lat[ix2]
+            lons_reg=lon
+            
+            SLPint=mslp[ix2]
+            MSLP=SLPint[:,ix1]
+            
+            MSLP=np.squeeze(MSLP)
+            MSLP=MSLP/100. # convert to millibars
+ 
+            latsize=len(lats_reg)
+            lonsize=len(lons_reg)
+            
+            if year == startyear and monthno == 0:  # arrays to store all data
+                all_MSLP = np.zeros((ntimes,latsize,lonsize)) 
+                
+
+            all_MSLP[year-startyear,:,:]=all_MSLP[year-startyear,:,:]+MSLP
+            # this is the end of the loop over years and months
+
+           
+           
+    
+    all_MSLP=all_MSLP/nmonths
+   
+    # remove average from MSLP
+    for i in range(0,lonsize):
+        for j in range(0,latsize):
+            all_MSLP[:,j,i]=all_MSLP[:,j,i]-np.mean(all_MSLP[:,j,i])
+
+    #plotdata(all_MSLP[0,:,:],0,lons_reg,lats_reg,'test1',-4.0,4.0,1.0,0,'n','test2')
+
+    # multiply by a weighting factor because all of the gridboxes are a 
+    # different size
+    for j in range(0,latsize):
+        all_MSLP[:,j,:]=all_MSLP[:,j,:] * np.cos(np.radians(lats_reg[j]))
+
+
+    #plotdata(all_MSLP[0,:,:],1,lons_reg,lats_reg,'test1',-4.0,4.0,1.0,0,'n','test2')
+    # reshape and transpose the data to the correct dimension
+    rs_MSLP_nt=np.reshape(all_MSLP,(ntimes,latsize*lonsize))
+    lons, lats = np.meshgrid(lons_reg,lats_reg)
+    lons=np.reshape(lons,latsize*lonsize)
+    lats=np.reshape(lats,latsize*lonsize)
+
+    rs_MSLP=np.transpose(rs_MSLP_nt)
+
+
+    # have a go at pcanalysis using sklearn
+
+    neofs=2
+    altpca=sk.PCA(n_components=neofs)
+    altpca.fit(rs_MSLP)
+    expl_var=altpca.explained_variance_ratio_
+    EOFs=altpca.transform(rs_MSLP)
+    print(np.shape(EOFs)) 
+    print('b4 pc shape',np.shape(rs_MSLP),np.shape(EOFs))
+
+    # scale so each EOF has a unit length
+    EOFs=normalize(EOFs,axis=0)
+    # check EOF1 has low (negative pressure over Iceland)
+    lons,lats 
+    ixuse=(lons == -18.75) & (lats == 65.)
+    
+    if EOFs[ixuse,0] >= 0:
+        EOFs[:,0]=EOFs[:,0] * -1.0
+
+    PCs=np.mat(rs_MSLP_nt) * np.mat(EOFs)
+    print('pc shape',np.shape(PCs),np.shape(rs_MSLP),np.shape(EOFs))
+
+   
+    for i in range(0,2):
+        EOF_temp=EOFs[:,i]
+        EOF_plot=np.reshape(EOF_temp,(latsize,lonsize))
+        stdevpc=np.std(PCs[:,i])
+        PCs[:,i]=PCs[:,i]/stdevpc
+        EOF_plot=EOF_plot * stdevpc
+
+        titlename='PC'+str(i+1)+':'+exptname+'_'+seasname+' '+str(np.ceil(expl_var[i]*100.))+'%'
+        plotdata(EOF_plot,(i*2),lons_reg,lats_reg,titlename,-4.0,4.0,1.0,0,'n',titlename)
+
+        toplot=PCs[:,i]
+        indexplot(toplot,(2*i)+1,toplot,toplot,toplot,0,ntimes,exptname)
+    
+    
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/'+exptname+'_'+seasname+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+#   write out the AO index to a file
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/'+exptname+'_'+seasname+'.txt' 
+    f1=open(fileout,'w+')
+    f1.write('nino index from PC1 of mslp in North Atlantic region \n')
+    f1.write('nyears='+str(nyears)+' \n')
+    f1.write('extra  year  AO index\n')
+    for year in range (startyear,endyear+1):
+        yearuse=year
+        extrause=extra
+        if yearuse >= 100:
+            yearuse=yearuse-100
+            extrause=chr(ord(extra)+1)
+
+        if yearuse < 0:
+            yearuse=yearuse+100
+            extrause=chr(ord(extra)-1)
+
+        yearfname=str(yearuse)
+
+        if yearuse < 10:
+            yearfname='0'+str(yearuse)
+
+        f1.write(extrause+';'+str(yearfname)+';'+str(PCs[year-startyear,0])+'\n')
+    f1.close()
+        
+
+#=========================================
+def get_AO_seas_telecon(exptname,seasname,extra,startyear,endyear,monthnames,latname,lonname,fieldname,fieldlocation,fileext):
+# this will plot the teleconnections associated with the AO by taking the
+# most exteme 5% of the AO years and plotting the climate anomaly
+
+
+    # read in the AO index
+
+    filein='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/'+exptname+'_'+seasname+'.txt' 
+    f=open(filein,'r')
+    # discard titleline
+    textline=f.readline()
+    # get number of years from next line
+    textline=f.readline()
+    b=textline.split()  # split text by removing newline
+    c=b[0]
+    b=c.split('=')  # split text by removing equals sign
+    nyears=int(b[1])
+    # discard second titleline
+    textline=f.readline()
+
+
+
+    # read over the rest of the data
+    extraindex=np.empty(nyears,dtype=np.dtype('S1'))
+    yearindex=np.zeros(nyears)
+    AOindex=np.zeros(nyears)
+    extremeindex=np.zeros(nyears)  # here we mark the 5% most extreme values
+    
+
+    count=0
+    for line in f:
+        # extract extra year and AOindex
+        linesplit=line.split(';')   # the data in the file is split by ;
+        extraindex[count]=linesplit[0]
+        yearindex[count]=linesplit[1]
+        AOindex[count]=linesplit[2]
+        count=count+1
+
+
+    # next we want to find the years that have the largest positive and negative
+    # nao index
+
+    num_extr=int(np.ceil(nyears*0.05))
+
+    # get highest 5 values.
+    # note that 'zip' zips the arrays together forming a multi dim list
+    # sort sorts the list on the first element
+    # reverse will reverse the sort
+    lowdata=sorted(zip(AOindex,extraindex,yearindex))[:num_extr]
+    uppdata=sorted(zip(AOindex,extraindex,yearindex),reverse=True)[:num_extr]
+    
+
+    # we will now put our indices to one side and get the data we are 
+    # interested in 
+    # the field we are using will be passed in the calling program
+
+    nmonths=len(monthnames)
+    dirname='/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+fieldlocation
+    os.chdir(dirname)
+    nyears=endyear-startyear+1
+    ntimes=nyears
+
+    # firstly get average field over the season
+    allfiles=[]
+    for month in monthnames:
+        allfiles.append(dirname+exptname+'a@pd*'+month+fileext)
+
+    for monthno in range(0,nmonths):
+        f=MFDataset(allfiles[monthno])
+        lat = f.variables[latname][:]
+        lon = f.variables[lonname][:]
+    
+         
+        if len(fieldname) ==1 :
+            atemp=f.variables[fieldname[0]][:]
+            atemp=np.squeeze(atemp)
+
+        if len(fieldname) == 2:
+            atemp=f.variables[fieldname[0]][:]
+            atemp=np.squeeze(atemp)
+            atemp2=f.variables[fieldname[1]][:]
+            atemp2=np.squeeze(atemp2)
+        
+        if len(fieldname) > 2:
+            print('length of fieldname is', len(fieldname))
+            print('you are requesting too many variables')
+            sys.exit()
+
+        ntimes,ny,nx=np.shape(atemp)
+
+        #average across the time dimension
+        temp_m1=np.mean(atemp,axis=0)
+
+        # set array for storing average
+        if monthno == 0:
+            temp_avg=temp_m1
+        else:
+            temp_avg=temp_avg+temp_m1
+
+        
+        if len(fieldname) ==2:
+            temp_m1=np.mean(atemp2,axis=0)
+            if monthno == 0:
+                temp2_avg=temp_m1
+            else:
+                temp2_avg=temp2_avg+temp_m1
+
+
+    temp_avg=temp_avg/nmonths
+    if len(fieldname) == 2:
+        temp2_avg=temp2_avg/nmonths
+
+    
+
+    # now get data for the highest and lowest years
+
+
+    lowdata=sorted(zip(AOindex,extraindex,yearindex))[:num_extr]
+    uppdata=sorted(zip(AOindex,extraindex,yearindex),reverse=True)[:num_extr]
+
+    # lowest and highest years
+    for ex in range(0,2):
+        # are we doing highest or lowest
+        if ex == 0:
+            extremedata=lowdata
+        if ex == 1:
+            extremedata=uppdata
+
+        for time in range (0,num_extr):
+            for monthno in range (0,nmonths):
+                singleline=extremedata[time]
+                yearuse=int(singleline[2])
+                extrause=singleline[1]
+                month=monthnames[monthno]
+                if month == 'dc' and nmonths > 1:
+                    yearuse=yearuse-1
+                if month == 'nv' and nmonths > 2:
+                    yearuse=yearuse-1
+                if month == 'ot' and nmonths > 3:
+                    yearuse=yearuse-1
+                if month == 'sp' and nmonths > 4:
+                    yearuse=yearuse-1
+                if yearuse >= 100:
+                    yearuse=yearuse-100
+                    extrause=chr(ord(extrause)+1)
+                                    
+                if yearuse < 0:
+                    yearuse=yearuse+100
+                    extrause=chr(ord(extrause)-1)
+                                        
+                yearfname=str(yearuse)
+
+                if yearuse < 10:
+                    yearfname='0'+str(yearuse)
+
+                fname=dirname+exptname+'a@pd'+extrause+yearfname+month+fileext
+                
+                f=Dataset(fname,mode='r')
+                lat = f.variables[latname][:]
+                latsize=len(lat)
+                lon = f.variables[lonname][:]
+                lonsize=len(lon)
+                lontemp=lon
+
+                if len(fieldname) ==1 :
+                    atemp=f.variables[fieldname[0]][:]
+                    atemp=np.squeeze(atemp)
+
+                if len(fieldname) == 2:
+                    atemp=f.variables[fieldname[0]][:]
+                    atemp=np.squeeze(atemp)
+                    atemp2=f.variables[fieldname[1]][:]
+                    atemp2=np.squeeze(atemp2)
+        
+                if len(fieldname) > 2:
+                    print('you are requesting too many variables')
+                    sys.exit()
+    
+
+                # set array for storing average
+                if monthno == 0 and time == 0:
+                    temp_extreme=atemp
+                    temp2_extreme=0.
+                    if len(fieldname)==2:
+                        temp2_extreme=atemp2
+                    count=1
+                else:
+                    temp_extreme=temp_extreme+atemp
+                    if len(fieldname)==2:
+                        temp2_extreme=temp2_extreme+atemp2
+                    count=count+1
+
+        # put temperature data in lower or higher catogry
+        if ex == 0:
+            temp_low=temp_extreme/count
+            temp2_low=temp2_extreme/count
+        if ex == 1:
+            temp_high=temp_extreme/count
+            temp2_high=temp2_extreme/count
+
+
+    # we have finished with the loop        
+    # shiftdata for plot
+    lontemp=lon
+    temp_low,lon = shiftgrid(180.,temp_low,lon,start=False)    
+    lon=lontemp
+    temp_high,lon = shiftgrid(180.,temp_high,lon,start=False)    
+    lon=lontemp
+    temp_avg,lon = shiftgrid(180.,temp_avg,lon,start=False)    
+    
+
+    if fieldname[0] == 'temp_1':  # temperature data
+        titlename=exptname+' low seas temp'
+        plotdata(temp_low-273.15,0,lon,lat,titlename,-40.0,40.0,10.0,0,'n','degC')
+        plotdata(temp_high-273.15,1,lon,lat,'high seas temp',-40.0,40.0,10.0,0,'n','degC')
+
+        plotdata(temp_low-temp_avg,2,lon,lat,'low seas Tanom',-5.0,6.0,1.0,0,'n','degC')
+        plotdata(temp_high-temp_avg,3,lon,lat,'high seas Tanom',-5.0,6.0,1.0,0,'n','degC')
+
+     
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/tele_temp'+exptname+'_'+seasname+'.eps' 
+
+
+    if fieldname[0] == 'precip_1':  # precipitation data
+        titlename=exptname+' low seas precip'
+        plotdata(temp_low*60.*60.*24.*30.,0,lon,lat,titlename,-0,275,25,0,'n','mm/month')
+        plotdata(temp_high*60.*60.*24.*30.,1,lon,lat,'high seas temp',0,275,25,0,'n','mm/month')
+
+        plotdata((temp_low-temp_avg)*60.*60.*24.*30.,2,lon,lat,'low seas panom',-50,50,15,0,'n','mm/month')
+        plotdata((temp_high-temp_avg)*60.*60.*24.*30.,3,lon,lat,'high seas panom',-50,50,10,0,'n','mm/month')
+
+     
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/tele_precip'+exptname+'_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+        plt.close()
+        # if precip also do percentage change
+        pcent_low=((temp_low-temp_avg)/temp_avg)*100.
+        pcent_high=((temp_high-temp_avg)/temp_avg)*100.
+        titlename=exptname+' low seas precip anom'
+        plotdata(pcent_low,0,lon,lat,titlename,-50,60,5,0,'a','%')
+        plotdata(pcent_high,1,lon,lat,'high seas Precip anomaly',-50,60,5,0,'a','%')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/tele_precip_pcent'+exptname+'_'+seasname+'.eps' 
+
+
+    if fieldname[0] == 'p': # mean slp data
+        titlename=exptname+' low seas mslp'
+        plotdata(temp_low/100.,0,lon,lat,titlename,980,1040,10.0,0,'n','mbar')
+        plotdata(temp_high/100.,1,lon,lat,'high seas mslp',980,1040,10.0,0,'n','mbar')
+
+        plotdata((temp_low-temp_avg)/100.,2,lon,lat,'low seas mslp',-5.0,6.0,1.0,0,'n','mbar')
+        plotdata((temp_high-temp_avg)/100.,3,lon,lat,'high seas mslp',-5.0,6.0,1.0,0,'n','mbar')
+
+     
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/tele_mslp'+exptname+'_'+seasname+'.eps' 
+
+
+
+
+    if len(fieldname)==2 and fieldname[0] == 'u':  # winds dat
+        ms='m/s'
+        lon=lontemp
+        temp2_low,lon = shiftgrid(180.,temp2_low,lon,start=False)    
+        lon=lontemp
+        temp2_high,lon = shiftgrid(180.,temp2_high,lon,start=False)    
+        lon=lontemp
+        temp2_avg,lon = shiftgrid(180.,temp2_avg,lon,start=False)    
+
+        titlename=exptname+' low seas winds'
+        plotquiver(temp_low,temp2_low,lon,lat,0,titlename,0,400,40.0,0.0,'n',ms)
+        plotquiver(temp_high,temp2_high,lon,lat,1,'high seas winds',1,400,40.0,0.0,'n',ms)       
+        #plotquiver(temp_avg,temp2_avg,lon,lat,1,'avg winds',1,400,40.0,0.0,'n',ms)       
+        plotquiver(temp_low-temp_avg,temp2_low-temp2_avg,lon,lat,2,'low seas uvanom',0,400,40.0,0.0,'n',ms)
+        plotquiver(temp_high-temp_avg,temp2_high-temp2_avg,lon,lat,3,'high seas uvanom',1,400,40.0,0.0,'n',ms)       
+     
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_Arctic_Osc/tele_winds'+exptname+'_'+seasname+'.eps' 
+
+    
+
+
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+        
+
+################################
+# main program
+
+figureno=0
+
+#==================================
+# get annual PC
+
+#get_PC_allmonths('xkvjc')
+
+
+#=================================
+# get seasonal PC
+monthnames=['dc','ja','fb','mr']
+get_PC_seas('xkvje',monthnames,'n',1,100)
+get_PC_seas('xkvjf',monthnames,'n',1,100)
+get_PC_seas('xkvjg',monthnames,'n',1,100)
+
+
+
+#=====================================
+# get seasonal teleconnections
+
+monthnames=['dc','ja','fb','mr']
+seasname='djfm'
+# note monthnames is the month of the climate variable, seasonnames is the 
+# season that the AO index is calculated over
+
+# temperature
+#get_AO_seas_telecon('xkvja',seasname,'m',1,100,monthnames,'latitude','longitude',['temp_1'],'/temp_data/','_temp.nc')
+#get_AO_seas_telecon('xkvjb',seasname,'m',1,100,monthnames,'latitude','longitude',['temp_1'],'/temp_data/','_temp.nc')
+#get_AO_seas_telecon('xkvjc',seasname,'m',1,100,monthnames,'latitude','longitude',['temp_1'],'/temp_data/','_temp.nc')
+
+# winds
+#get_AO_seas_telecon('xkvja',seasname,'m',1,100,monthnames,'latitude_1','longitude_1',['u','v'],'/winds_data/','_winds.nc')
+#get_AO_seas_telecon('xkvjb',seasname,'m',1,100,monthnames,'latitude_1','longitude_1',['u','v'],'/winds_data/','_winds.nc')
+#get_AO_seas_telecon('xkvjc',seasname,'m',1,100,monthnames,'latitude_1','longitude_1',['u','v'],'/winds_data/','_winds.nc')
+
+
+# precipitation
+#get_AO_seas_telecon('xkvja',seasname,'m',1,100,monthnames,'latitude','longitude',['precip_1'],'/precip_data/','_precip.nc')
+#get_AO_seas_telecon('xkvjb',seasname,'m',1,100,monthnames,'latitude','longitude',['precip_1'],'/precip_data/','_precip.nc')
+#get_AO_seas_telecon('xkvjc',seasname,'m',1,100,monthnames,'latitude','longitude',['precip_1'],'/precip_data/','_precip.nc')
+
+# mslp
+#get_AO_seas_telecon('xkvja',seasname,'m',1,100,monthnames,'latitude','longitude',['p'],'/mslp_data/','_mslp.nc')
+#get_AO_seas_telecon('xkvjb',seasname,'m',1,100,monthnames,'latitude','longitude',['p'],'/mslp_data/','_mslp.nc')
+#get_AO_seas_telecon('xkvjc',seasname,'m',1,100,monthnames,'latitude','longitude',['p'],'/mslp_data/','_mslp.nc')
+
+
+sys.exit(0)
+
+####
+

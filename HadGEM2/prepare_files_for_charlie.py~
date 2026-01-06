@@ -1,0 +1,197 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on Thu Mar 18 14:13:50 2019
+
+#@author: earjcti1
+#
+# This program will extract the fields that charlie asked for
+#
+#
+#
+
+import os
+import numpy as np
+import scipy as sp
+#import cf
+import iris
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import netCDF4
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.analysis.cartography
+from iris.experimental.equalise_cubes import equalise_attributes
+import sys
+import warnings
+
+warnings.filterwarnings("ignore")
+
+def simplify_cube(cube):
+    """
+    gets cube and makes sure dimensions are longitude, latitude surface and
+    t. 
+    """    
+    for coord in cube.coords():
+        if coord.var_name == 'level275':
+            coord.var_name = 'surface'
+    
+    cube.coord('surface').points = 0.0
+    cube.coord('surface').units = 'm'
+    cube.coord('surface').attributes = None
+    
+    cube.data = np.where(cube.data > 1.0E10, 0., cube.data)
+    return cube
+
+def get_evap(filename_):
+    """
+    will add up all the fluxes that make evaporation and returns
+    total evaporation within a cube
+    The fluxes are:
+      evaporation from canopy
+      evaporation from sea
+      transpiration (this is exactly the same as evaporation from soil
+                     I have checked some examples)
+      sublim from surface
+    """
+
+    varnames_sec = ["EVAPORATION FROM SEA (GBM)   KG/M2/S",
+                "TRANSPIRATION RATE           KG/M2/S"]
+    
+    varnames_ts = ["EVAP FROM CANOPY - AMOUNT   KG/M2/TS",
+                "SUBLIM. FROM SURFACE (GBM)  KG/M2/TS"]
+    
+    
+    for i, var in enumerate(varnames_sec):
+        cube = iris.load_cube(filename_,var)
+        cube = simplify_cube(cube)
+        if i == 0:
+            cubetot = cube
+        else:
+            cubetot = cubetot + cube
+        
+        
+    for i, var in enumerate(varnames_ts):
+        cube = iris.load_cube(filename_,var)
+        cube = simplify_cube(cube)
+        cube.data = cube.data / (30. * 60.)
+        cube.units = 'kg m-2 s-1'
+        cubetot = cubetot + cube
+     
+    return cubetot
+
+#####################################
+def extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,
+                   fileoutstart,varnamein,varnameout):
+
+    # load required cubes
+    #cubes=iris.load(filename)
+    #print(cubes)
+    #sys.exit(0)
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    
+    
+    # loop over years
+    
+   
+    for year in range(startyear,endyear):
+        allcubes=iris.cube.CubeList([])
+        stringyear=np.str(year).zfill(2)
+        for mon in range(0,len(monthnames)):
+            print(mon)
+            filename=(filestart + expt + filetype + 
+                      extra + stringyear + monthnames[mon] + '.nc')
+            if varnamein == 'TOTAL EVAPORATION':
+                cube = get_evap(filename)
+            else:
+                print(filename,varnamein)
+                cube=iris.load_cube(filename,varnamein)
+                cube.coord('t').points=mon+1
+            allcubes.append(cube)
+            if mon==11:
+                print(allcubes)
+            
+        #make sure the metadata on all cubes are the same
+        equalise_attributes(allcubes)
+        catcube=allcubes.concatenate()[0]
+        
+        # if precipitation convert to mm/day
+        if varnameout=='TotalPrecipitation':
+            catcube.data=catcube.data * 60.*60.*24.
+            catcube.long_name='TOTAL PRECIPITATION RATE    MM/DAY'
+            catcube.units='mm/day'
+       
+        if varnameout=='evap':
+            catcube.data=catcube.data * 60.*60.*24.
+            catcube.long_name='TOTAL EVAPORATION    MM/DAY'
+            catcube.units='mm/day'
+       
+            
+        # if temperature convert to Celcius
+        print(varnameout)
+        if varnameout=='SurfaceTemperature':
+            print('convert to celcius')
+            catcube.convert_units('celsius')
+       
+    
+        stringyear=np.str(year).zfill(3)
+        print(stringyear)
+        fileout=fileoutstart+varnameout+'/'+timeperiod+'.'+varnameout+'.'+stringyear+'.nc'        
+        iris.save(catcube,fileout,netcdf_format='NETCDF3_CLASSIC',fill_value=2.0E20)
+     
+    
+   
+
+##########################################################
+# main program
+
+# this is regridding where all results are in a single file
+# create a dictionary with the long field names in and the field names we want
+# we are also using dictionaries so that we only have to change timeperiod name
+# when rerunning
+            
+FIELEXTRA = {
+		"SURFACE TEMPERATURE AFTER TIMESTEP" : "pd",
+        "TOTAL PRECIPITATION RATE     KG/M2/S" : "pd",
+        "OCN TOP-LEVEL TEMPERATURE          K" : "pf",
+      	}
+
+SHORTNAME = {
+		"SURFACE TEMPERATURE AFTER TIMESTEP" : "SurfaceTemperature",
+        "TOTAL PRECIPITATION RATE     KG/M2/S" : "TotalPrecipitation",
+        "OCN TOP-LEVEL TEMPERATURE          K" : "SST",
+  	}
+
+
+FIELDNAMES = ["SURFACE TEMPERATURE AFTER TIMESTEP",
+          "TOTAL PRECIPITATION RATE     KG/M2/S",
+        "OCN TOP-LEVEL TEMPERATURE          K",
+       	]
+	       
+#fieldname=["V COMPNT OF WIND ON PRESSURE LEVELS"]
+
+expt = 'xkvjg'
+linux_win='l'
+startyear=0
+endyear=100
+timeperiod='e280'
+expt=exptname.get(timeperiod)
+extra=extraname.get(timeperiod)
+
+
+if linux_win=='w':
+    filestart='C:\\Users\\julia\\OneDrive\\WORK\\DATA\\HadCM3\\'+exptname.get(timeperiod)+'/'
+    fileoutstart='C:\\Users\\julia\\OneDrive\\WORK\\DATA\\HadCM3_UPLOAD\\'+timeperiod+'/'
+else:
+    filestart='/nfs/hera1/earjcti/um/'+expt+'/pd/'
+    fileoutstart='/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/'+timeperiod+'/'
+
+for i in range(0,len(fieldname)):
+    varnamein=fieldname[i]
+    varnameout=shortname.get(varnamein)
+    filetype=fileextra.get(varnamein)
+
+    extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,fileoutstart,varnamein,varnameout)
+
+#sys.exit(0)

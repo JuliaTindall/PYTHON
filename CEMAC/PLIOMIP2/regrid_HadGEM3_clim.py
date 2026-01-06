@@ -1,0 +1,182 @@
+import iris 
+import numpy as np
+import numpy.ma as ma
+
+def regrid_HadGEM(field, period):
+
+    """
+    creates the netcdf averaged files from HG3
+    """
+
+    periodalt = {'E280' : 'pi',
+                 'Eoi400' : 'pliocene'}
+
+    if field == 'NearSurfaceTemperature':
+        fileend = ('/atmos/clims_hadgem3_' + periodalt.get(period) + 
+                    '_airtemp_final.nc')
+    if field == 'TotalPrecipitation':
+        fileend = ('/atmos/clims_hadgem3_' + periodalt.get(period) + 
+                    '_precip_final.nc')
+  
+    if field == 'SST':
+       fileend = ('/ocean/clims_hadgem3_' + periodalt.get(period) + 
+                    '_sst')
+       if period == 'Eoi400':
+           fileend = fileend + '_final.nc'
+       else:
+           fileend = fileend + '.nc'
+
+    filein = ('/nfs/hera1/pliomip2/data/HadGEM3_new/climatologies/' 
+          + period + fileend)
+
+    cube = iris.load_cube(filein)
+    cube.long_name = field
+    if field == 'NearSurfaceTemperature':
+        cube.data = cube.data - 273.15
+        cube.units = 'Celsius'
+    if field == 'TotalPrecipitation':
+        cube.data = cube.data *60.*60.*24.
+        cube.units = 'mm/day'
+    print(cube)
+
+    cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+    regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
+    print('cubegrid',cubegrid)
+    print('regridded_cube',regridded_cube)
+   
+    if field == 'SST':
+        regridded_data = np.ma.asarray(regridded_cube.data) 
+        
+        for index, x in np.ndenumerate(regridded_data):
+            if not np.isfinite(x):
+                regridded_data.mask[index] = True
+        
+       
+  
+
+    fileout = ('/nfs/hera1/earjcti/regridded100/HadGEM3/' + period.upper() 
+               + '.' + 
+           field + '.mean_month.nc')
+
+    iris.save(regridded_cube, fileout, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    avg_cube =  regridded_cube.collapsed(['time'], iris.analysis.MEAN)
+   
+    fileout = ('/nfs/hera1/earjcti/regridded100/HadGEM3/' 
+               + period.upper() + '.' + 
+               field + '.allmean.nc')
+
+    iris.save(avg_cube, fileout, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    return (regridded_cube, avg_cube)
+
+
+########################################
+def avg_NorESM_SST(model, period):
+    """
+    averages NorESM that the NorESM group regridded
+    """
+
+    filename = ('/nfs/hera1/pliomip2/data/' + model + 
+                 '/' + model + '_' + period + '.sst.climo.nc')
+    cubeorig = iris.load_cube(filename)
+    cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+    cube = cubeorig.regrid(cubegrid, iris.analysis.Linear())
+
+
+    fileout = ('/nfs/hera1/earjcti/regridded100/'+ model +'/' 
+               + period.upper() +  
+               '.SST.mean_month.nc')
+
+    iris.save(cube, fileout, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    avg_cube =  cube.collapsed(['time'], iris.analysis.MEAN)
+
+    fileout = ('/nfs/hera1/earjcti/regridded100/' + model + '/' + period.upper() + 
+               '.SST.allmean.nc')
+
+    iris.save(avg_cube, fileout, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    return cube, avg_cube
+
+################################################
+def means_to_txt(modelname, annmeancube, avgcube, field, period):
+    """ 
+    creates the text file from HadGEM3
+    """ 
+
+    textout = ('/nfs/hera1/earjcti/regridded100/' + modelname 
+               + '/' + period.upper() +
+               '.' + field + '.data.txt')
+    file1 =  open(textout, "w")
+
+    # get mean field for cube
+
+    avgcube.coord('latitude').guess_bounds()
+    avgcube.coord('longitude').guess_bounds()
+    grid_areas  =  iris.analysis.cartography.area_weights(avgcube)
+    tempcube = avgcube.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas)
+    meanann = tempcube.data 
+
+
+    # get mean for each latitude
+    tempcube = avgcube.collapsed(['longitude'], iris.analysis.MEAN)
+    
+    meanlat = tempcube.data 
+    meanlat = np.squeeze(meanlat)
+  
+    
+    # write out to a file
+    file1.write('global annual mean and standard deviation\n')
+    file1.write('------------------------------------------\n')
+    file1.write(np.str(np.round(meanann, 2))+', 0.0\n')
+
+    # get monthly means and standard deviation
+    file1.write('monthly means and standard deviations \n')
+    file1.write('----------------------------------------')
+    file1.write('month    mean    sd  \n')
+
+    annmeancube.coord('latitude').guess_bounds()
+    annmeancube.coord('longitude').guess_bounds()
+    grid_areas2  =  iris.analysis.cartography.area_weights(annmeancube)
+    tempcube = annmeancube.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas2)
+    if field == 'NearSurfaceTemperature':
+        meanmon = tempcube.data -273.15
+    else:
+        meanmon = tempcube.data 
+
+    for i in range(0, 12):
+        file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i], 2))+', 0.0\n')
+
+    # get latitudinal means and standard deviation
+    file1.write('zonal means and standard deviations \n')
+    file1.write('----------------------------------------\n')
+    file1.write('latitude    mean    sd  \n')
+    for i in range(0, len(meanlat)):
+        file1.write(np.str(avgcube.coord('latitude').points[i])+', '+np.str(np.round(meanlat[i], 2))+', 0.0\n')
+
+    file1.close()
+
+
+#############################################
+
+periods = ['Eoi400','E280']
+fields = ['NearSurfaceTemperature','SST']
+#fields = ['TotalPrecipitation']
+
+for period in periods:
+    for field in fields:
+        (annmeancube, avgcube) = regrid_HadGEM(field, period)
+        means_to_txt('HadGEM3',annmeancube,avgcube, field, period)
+
+
+######
+# also average noresm here because we need to do it somewhe
+#models = ['NorESM1-F','NorESM-L']
+#for period in periods:
+#    for model in models:
+#        annmeancube, avgcube = avg_NorESM_SST(model, period)
+#        means_to_txt(model, annmeancube, avgcube, 'SST', period)
+        

@@ -1,0 +1,48 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on Thu Mar 14 15:53:19 2019
+
+#@author: earjcti
+
+# create a blank netcdf file on the correct grid for putting the pliomip data on
+
+
+import netCDF4
+import numpy as np
+from netCDF4 import Dataset
+
+dataset=Dataset('one_lev_one_deg.nc', 'w',format='NETCDF3_CLASSIC') 
+#create dimensions
+level = dataset.createDimension('level', 1) 
+latitude = dataset.createDimension('latitude', 181)
+longitude = dataset.createDimension('longitude', 360) 
+time = dataset.createDimension('time', None)
+
+# create variables
+times = dataset.createVariable('time', np.float64, ('time',)) 
+levels = dataset.createVariable('level', np.int32, ('level',)) 
+latitudes = dataset.createVariable('latitude', np.float32,('latitude',))
+longitudes = dataset.createVariable('longitude', np.float32,('longitude',)) 
+# Create the actual 4-d variable
+dummy = dataset.createVariable('dummy', np.float32, ('time','level','latitude','longitude')) 
+
+# Variable Attributes  
+latitudes.units = 'degree_north'  
+longitudes.units = 'degree_east'  
+levels.units = 'Surface' 
+dummy.units = 'None' 
+times.units = 'hours since 0001-01-01 00:00:00'  
+times.calendar = 'gregorian' 
+
+# add variables
+lats = np.arange(-90,91,1.0) 
+lons = np.arange(-180,180,1.0)
+print(len(lats)) 
+print(len(lons))
+latitudes[:] = lats  
+longitudes[:] = lons 
+dummy[:,:,:,:]=0.0
+levels[0]=0
+
+dataset.close()

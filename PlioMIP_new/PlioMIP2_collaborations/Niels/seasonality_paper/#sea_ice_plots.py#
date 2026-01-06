@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#"""
+#Created 16 May 2023
+#
+#@author: earjcti
+#"""
+#
+# Niels noted that for his site the summer warming was more than the
+# winter warming.
+#
+# we would like to look at winter and summer sea ice for the pliocene and preind
+#
+#
+#
+
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import numpy as np
+
+       
+
+
+#################
+# MAIN PROGRAM
+################
+
+
+# read in multimodel mean monthly SST data (EOI400-E280)
+
+MP_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SeaIceConc_multimodelmean_month.nc', 'SeaIceConcmean_plio')
+PI_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/SeaIceConc_multimodelmean_month.nc', 'SeaIceConcmean_pi')
+#anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
+#                           'NearSurfaceTemperatureplio - pi')
+janMP_cube = MP_cube.extract(iris.Constraint(time=1))
+julMP_cube = MP_cube.extract(iris.Constraint(time=7))
+janPI_cube = PI_cube.extract(iris.Constraint(time=1))
+julPI_cube = PI_cube.extract(iris.Constraint(time=7))
+
+
+levels=np.arange(0.1, 1.1, 0.1)
+#print(janMP_cube)
+#print(janMP_cube.data)
+#plt.subplot(2,2,1,projection=ccrs.Orthographic(60,90))
+#qplt.contourf(janMP_cube,levels=levels)
+#plt.show()
+#sys.exit(0)
+ax=plt.subplot(2,2,1,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(janMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,2,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(julMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,3,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(janPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January PI')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,4,projection=ccrs.Orthographic(60,90))
+axplot=qplt.contourf(julPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July PI')
+plt.gca().coastlines()
+
+
+plt.savefig('summer_and_winter_seaice_orth.png')
+plt.savefig('summer_and_winter_seaice_orth.eps')
+
+
+ax=plt.subplot(2,2,1,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,2,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julMP_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July MP')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,3,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(janPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('January PI')
+plt.gca().coastlines()
+
+ax=plt.subplot(2,2,4,projection=ccrs.PlateCarree())
+ax.set_extent([-100,20,20,90],crs=ccrs.PlateCarree())
+axplot=qplt.contourf(julPI_cube,levels=levels,cmap='rainbow')
+axplot.cmap.set_under('white')
+plt.title('July PI')
+plt.gca().coastlines()
+
+
+plt.savefig('summer_and_winter_seaice_NA.png')
+plt.savefig('summer_and_winter_seaice_NA.eps')
+

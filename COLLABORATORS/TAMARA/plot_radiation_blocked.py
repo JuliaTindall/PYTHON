@@ -1,0 +1,92 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 29.03.2022 by Julia
+
+We are trying to see how much radiation the clouds block.
+
+We are going to plot.
+Downward surface radiation (clear sky)  / downward surface radiation.
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+from numpy.linalg import norm  # used in calculating euclidian distance
+import sys
+
+def get_data():
+    """
+    extracts the data at the nearest gridbox
+    """
+
+    swdowncube = iris.load_cube(FILEIN,'TOTAL DOWNWARD SURFACE SW FLUX')
+    swdowncube_cs = iris.load_cube(FILEIN,'CLEAR-SKY (II) DOWN SURFACE SW FLUX')
+    totcloud_cube = iris.load_cube(FILEIN,'TOTAL CLOUD AMOUNT - RANDOM OVERLAP')
+   
+    ratio_remaining = np.where(swdowncube.data > 20.0, 
+                                swdowncube.data / swdowncube_cs.data, 
+                              np.nan)
+   
+    ratio_blocked = np.where(swdowncube.data > 20.0, 
+                               (1.0 - swdowncube.data / swdowncube_cs.data), 
+                              np.nan)
+    ratio_rem_cube = swdowncube.copy(data = ratio_remaining)
+    ratio_rem_cube.long_name = 'ratio of sw radiation remaining after clouds'
+    ratio_rem_cube.units = None
+    ratio_rem_cube = iris.util.squeeze(ratio_rem_cube)
+    ratio_blocked_cube = swdowncube.copy(data = ratio_blocked)
+    ratio_blocked_cube.long_name = 'ratio of sw radiation blocked by clouds'
+    ratio_blocked_cube = iris.util.squeeze(ratio_blocked_cube)
+    ratio_blocked_cube.units = None
+
+    totcloud_cube = iris.util.squeeze(totcloud_cube)
+
+
+   
+  
+    return ratio_rem_cube, ratio_blocked_cube, totcloud_cube
+##########################################################################
+def plot_field(fieldcube, land_only, preind, totcloud_cube):
+    """
+    plots the cube 'fieldcube'
+    """
+    plt.figure(figsize=[11.0,6.0])
+    if land_only == 'y':
+       if preind == 'n':
+            maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/eoi400/P4_enh_qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+       else:
+            maskcube=iris.load_cube('/nfs/b0164/Data/LEEDS/HadCM3/e280/qrparm.mask.nc','LAND MASK (LOGICAL: LAND=TRUE)')
+       maskcube = iris.util.squeeze(maskcube)
+       print(maskcube.data)
+       print(fieldcube)
+       fieldcube.data = np.ma.masked_where(maskcube.data == 0.0, fieldcube.data)
+       totcloud_cube.data = np.ma.masked_where(maskcube.data == 0.0, totcloud_cube.data)
+      
+    plt.subplot(121)
+    qplt.contourf(fieldcube, extend='max', levels = np.arange(0,0.55, 0.05))
+    plt.gca().coastlines()
+    plt.subplot(122)
+    qplt.contourf(totcloud_cube, levels=np.arange(0, 1.1, 0.1))
+    plt.gca().coastlines()
+  
+    plt.savefig('radiation_blocked_' + MONTHNAME + '.eps')
+
+
+   
+#########################################################################   
+#SITENAME = 'Beaver Pond'
+#SITELAT = 79.0   # 79N
+#SITELON = 278.0  # 82W 278E
+
+MONTHNAME = 'December' 
+shortmonth = {'July' : 'jl', 'December' : 'dc','April':'ar'}
+FILEIN = 'xozzaa@pdp00' + shortmonth.get(MONTHNAME) +  '.nc'
+PRE_IND = 'y'
+
+ratio_rem_cube, ratio_blocked_cube, totcloud_cube = get_data()
+plot_field(ratio_blocked_cube,'y',PRE_IND, totcloud_cube)
+
+
+

@@ -1,0 +1,52 @@
+#NAME
+#    difference_two_fields.py
+#PURPOSE 
+#
+#  This program will plot a difference of two fields to the screen
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+import iris.quickplot as qplt
+from iris.experimental.equalise_cubes import equalise_attributes
+import sys
+#from netCDF4 import Dataset, MFDataset
+from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+ 
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+#field = '_p_1'
+field = '_Temperature'
+file1 = '/nfs/hera1/earjcti/um/xoorb/database_averages/xoorb_Annual_Average_a@pd'+field+'.nc'
+file2 = '/nfs/hera1/earjcti/um/xogzl/database_averages/xogzl_Annual_Average_a@pd'+field+'.nc'
+
+#FIELDNAME = 'PSTAR AFTER TIMESTEP'
+levels = np.arange(-3000,3500,250)
+FIELDNAME = 'TEMPERATURE AT 1.5M'
+levels = np.arange(-3.,3.2,0.2)
+
+
+cube1 = iris.util.squeeze(iris.load_cube(file1,FIELDNAME))
+cube2 = iris.util.squeeze(iris.load_cube(file2,FIELDNAME))
+
+cubediff = cube2 - cube1
+qplt.contourf(cubediff, levels, extend='both',cmap='RdBu_r')
+plt.gca().coastlines()
+plt.title(FIELDNAME + ': xogzl - xoorb')
+#plt.savefig('pressure_diff.png')
+#plt.savefig('pressure_diff.pdf')
+plt.savefig('temp_diff.png')
+plt.savefig('temp_diff.pdf')
+plt.close()
+

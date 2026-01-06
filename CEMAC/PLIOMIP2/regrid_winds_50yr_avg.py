@@ -1,0 +1,1206 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on june 24 2020; copied from regrid_ocn_50yr_avg.py
+
+
+#
+# This program will regrid some of the data that is needed for PLIOMIP2.
+# We will put 50 year average fields onto a 1deg X 1deg standard grid
+# it can be used where experiments have been uploaded with 100 years in
+# one file
+#ze
+# This will not just regrid the winds but will also regrid the data on 
+# levels
+#
+
+
+
+import numpy as np
+import iris
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import iris.analysis.cartography
+import iris.coord_categorisation
+from iris.cube import CubeList
+import cf_units as unit
+#from iris.experimental.equalise_cubes import equalise_attributes
+import sys
+#import os
+
+###################################################
+# get all data from files as a single cube
+##################################################
+
+def get_hadcm3_cube(model):
+    """
+    get's the datacube from hadcm3 or mri-cgcm2.3
+    """
+    allcubes = CubeList([])
+    startyear = 0
+    endyear = 100
+    if model  == 'MRI2.3':
+        startyear = startyear+1
+        endyear = endyear+1
+
+    for i in range(startyear, endyear):
+        yearuse = str(i).zfill(3)
+        filenameuse = (filename+yearuse+'.nc')
+        cubetemp = iris.load_cube(filenameuse)
+
+        u  =  unit.Unit('days since 0800-01-01 00:00:00',
+                                  calendar = unit.CALENDAR_360_DAY)
+        if model  == 'HadCM3':
+            cubetemp.coord('t').rename('time')
+        cubetemp.coord('time').points = (np.arange(0, 12)+((i-startyear)*12))*30.
+
+        cubetemp.coord('time').units = u
+
+        allcubes.append(cubetemp)
+
+    print(allcubes)
+    iris.util.equalise_attributes(allcubes)
+    cube = allcubes.concatenate_cube()
+
+ 
+    return(cube)
+
+def get_ipslcm5_atm(exptname, fieldnamein):
+    """
+      get data from the atmospheric files in ipslcm5
+
+      there is a bit of an error in the file calendar so we will
+    """
+    # copy the data to a new file but without the error
+    with Dataset(filename) as src,  Dataset("temporary.nc",  "w", format = 'NETCDF3_CLASSIC') as dst:
+        # copy attributes
+        for name in src.ncattrs():
+            dst.setncattr(name,  src.getncattr(name))
+        # copy dimensions
+        print(src.dimensions)
+        #for name,  dimension in src.dimensions.iteritems():
+        for name,  dimension in src.dimensions.items():
+
+            if name !=  'tbnds':   # don't copy across time counter bounds
+                dst.createDimension(name,  (len(dimension)))
+
+        # copy all file data
+        for name,  variable in src.variables.items():
+            print('name is', name, variable)
+            if name != 'time_counter_bnds' and name!= 'time_centered':
+                x  =  dst.createVariable(name,  variable.datatype,
+                                       variable.dimensions)
+                if name  == 'time_counter':
+                    # convert from seconds to days and start at middle of month
+                    dst.variables[name][:]  =  (src.variables[name][:] / (60.*60.*24))-(src.variables[name][0] / (60.*60.*24))+15.
+                else:
+                    dst.variables[name][:]  =  src.variables[name][:]
+                # copy attributes for this variable
+                for ncattr in src.variables[name].ncattrs():
+                    attribute = src.variables[name].getncattr(ncattr)
+                    print(ncattr, exptname)
+                    if ncattr  == 'calendar' and exptname  == 'Eoi400':
+                        dst.variables[name].setncattr(ncattr, '360_day')
+                    else:
+                        if (ncattr  == 'units' and name  == 'time_counter'):
+                    # change units from seconds to days
+                            dst.variables[name].setncattr(ncattr, attribute.replace('seconds', 'days'))
+                        else:
+                            dst.variables[name].setncattr(ncattr, attribute)
+
+        fieldreq = fieldnamein
+        if fieldnamein  == 'pr':
+            fieldreq = 'Precip Totale liq+sol'
+        if fieldnamein  == 'tas':
+            fieldreq = 'Temperature 2m'
+
+
+        cube = iris.load_cube('temporary.nc', fieldreq)
+
+        if fieldnamein  == 'ts' or fieldnamein  == 'tas':
+            cube.convert_units('Celsius')
+
+        if exptname  == 'Eoi400':
+            u  =  unit.Unit('days since 0800-01-01 00:00:00',
+                              calendar = unit.CALENDAR_360_DAY)
+        else:
+            u  =  unit.Unit('days since 0800-01-01 00:00:00',
+                          calendar = unit.CALENDAR_365_DAY)
+        cube.coord('time').units = u
+
+        return(cube)
+
+def get_ipslcm6():
+    """
+    get ipslcm6 data
+    here 200 years have been supplied.  We only want the last 100 years
+    """
+    cubeall = iris.load_cube(filename)
+
+    cubelist = iris.cube.CubeList([])
+    for i,  t_slice in enumerate(cubeall.slices(['latitude', 
+                                                 'longitude',
+                                                 'air_pressure'])):
+        if i >= 1200:
+            t_slice.coord('time').bounds = None
+            t_slice2 = iris.util.new_axis(t_slice, 'time')
+            cubelist.append(t_slice2)
+
+    cube = cubelist.concatenate_cube()
+    return(cube)
+
+def get_giss():
+    """
+    get giss data
+    here are multiple files containing the data
+    """
+    allcubes = iris.cube.CubeList([])
+    for file in range(0, len(filename)):
+        cubetemp = iris.load_cube(filename[file])
+        allcubes.append(cubetemp)
+
+    iris.util.equalise_attributes(allcubes)
+
+    cube = allcubes.concatenate_cube()
+
+    return(cube)
+    
+    
+def get_ccsm4_2deg():
+    """
+    get ccsm4_2deg utrecht data
+    """
+    
+    allcube = iris.load(filename)
+    ncubes = len(allcube)
+    for i in range(0, ncubes):
+        print(allcube[i].var_name,fielduse)
+        if allcube[i].var_name == fielduse:
+            cube = allcube[i]
+    
+    # put units as celcius if required
+    if fielduse == 'tas':
+        print(cube.units)
+        cube.units='Celsius'
+    
+    cube2 = iris.util.new_axis(cube, 'time')
+    print('julia check')
+    
+    return cube
+
+def get_ccsm4_uot():
+    """
+    get Uof T cube (need to add a dimension)
+    if precip convert to mm/day
+    """
+    
+    cubes = iris.load(filename)
+    print(cubes)
+    for cubetemp in cubes:
+        if cubetemp.var_name == 'plevel':
+            pressures = cubetemp.data
+        else:
+            cube = cubetemp
+    
+    
+    
+    points = (np.arange(0, 1200)*30)+15. # go for middle of month
+    u  =  unit.Unit('days since 0800-01-01 00:00:00',
+               calendar = unit.CALENDAR_360_DAY) # put as 360 day calendar because of the way
+                                               # the data was sent.
+
+    print('pressures')
+    cube.add_dim_coord(iris.coords.DimCoord(pressures,
+                standard_name = 'air_pressure',  long_name = 'pressure',
+                var_name = 'pressure',
+                units = 'Pa',
+                bounds = None,
+                coord_system = None,  circular = False), 1)
+
+
+    
+    cube.add_dim_coord(iris.coords.DimCoord(points,
+                standard_name = 'time',  long_name = 'time',
+                var_name = 'time',
+                units = u,
+                bounds = None,
+                coord_system = None,  circular = False), 0)
+
+
+    return cube
+
+    
+def get_cesm12(exptnamein):
+    """
+    get cesm1.2 data
+    """
+    allcube = iris.load(filename)
+    ncubes = len(allcube)
+    for i in range(0, ncubes):
+        print(allcube[i].var_name,fielduse)
+        if allcube[i].var_name == fielduse:
+            cube = allcube[i]
+        if allcube[i].var_name == "lev":
+            cubelev = allcube[i]
+
+    if exptnamein == 'E280' or MODELNAME == 'CCSM4' or MODELNAME == 'CESM1.2':
+        pressures = cubelev.data * 100.
+        print(pressures)
+        cube.add_dim_coord(iris.coords.DimCoord(pressures,
+                standard_name = 'air_pressure',  long_name = 'pressure',
+                var_name = 'pressure',
+                units = 'Pa',
+                bounds = None,
+                coord_system = None,  circular = False), 1)
+
+    if exptname == 'E280' and MODELNAME == 'CESM1.2':
+        points = (np.arange(0, 1200)*30)+15. # go for middle of month
+        u  =  unit.Unit('days since 0800-01-01 00:00:00',
+               calendar = unit.CALENDAR_360_DAY) # put as 360 day calendar because of
+        cube.coord('time').points = points
+        cube.coord('time').units = u
+        iris.util.promote_aux_coord_to_dim_coord(cube, 'time')
+       
+         #cube.add_dim_coord(iris.coords.DimCoord(points,
+         #       standard_name = 'time',  long_name = 'time',
+         #       var_name = 'time',
+         #       units = u,
+         #       bounds = None,
+         #       coord_system = None,  circular = False), 0)
+
+    return cube
+
+
+def reduce_years(cube100yr):
+    """
+    this will supply a cube with 100 years of data
+    we reduce this to 50 years
+    """
+    
+    cubelist = iris.cube.CubeList([])
+    for i,  t_slice in enumerate(cube100yr.slices(['latitude', 'longitude'])):
+        if i >= 600:
+            t_slice.coord('time').bounds = None
+            t_slice2 = iris.util.new_axis(t_slice, 'time')
+            cubelist.append(t_slice2)
+
+    cube50yr = cubelist.concatenate_cube()
+    
+    return cube50yr
+
+######################################################
+def correct_start_month(cube):
+    """
+    parameters: cube
+    returns: the same cube
+    
+    if month doesn't start on january we will have to change some of the
+    years from the end to match those at the start to give 100 full years
+
+    
+    """
+    print('julia3')
+
+    print(cube.coord('time').points)
+    print(cube.coord('time').units)
+    print(cube.coord('year').points)
+    print(cube.coord('month').points)
+
+    
+    startyear = (cube.coord('year').points[0])
+    endyear = (cube.coord('year').points[-1])
+    # count the number of months that have the same year as the first index
+    nstart = 0
+    nend = 0
+    for i in range(0, 12):
+        if cube.coord('year').points[i]  == startyear:
+            nstart = nstart+1
+    for i in range(-13, 0):
+        if cube.coord('year').points[i]  == endyear:
+            nend = nend+1
+    if nend!= 12 or nstart!= 12:
+        # oops we don't have a full year at the start and the end
+        # check to see whether we can aggregate into one year
+        if nend+nstart  == 12:
+            for i in range(-1 * nend, 0):
+                # move the last few to the start of the cube
+                cube.coord('year').points[i] = startyear
+        
+
+        else:
+
+            print('you have a partial year somewhere')
+            print('correct input data to provide full years')
+            print(nend, nstart)
+            sys.exit(0)
+
+    
+    return cube
+
+######################################################    
+def cube_avg(cube, exptnamein):
+    """
+    Extract averaged data and standard deviation values from a cube
+
+    Parameters:
+    cube (iris cube): A cube with montly data that we average
+
+    Returns:
+    meanmonthcube (iris cube): the input cube averaged over each of the 12 calendar months
+    sdmonthcube (iris cube): the standard deviation on the values in meanmonthcube
+    meanyearcube (iris cube): annual average values for each calendar year
+    meancube (iris cube) : the long term mean value at each gridpoint
+    sdcube (iris cube): the interannual standard deviation on the mean at each gridpoint
+    """
+
+    meanmonthcube = cube.aggregated_by('month', iris.analysis.MEAN)
+    
+    # NORESM and CESM1.2 does not start at month = 1,
+    #it starts at month = 2. but should be 1
+    # we are doing dome roundabout way of reordering the data
+    if (MODELNAME  == 'NorESM1-F' or MODELNAME  == 'NorESM-L'
+       or MODELNAME == 'CESM1.2' or MODELNAME == 'CCSM4'
+       or (MODELNAME == 'CESM2' and exptnamein == 'E280')):
+        allcubes = iris.cube.CubeList([])
+        for mon in range(2, 13):
+            slice  =  meanmonthcube.extract(iris.Constraint(month = mon))
+            # attempt to reorder time coordinate
+            slice.coord('time').points = mon-1
+            slice.coord('month').points = mon-1
+            slice.coord('time').bounds = None
+            allcubes.append(slice)
+        # do december (month 1)
+        slice  =  meanmonthcube.extract(iris.Constraint(month = 1))
+        slice.coord('time').points = 12
+        slice.coord('month').points = 12
+        slice.coord('time').bounds = None
+        allcubes.append(slice)
+        #process
+        meanmonthcube = (allcubes.merge_cube())
+        print(meanmonthcube.coord('time').points)
+        print(meanmonthcube.coord('month').points)
+
+    meanmonthcube.long_name = FIELDNAMEOUT
+    
+    iris.util.promote_aux_coord_to_dim_coord(meanmonthcube, 'month')
+    sdmonthcube = cube.aggregated_by('month', iris.analysis.STD_DEV)
+    sdmonthcube.long_name = FIELDNAMEOUT
+
+    # mean and standard deviation for each year
+    meanyearcube = cube.aggregated_by('year', iris.analysis.MEAN)
+    meanyearcube.long_name=FIELDNAMEOUT
+
+    # mean and interannual standard deviation over dataset
+    meancube = meanmonthcube.collapsed('time', iris.analysis.MEAN)
+    meancube.long_name=FIELDNAMEOUT
+    sdcube = meanyearcube.collapsed('time', iris.analysis.STD_DEV)
+    sdcube.long_name=FIELDNAMEOUT
+
+    return [meanmonthcube, sdmonthcube, meanyearcube, sdcube, meancube]
+
+
+def mon_avg(cube):
+    """
+    get the monthly average data from a cube
+
+    Parameters:
+    cube (iris cube) contains monthly data (ie t=12)
+
+    Returns:
+    meanmon (np array) with mean global values for each of the 12 months
+    """
+
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    grid_areas2 = iris.analysis.cartography.area_weights(cube)
+    tempcube = cube.collapsed(['latitude', 'longitude'],
+                              iris.analysis.MEAN, weights=grid_areas2)
+    meanmon = tempcube.data
+
+    return meanmon
+
+def get_monthly_sd(cube):
+    """
+    get monthly values of the standard deviation on the
+    globally averaged mean from a cube
+
+    Parameters:
+        cube (iris cube) : a cube with monthly data from the whole dataset
+                           (tdim=nyears*nmonths)
+    Returns:
+        stdevmon (numpy array) : an array with the monthly standard deviation
+                                 on the monthly global mean
+
+    """
+
+
+    stdevmon = np.zeros(12)
+    for mon in range(1, 13):
+        # mon_slice is the slice from this month.  It should have a time
+        # dimension of t where t is the number of years
+        mon_slice = cube.extract(iris.Constraint(month=mon))
+        mon_slice.coord('latitude').guess_bounds()
+        mon_slice.coord('longitude').guess_bounds()
+        grid_areas = iris.analysis.cartography.area_weights(mon_slice)
+        mon_avg = mon_slice.collapsed(['latitude', 'longitude'],
+                                      iris.analysis.MEAN, weights=grid_areas)
+        stdevcube = mon_avg.collapsed(['time'], iris.analysis.STD_DEV)
+        stdevmon[mon-1] = stdevcube.data
+
+    return stdevmon
+
+
+
+def area_means(allmeancube, yearmeancube):
+    """
+    get the globally averaged mean and standard deviation
+    and latitudinal means and standard deviation
+
+    Parameters:
+    allmeancube (iris cube) lat/lon cube of temporal mean tdim=1
+    yearmeancube (iris cube)  lat/lon/time cube of yearly averages tdim=nyears
+
+    Returns
+    meanann (float) global long term mean
+    stdevann (float)  global long term standard deviation of the mean
+    mean lat (np.array(nlats) latitudinally averaged long term mean
+    stdevlat (np.array(nlats)standard deviation of the latitudinal mean
+
+    """
+
+    allmeancube.coord('latitude').guess_bounds()
+    allmeancube.coord('longitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(allmeancube)
+    tempcube = mean_data.collapsed(['latitude', 'longitude'],
+                                   iris.analysis.MEAN, weights=grid_areas)
+    meanann = tempcube.data
+
+
+    # get mean for each latitude
+    tempcube = allmeancube.collapsed(['longitude'], iris.analysis.MEAN)
+    meanlat = tempcube.data
+    meanlat = np.squeeze(meanlat)
+
+
+    # get standard deviation
+    # 1. mean for each year
+
+    yearmeancube.coord('latitude').guess_bounds()
+    yearmeancube.coord('longitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(yearmeancube)
+    tempcube = yearmeancube.collapsed(['latitude', 'longitude'],
+                                      iris.analysis.MEAN, weights=grid_areas)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevann = stdevcube.data
+
+
+    # get standard deviation for each latitude
+    tempcube = yearmeancube.collapsed(['longitude'], iris.analysis.MEAN)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    #stdevann=stdevcube.data
+    stdevlat = stdevcube.data
+    stdevlat = np.squeeze(stdevlat)
+
+    return [meanann, stdevann, meanlat, stdevlat]
+
+##############################################
+def regrid_data(exptnamein, filename, fielduse, constraint):
+    """
+    regrid the data
+    """
+
+
+    print('moodelname is', MODELNAME)
+    print('filename is', filename)
+    print('fielduse is', fielduse)
+    print('exptnamein is', exptnamein)
+
+
+
+    # outfile
+    if LINUX_WIN  == 'l':
+        outstart = ('/nfs/hera1/earjcti/regridded/'+MODELNAME+'/'+ EXPTNAMEOUT +'.'+
+        FIELDNAMEOUT + '.')
+        lsmstart = '/nfs/hera1/earjcti/regridded/'
+    else:
+        outstart = ('C:\\Users\\julia\\OneDrive\\WORK\\DATA\\regridded\\'
+              +MODELNAME+'\\' + EXPTNAMEOUT + '.' + FIELDNAMEOUT + '.')
+        lsmstart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+
+   
+    #####################################
+    # get all data in a single cube
+    if (MODELNAME  == 'EC-Earth3.1' or
+       MODELNAME == 'EC-Earth3.3'): # all fields in one file
+        cube100 = iris.load_cube(filename, fielduse)
+    elif (MODELNAME  == 'HadCM3' or MODELNAME  == 'MRI2.3'):
+        cube100 = get_hadcm3_cube(MODELNAME)
+    elif ((MODELNAME  == 'IPSLCM5A' or MODELNAME  == 'IPSLCM5A2') and
+        (FIELDNAMEIN != 'tos')):
+        cube100 = get_ipslcm5_atm(exptnamein, FIELDNAMEIN)
+    elif (MODELNAME  == 'IPSLCM6A'):
+        cube100 = get_ipslcm6()
+    elif (MODELNAME  == 'GISS2.1G'):
+        cube100 = get_giss()
+    elif (MODELNAME  == 'CCSM4-Utr'):
+        cube100 = get_ccsm4_2deg()
+    elif (MODELNAME  == 'CESM1.2' 
+          or MODELNAME == 'CCSM4'
+          or MODELNAME == 'CESM2'):
+        cube100 = get_cesm12(exptnamein)
+    elif (MODELNAME == 'CCSM4-UoT'):
+        cube100 = get_ccsm4_uot()
+    else:
+        cube100 = iris.load_cube(filename)
+
+    #print('julia1',cube100.coord('air_pressure').points)
+    #print('julia2',cube100)
+
+    cube_level = cube100.extract(constraint)
+   
+    ###########################################
+    # reduce number of years to 50
+
+    cube = reduce_years(cube_level)
+    cube.data = cube.data.astype('float32')
+    ndim = cube.ndim
+
+
+    # now regrid the cube onto a 1X1 grid (we will first try regridding the raw data)
+    # we have stored the grid we want in a file 'one_lev_one_deg.nc'
+
+    # do not need to regrid CCSM4_UoTdata or a field that was originally on a tripolar grid
+   
+    if ((MODELNAME   == 'CCSM4-UoT')
+        or (MODELNAME  == 'IPSLCM5A' and fieldnamein  == 'tos')
+        or (MODELNAME  == 'IPSLCM5A2' and fieldnamein  == 'tos')):
+        regridded_cube = cube
+    else:
+        cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+        regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
+
+
+
+    refdate = 'days since 0800-01-01 00:00:00'
+
+    # for cosmos
+    if MODELNAME  == 'COSMOS':
+        # cosmos data is in a strange time coordinate line yyyymmdd
+        # we need to convert it to days since reference time
+        origpoints = regridded_cube.coord('time').points
+        npoints = len(origpoints)
+        print(npoints)
+
+        print(origpoints)
+        yeararr = np.zeros(npoints)
+        montharr = np.zeros(npoints)
+        dayarr = np.zeros(npoints)
+        daydecimal = np.zeros(npoints)
+        dayssinceref = np.zeros(npoints)
+        for i in range(0, npoints):
+            origstr = str(origpoints[i])
+            yeararr[i] = origstr[:][0:4]
+            montharr[i] = origstr[:][4:6]
+            dayarr[i] = origstr[:][6:8]
+            daydecimal[i] = origstr[:][8:]
+            dayssinceref[i] = dayssinceref[i-1]+dayarr[i]+daydecimal[i]-daydecimal[i-1]
+        # subtract 1 from days since reference date (as reference date will be 1st Jan)
+        dayssinceref = dayssinceref-1
+
+
+        regridded_cube.coord('time').points = dayssinceref
+        #  end of COSMOS loop
+
+    # for EC-Earth3.1
+    if (MODELNAME  == 'EC-Earth3.1'):
+    # convert from hours to days
+        origpoints = regridded_cube.coord('time').points
+        newpoints = origpoints/24.
+        regridded_cube.coord('time').points = newpoints
+        refdate = 'days since 2390-01-01 00:00:00'
+   
+        
+    if (MODELNAME  == 'COSMOS' or MODELNAME  == 'MIROC4m' or
+        MODELNAME  == 'IPSLCM6A' or 
+        MODELNAME  == 'EC-Earth3.1'):
+          regridded_cube.coord('time').units = refdate
+
+
+       
+    print(regridded_cube.coord('time'))
+    print('refdate is',refdate)
+  
+
+    # add auxillary coordinates month and year
+    iris.coord_categorisation.add_month_number(regridded_cube,  'time',  name = 'month')
+    iris.coord_categorisation.add_year(regridded_cube,  'time',  name = 'year')
+    
+    # correct the start month if required
+    regridded_cube=correct_start_month(regridded_cube)
+    
+    # calculate averages
+    mean_mon_data, sd_mon_data, mean_year_data, sd_data, mean_data = cube_avg(regridded_cube, exptnamein)
+
+
+   
+    print('j4 all mon', np.shape(mean_data))
+    print('j5 all year', np.shape(sd_data))
+
+    # extract monthly data from cubes
+
+    jan_slice  =  regridded_cube.extract(iris.Constraint(month = 1))
+    feb_slice  =  regridded_cube.extract(iris.Constraint(month = 2))
+    mar_slice  =  regridded_cube.extract(iris.Constraint(month = 3))
+    apr_slice  =  regridded_cube.extract(iris.Constraint(month = 4))
+    may_slice  =  regridded_cube.extract(iris.Constraint(month = 5))
+    jun_slice  =  regridded_cube.extract(iris.Constraint(month = 6))
+    jul_slice  =  regridded_cube.extract(iris.Constraint(month = 7))
+    aug_slice  =  regridded_cube.extract(iris.Constraint(month = 8))
+    sep_slice  =  regridded_cube.extract(iris.Constraint(month = 9))
+    oct_slice  =  regridded_cube.extract(iris.Constraint(month = 10))
+    nov_slice  =  regridded_cube.extract(iris.Constraint(month = 11))
+    dec_slice  =  regridded_cube.extract(iris.Constraint(month = 12))
+
+
+
+
+    # write the cubes out to a file
+
+    outfile = outstart+'mean_month.nc'
+    iris.save(mean_mon_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    outfile = outstart+'sd_month.nc'
+    iris.save(sd_mon_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    outfile = outstart+'allmean.nc'
+    iris.save(mean_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    outfile = outstart+'allstdev.nc'
+    iris.save(sd_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    ##########################################################################
+    # get the global mean and standard deviation and write them all out to a file
+    #
+    textout = outstart+'data.txt'
+
+    file1 =  open(textout, "w")
+
+    # get mean field for cube
+
+    mean_data.coord('latitude').guess_bounds()
+    mean_data.coord('longitude').guess_bounds()
+    grid_areas  =  iris.analysis.cartography.area_weights(mean_data)
+    tempcube = mean_data.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas)
+    meanann = tempcube.data
+
+
+    # get mean for each latitude
+    tempcube = mean_data.collapsed(['longitude'], iris.analysis.MEAN)
+    meanlat = tempcube.data
+    meanlat = np.squeeze(meanlat)
+
+
+    # get standard deviation
+    # 1. mean for each year
+
+    mean_year_data.coord('latitude').guess_bounds()
+    mean_year_data.coord('longitude').guess_bounds()
+    grid_areas  =  iris.analysis.cartography.area_weights(mean_year_data)
+    tempcube = mean_year_data.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevann = stdevcube.data
+
+    plt.plot(tempcube.data)
+    plt.plot([0, 100], [meanann, meanann])
+    plt.plot([0, 100], [meanann+stdevann+stdevann, meanann+stdevann+stdevann])
+    plt.plot([0, 100], [meanann-stdevann-stdevann, meanann-stdevann-stdevann])
+    plt.title('data and data+/-2sd')
+
+    # get standard deviation for each latitude
+    tempcube = mean_year_data.collapsed(['longitude'],  iris.analysis.MEAN)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    #stdevann = stdevcube.data
+    stdevlat = stdevcube.data
+    stdevlat = np.squeeze(stdevlat)
+
+
+
+
+
+
+    # write out to a file
+    file1.write('global annual mean and standard deviation\n')
+    file1.write('------------------------------------------\n')
+    if ndim>= 4:
+        file1.write(np.str(np.round(meanann[0], 2))+', '+np.str(np.round(stdevann[0], 3))+'\n')
+    else:
+        file1.write(np.str(np.round(meanann, 2))+', '+np.str(np.round(stdevann, 3))+'\n')
+
+    # get monthly means and standard deviation
+    file1.write('monthly means and standard deviations \n')
+    file1.write('----------------------------------------')
+    file1.write('month    mean    sd  \n')
+
+    mean_mon_data.coord('latitude').guess_bounds()
+    mean_mon_data.coord('longitude').guess_bounds()
+    grid_areas2  =  iris.analysis.cartography.area_weights(mean_mon_data)
+    tempcube = mean_mon_data.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas2)
+    meanmon = tempcube.data
+
+    # get monthly average using grid areas from year average
+    # to calculate standard deviation
+    #print(np.shape(jan_slice))
+    #print(np.shape(grid_areas))
+    #sys.exit(0)
+
+    jan_avg = jan_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    feb_avg = feb_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    mar_avg = mar_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    apr_avg = apr_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    may_avg = may_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    jun_avg = jun_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    jul_avg = jul_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    aug_avg = aug_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    sep_avg = sep_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    oct_avg = oct_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    nov_avg = nov_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    dec_avg = dec_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+
+    stdevmon = np.zeros(12)
+
+    stdevcube = jan_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[0] = stdevcube.data
+    stdevcube = feb_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[1] = stdevcube.data
+    stdevcube = mar_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[2] = stdevcube.data
+    stdevcube = apr_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[3] = stdevcube.data
+    stdevcube = may_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[4] = stdevcube.data
+    stdevcube = jun_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[5] = stdevcube.data
+    stdevcube = jul_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[6] = stdevcube.data
+    stdevcube = aug_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[7] = stdevcube.data
+    stdevcube = sep_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[8] = stdevcube.data
+    stdevcube = oct_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[9] = stdevcube.data
+    stdevcube = nov_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[10] = stdevcube.data
+    stdevcube = dec_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[11] = stdevcube.data
+
+    for i in range(0, 12):
+        if ndim>= 4:
+            file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i].data[0], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+        else:
+            file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+
+    # get latitudinal means and standard deviation
+    file1.write('zonal means and standard deviations \n')
+    file1.write('----------------------------------------\n')
+    file1.write('latitude    mean    sd  \n')
+    for i in range(0, len(meanlat)):
+        file1.write(np.str(mean_data.coord('latitude').points[i])+', '+np.str(np.round(meanlat[i], 2))+', '+np.str(np.round(stdevlat[i], 3))+'\n')
+
+    file1.close()
+
+
+    ########################################################
+    # check that we have averaged properly.  To do this we are
+    # going to plot the annual cycle of the global mean field
+    # for the regridded dataset and also for each year
+
+
+
+    #global mean
+   # plt.subplot(2, 2, 1) # global mean from each year
+    #subcube = subcube_mean_mon.copy(data = )  # set up structure of subcube
+
+    if cube.coord('latitude').has_bounds():
+        cube.coord('latitude').bounds
+    else:
+        cube.coord('latitude').guess_bounds()
+
+    if cube.coord('longitude').has_bounds():
+        cube.coord('longitude').bounds
+    else:
+        cube.coord('longitude').guess_bounds()
+
+    grid_areas  =  iris.analysis.cartography.area_weights(cube)
+    newcube = cube.collapsed(['latitude', 'longitude'],  iris.analysis.MEAN, weights = grid_areas)
+    nt = len(newcube.data)
+    nyears = np.int(nt/12)
+    print('nyears is', nyears)
+
+    for i in range(0, nyears):
+        tstart = i*12
+        tend = (i+1)*12
+        plotdata = newcube.data[tstart:tend]
+       # plt.plot(plotdata, color = 'r')
+
+
+
+    # global mean from average
+
+    grid_areas  =  iris.analysis.cartography.area_weights(mean_mon_data)
+    temporal_mean  =  mean_mon_data.collapsed(['latitude', 'longitude'],  iris.analysis.MEAN, weights = grid_areas)
+
+    #plt.plot(temporal_mean.data, color = 'b', label = 'avg')
+    #plt.title('globavg ' + FIELDNAMEIN)
+    #plt.legend()
+
+
+
+
+    # check at 30N
+    #plt.subplot(2, 2, 2)
+
+    bounds = cube.coord('latitude').bounds
+    nbounds = cube.coord('latitude').nbounds
+    nbounds, dummy = np.shape(bounds)
+    for i in range(0, nbounds):
+        if (bounds[i, 0]>= 32. >= bounds[i, 1] or bounds[i, 0]<= 32. <bounds[i, 1]):
+            index = i
+    #print(cube)
+    if ndim>= 4:
+        subcube = cube[:, :, index, :]
+    else:
+        subcube = cube[:, index, :]
+    cube_avg_30N = subcube.collapsed(['longitude'], iris.analysis.MEAN)
+
+    for i in range(0, nyears):
+        tstart = i*12
+        tend = (i+1)*12
+        plotdata = cube_avg_30N.data[tstart:tend]
+        #plt.plot(plotdata, color = 'r')
+
+    #mean at 30N
+    slice_30N =  mean_mon_data.extract(iris.Constraint(latitude = 32))
+    mean_30N = slice_30N.collapsed(['longitude'],  iris.analysis.MEAN)
+
+
+    #plt.plot(mean_30N.data, color = 'b', label = 'avg')
+    #plt.title('average at 30N by month')
+    #plt.legend()
+    #plt.show()
+    plt.close()
+
+
+#############################################################################
+def getnames(exptnamein):
+
+# this program will get the names of the files and the field for each
+# of the model
+
+    # set up model specific dictionaries
+    
+    COSMOS_FIELDS  = {"ua" : "u-velocity", "va" : "v-velocity",
+                      "zg" : "geopotential height"}
+
+    ECearth_FIELDS  = {"ua" : "U component of wind", 
+                       "va" : "V component of wind" ,
+                       "zg" : "Geopotential"}
+
+    HadCM3_FIELDS  = {"ua" : "U COMPNT OF WIND ON PRESSURE LEVELS", 
+                      "va" : "V COMPNT OF WIND ON PRESSURE LEVELS",
+                      "zg" : "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS"}
+
+    IPSLCM5A_FIELDS  = {"ua" : "Uwindplev5_uwind",
+                        "va" : "Vwindplev5_vwind" }
+
+    NorESM_FIELDS = {"ua" : "U", "va" : "V"}
+    
+    CCSM42_FIELDS = {"ua" : "U", "va": "V" }
+    
+    CESM12_FIELDS = {"ua": "U", "va": "V"}
+    
+    CESM12_EXTRA =  {"Eoi400": "b.e12.B1850.f09_g16.PMIP4-pliomip2.",
+                     "E280": "b.e12.B1850.f09_g16.preind.cam.h0.",
+                    }
+    
+    CESM2_EXTRA =  {"Eoi400": "b.e21.B1850.f09_g17.PMIP4-midPliocene-eoi400.001.cam.h0.",
+                     "E280": "b.e21.B1850.f09_g17.CMIP6-piControl.001.cam.h0.",
+                    }
+    
+    CCSM4_EXTRA =  {"Eoi400": "b40.B1850.f09_g16.PMIP4-pliomip2.",
+                     "E280": "b40.B1850.f09_g16.preind.cam.h0.",
+                    }
+
+    ECearth_EXPT = {"Eoi400": "mPlio",
+              "E280":"PI"
+              }
+    
+    CESM12_EXPT = {"Eoi400": "PlioMIP2",
+              "E280":"PI"
+              }
+
+    IPSLCM5A_EXPT = {"Eoi400": "Eoi400",
+              "E280":"PI"
+              }
+
+    CESM12_TIME = {"E280" : ".0707.0806",
+                   "Eoi400" : ".1101.1200"
+                   }
+    
+    CESM2_TIME = {"E280" : ".110001-120012",
+                   "Eoi400" : ".1101.1200"
+                   }
+    
+    CCSM4_TIME = {"Eoi400" : ".1001.1100",
+                  "E280" : ".0081.0180"
+                  }
+
+    IPSLCM5A_TIME = {"Eoi400": "3581_3680",
+              "E280":"3600_3699"
+              }
+
+    IPSLCM5A21_TIME = {"Eoi400": "3381_3480",
+              "E280":"6110_6209",
+              }
+    IPSLCM6A_TIME = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gr_185001-204912",
+              "E280":"piControl_r1i1p1f1_gr_285001-304912",
+              }
+    IPSLCM6A_TIME_ALT = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gn_185001-204912",
+              "E280":"piControl_r1i1p1f1_gn_285001-304912",
+              }
+    GISS_TIME1 = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gn_305101-310012",
+              "E280":"piControl_r1i1p1f1_gn_490101-495012",
+              "E560": "abrupt-2xCO2_r1i1p1f1_gn_190101-195012"
+              }
+    CCSM4_UofT_TIME = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gr1_160101-170012",
+              "E280":"piControl_r1i1p1f1_gr1_150101-160012",
+              "E560": "abrupt-2xCO2_r1i1p1f1_gn_195101-200012"
+              }
+    GISS_TIME2 = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gn_310101-315012",
+              "E280":"piControl_r1i1p1f1_gn_495101-500012",
+              "E560": "abrupt-2xCO2_r1i1p1f1_gn_195101-200012"
+              }
+    
+    # get names for each model
+    if MODELNAME   ==  'MIROC4m':
+        filename = FILESTART + MODELNAME + '/'
+        fielduse = FIELDNAMEIN
+        filename = (filename + fielduse + '/MIROC4m_' + 
+                    exptnamein + '_Amon_' + fielduse + '.nc')
+        constraint = iris.Constraint(air_pressure = LEVEL)
+  
+  
+    if MODELNAME   ==  'COSMOS':
+        print('model is COSMOS',LEVEL)
+        if LINUX_WIN  == 'l':
+            filename = FILESTART + 'AWI/COSMOS/'
+            filename = filename + exptnamein + '/'
+        else:
+            filename = FILESTART + '/COSMOS/'
+        fielduse = COSMOS_FIELDS.get(FIELDNAMEIN)
+        filename = (filename + exptnamein + '.' + FIELDNAMEIN +
+                    '_2650-2749_monthly_mean_time_series.nc')
+        constraint = iris.Constraint(air_pressure = LEVEL)
+  
+    if MODELNAME   ==  'CCSM4-UoT':
+        if LINUX_WIN  == 'l':
+            filename = FILESTART + 'UofT/'
+            filename = (filename + 'UofT-CCSM4/for_julia/' + 
+                        exptnamein + '/Amon/')
+        else:
+            filename = FILESTART+'UofT-CCSM4\\'+exptnamein+'\\'
+        fielduse = FIELDNAMEIN
+        
+        filename = (filename +  fielduse +
+                      '_Amon_' + exptnamein + '_UofT-CCSM4_gr.nc')
+        constraint = iris.Constraint(air_pressure = LEVEL)
+        
+
+    if MODELNAME  == 'HadCM3':
+        exptuse = EXPTNAME_L.get(exptnamein)
+        fielduse = HadCM3_FIELDS.get(FIELDNAMEIN)
+        filename = (FILESTART + 'LEEDS/HadCM3/' + exptuse
+                    + '/' + FIELDNAMEIN + '/'
+                    + exptuse + '.' + FIELDNAMEIN + '.')
+        constraint = iris.Constraint(p = LEVEL)
+
+    if MODELNAME  == 'MRI2.3':
+        exptuse = EXPTNAME_L.get(exptnamein)
+        fielduse = FIELDNAMEIN + str(np.int(LEVEL))
+        
+        filename = (FILESTART + 'MRI-CGCM2.3/' + fielduse + 
+                    '/' + exptuse + '.' + fielduse + '.')
+        constraint = None
+      
+    if MODELNAME  == 'EC-Earth3.1' or MODELNAME == 'EC-Earth3.3':
+        fileend = '_z.nc'
+        exptuse = EXPTNAME_L.get(exptnamein)
+        fielduse = ECearth_FIELDS.get(FIELDNAMEIN)
+        filename = (FILESTART + MODELNAME + '/'
+                    + MODELNAME 
+                    + '_' 
+                    + ECearth_EXPT.get(exptnamein) 
+                    + fileend)
+        constraint = iris.Constraint(air_pressure = LEVEL * 100)
+   
+
+    if MODELNAME  == 'IPSLCM5A' or MODELNAME  == 'IPSLCM5A2':
+        exptuse = EXPTNAME_L.get(exptnamein)
+        if MODELNAME  == 'IPSLCM5A':
+            timeuse = IPSLCM5A_TIME.get(exptnamein)
+        if MODELNAME  == 'IPSLCM5A2':
+            timeuse = IPSLCM5A21_TIME.get(exptnamein)
+        fielduse = IPSLCM5A_FIELDS.get(FIELDNAMEIN)
+        print(FILESTART)
+        print(MODELNAME)
+        print(exptnamein)
+        print(IPSLCM5A_EXPT.get(exptnamein))
+        print(FIELDNAMEIN)
+        print(IPSLCM5A_FIELDS.get(FIELDNAMEIN))
+        print(timeuse)
+        filename = (FILESTART+MODELNAME+'/'
+                  +IPSLCM5A_EXPT.get(exptnamein)+'.'
+                  +IPSLCM5A_FIELDS.get(FIELDNAMEIN)+'_'+timeuse+'_monthly_TS.nc')
+        constraint = None
+
+    if MODELNAME  == 'NorESM1-F' or MODELNAME  == 'NorESM-L':
+        fielduse = NorESM_FIELDS.get(FIELDNAMEIN)
+        filename = (FILESTART + MODELNAME + '/' + MODELNAME + '_' 
+                    + exptnamein + '_' + fielduse + '.nc')
+        constraint = iris.Constraint(pressure = LEVEL)
+
+    if MODELNAME  == 'IPSLCM6A':
+        fielduse = FIELDNAMEIN
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/' + MODELNAME 
+                    + '/' + fielduse + '_' + 'Amon_IPSL-CM6A-LR_'
+                   + IPSLCM6A_TIME.get(exptnamein)+'.nc')
+        constraint = iris.Constraint(air_pressure = LEVEL * 100.)
+      
+    if MODELNAME  == 'GISS2.1G':
+        fielduse = FIELDNAMEIN
+        exptuse = EXPTNAME_L.get(exptnamein)
+        filename = []
+        filename.append('/nfs/hera1/earjcti/PLIOMIP2/GISS2.1G/'
+                        + exptuse + '/' + fielduse + '_Amon'
+                        + '_GISS-E2-1-G_' 
+                        + GISS_TIME1.get(exptnamein) + '.nc')
+        filename.append('/nfs/hera1/earjcti/PLIOMIP2/GISS2.1G/'
+                        + exptuse + '/' + fielduse + '_Amon'
+                        + '_GISS-E2-1-G_' 
+                        + GISS_TIME2.get(exptnamein) + '.nc')
+        constraint = iris.Constraint(air_pressure = LEVEL * 100.)
+      
+       
+
+    if MODELNAME == 'CCSM4-Utr':
+        filename=(FILESTART + 'CESM1.0.5/' + exptnamein + '/' +
+                  exptnamein + '_' + CCSM42_FIELDS.get(FIELDNAMEIN) +
+                  '.nc')
+        fielduse = FIELDNAMEIN
+        
+    if MODELNAME == 'CESM1.2':
+        filename=(FILESTART + 'NCAR/' + 
+                  CESM12_EXTRA.get(exptnamein) + 
+                  CESM12_FIELDS.get(FIELDNAMEIN) +
+                  CESM12_TIME.get(exptnamein) + '.nc')
+        fielduse = CESM12_FIELDS.get(FIELDNAMEIN)
+        constraint = iris.Constraint(air_pressure = LEVEL * 100.)
+        
+
+    
+    if MODELNAME == 'CESM2':
+        print(exptnamein)
+        print(CESM2_TIME.get(exptnamein))
+        print(CESM2_EXTRA.get(exptnamein))
+        print(CESM12_FIELDS.get(FIELDNAMEIN))
+
+        filename=(FILESTART + 'NCAR/' + 
+                  CESM2_EXTRA.get(exptnamein) + 
+                  CESM12_FIELDS.get(FIELDNAMEIN) +
+                  CESM2_TIME.get(exptnamein) + '.nc')
+        fielduse = CESM12_FIELDS.get(FIELDNAMEIN)
+        constraint = iris.Constraint(air_pressure = LEVEL * 100.)
+               
+            
+    if MODELNAME == 'CCSM4':
+        filename = (FILESTART + 'NCAR/' + 
+                  CCSM4_EXTRA.get(exptnamein) + 
+                  CESM12_FIELDS.get(FIELDNAMEIN) +
+                  CCSM4_TIME.get(exptnamein) + '.nc')
+        fielduse = CESM12_FIELDS.get(FIELDNAMEIN)
+        constraint = iris.Constraint(air_pressure = LEVEL * 100.)
+      
+        
+    print(fielduse,filename,constraint)
+    retdata = [fielduse, filename, constraint]
+    return(retdata)
+
+
+##########################################################
+# main program
+
+FILENAME  =  ' '
+LINUX_WIN  =  'l'
+MODELNAME  = "MRI2.3" # MIROC4m  COSMOS CCSM4UoT -EC-Earth3.3
+                   # HadCM3 MRI2.3
+                   # IPSLCM5A,  IPSLCM5A2
+                   # NorESM1-F NorESM-L
+                   # IPSLCM6A GISS2.1G
+                   # CCSM4-Utr, CESM1.2
+                   # CCSM4
+                   # new to this version
+                   # EC-Earth3.3 CESM2 (b.e21)
+
+EXPTNAME  =  {
+        "E280" : "E280",
+        "Eoi400" : "EOI400",
+        "E400":"E400",
+        "E560": "E560"}
+
+EXPTNAME_L  =  {
+        "E280" : "e280",
+        "Eoi400" : "eoi400",
+        "E400":"e400",
+        "E560": "e560"}
+
+
+
+# this is regridding where all results are in a single file
+FIELDNAMEIN = 'zg' # ua, va, zg
+ALLLEVELS = [1000., 925., 850., 700., 600., 500., 400., 300., 250., 200.,150., 100.]
+#ALLLEVELS = [850., 750.,  500., 200., 100.]
+#ALLLEVELS = [500.]
+EXPTNAMEIN = ['Eoi400','E280']
+#EXPTNAMEIN = ['E280']
+
+if LINUX_WIN  == 'l':
+    FILESTART = '/nfs/hera1/pliomip2/data/'
+else:
+    FILESTART = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+
+
+
+for exptname in EXPTNAMEIN:
+    for LEVEL in ALLLEVELS:
+
+
+        # call program to get model dependent names
+        # fielduse,  and  filename
+        
+        retdata = getnames(exptname)
+        print(retdata)
+#        sys.exit(0)
+        fielduse = retdata[0]
+        filename = retdata[1]
+        lev_constraint = retdata[2]
+        print(fielduse, filename, lev_constraint)
+   
+        FIELDNAMEOUT = FIELDNAMEIN + '_' + np.str(LEVEL)
+        EXPTNAMEOUT = EXPTNAME.get(exptname)
+        
+        regrid_data(exptname, filename, fielduse, lev_constraint)
+

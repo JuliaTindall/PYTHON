@@ -1,0 +1,791 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on September 2020
+# 
+#  This program will look at the temperature data provided by Ulrich.
+#  It will assess whether the temperature agrees better with a particular
+#  time of year. 
+#
+#  The ultimate aim is to do a better DMC by comparing the model
+#  to the times when the proxy represents.  
+#
+#
+#
+#import os
+import numpy as np
+import pandas as pd
+#import scipy as sp
+#import cf
+import iris
+#import iris.util
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+#import netCDF4
+from mpl_toolkits.basemap import Basemap, shiftgrid
+#from netCDF4 import Dataset, MFDataset
+#import iris.analysis.cartography
+#import iris.coord_categorisation
+import iris.quickplot as qplt
+import iris.plot as iplt
+#import cf_units as unit
+#from iris.experimental.equalise_cubes import equalise_attributes
+import cartopy.crs as ccrs
+#import matplotlib.ticker as mticker
+#from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+#from mpl_toolkits.basemap import Basemap
+
+import sys
+
+ 
+def get_land_obs():
+    """
+    reads in the spredsheet from ulrich and returns 
+    the field, latitude and longitude from the required site. 
+    """
+
+    if SITE_REQUIRED == 'Meighen Island':
+        fielddata = 3.6
+        lat = 77.5
+        lon = -99.0
+
+    if SITE_REQUIRED == 'Beaver Pond':
+        fielddata = 1.1
+        lat = 79.0
+        lon = -82.0
+   
+    if SITE_REQUIRED == 'Flyes Leaf Bed':
+        fielddata = 1.0
+        lat = 79.0
+        lon = -83.0
+
+    if SITE_REQUIRED == 'Lake Elgygytgyn':
+        fielddata = 16.0
+        lat = 67.0
+        lon = -172.0
+    dfs = pd.read_excel(LAND_DATAFILE)
+    found = 'n'
+    
+    if FIELD == 'NearSurfaceTemperature':
+        colreq = 9
+    if FIELD == 'TotalPrecipitation':
+        colreq = 11
+   
+    
+    for index, row in dfs.iterrows():
+        if row[0] == SITE_REQUIRED:
+            found = 'y'
+            fielddata = row[colreq]
+            lat = row[2]
+            lon = row[3]
+            pass
+            
+    
+    if found == 'n' and SITE_REQUIRED != 'Meighen Island':
+        print('couldnot find site in Ulrichs file')
+   #     sys.exit(0)
+        
+    if FIELD == 'TotalPrecipitation':
+       fielddata = fielddata / 365.
+    
+   
+    return fielddata, lat, lon
+
+
+
+
+def get_model_data(period, modelname, lat, lon, field):
+    """
+    gets the model data for each month of the year for the site.
+    """
+    
+    fielduse = {'T' : 'NearSurfaceTemperature',
+                'P' : 'TotalPrecipitation'}
+    lonreq=lon
+    if lonreq < 0.:
+        lonreq=lonreq + 360.
+    filename = (FILESTART + '/regridded100/' + modelname + '/'+ period + '.'
+                + fielduse.get(field) + '.mean_month.nc')
+    
+    fieldname = fielduse.get(field)
+   
+    if modelname == 'GISS2.1G' or modelname == 'IPSLCM6A':
+        if fieldname == 'NearSurfaceTemperature':
+            fieldname = 'air_temperature'
+        if fieldname == 'TotalPrecipitation':
+            fieldname = 'precipitation_flux'
+    if modelname == 'HadGEM3_TEMPORARY':
+        if fieldname == 'NearSurfaceTemperature':
+            fieldname = 'temp'
+    
+  
+    field_cube = iris.load_cube(filename,
+                              fieldname)
+    
+    
+    lat_ix = (np.abs(field_cube.coord('latitude').points - lat)).argmin()
+    lon_ix = (np.abs(field_cube.coord('longitude').points - lonreq)).argmin()
+    
+    seas_field = field_cube.data[:, lat_ix, lon_ix]
+   
+   
+    return seas_field.data
+
+
+
+def plot_seascyc_vs_proxy(proxyT, models_Tseas, lat, lon, period):
+    """
+    plots the temperature from the data vs the modelled seasonal cycle.
+
+    """
+    
+    ylab = {'NearSurfaceTemperature': 'degC',
+            'TotalPrecipitation': 'mm/day'}
+    
+    ax = plt.subplot(111)
+    for i, mod_data in enumerate(models_Tseas):
+        if i > 6:
+            ax.plot(mod_data, linestyle='dashed', label=MODELNAMES[i])
+        else:
+            ax.plot(mod_data, label=MODELNAMES[i])
+        MAT = np.mean(mod_data)
+        ax.plot([-1.0,0], [MAT, MAT], color='blue')
+        
+        
+        
+    if proxyT > -100:
+        ax.axhline(y=proxyT)
+    title = SITE_REQUIRED + ' lat=' + np.str(np.around(lat)), ' lon='+np.str(np.around(lon))
+    plt.title(title)
+    plt.xlabel('month')
+    plt.ylabel(ylab.get(FIELD))
+    
+    
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+   
+
+    if period == 'anom':
+        periodwrite = EXPTNAME + '-' + PI_EXPT
+    else:
+        periodwrite = period
+        
+    plt.savefig(FILEOUTSTART + 'seas_cyc_' + FIELD + '_' + periodwrite + '_' + SITE_REQUIRED.replace(' ','_') + PLOTTYPE)
+    plt.close()
+   
+    
+
+def get_lsm_for_cube(cube):
+    """
+    get's the PI land sea mask and checks it is on the same grid as cube
+
+    """
+    LSMfile = (FILESTART + 'regridded/PlioMIP2_Boundary_conds/Modern_std' 
+            + '/Modern_std/Modern_std_LSM_v1.0.nc')
+    lsm_pi_cube = iris.load_cube(LSMfile)
+    if LINUX_WIN == 'l':
+        cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+    else:
+        cubegrid = iris.load_cube('C:\\Users\\julia\\OneDrive\\WORK\\PROGRAMS\\one_lev_one_deg.nc')
+
+    regrid_lsm_cube = lsm_pi_cube.regrid(cubegrid, iris.analysis.Linear())
+    
+    for i, lsm in enumerate(regrid_lsm_cube.coord('longitude').points):
+        if lsm != cube.coord('longitude').points[i]:
+            print('lsm lon error')
+            print(lsm, cube.coord('longitude').points[i])
+            sys.exit(0)
+       
+    for j, lsm in enumerate(regrid_lsm_cube.coord('latitude').points):
+         if lsm != cube.coord('latitude').points[j]:
+            print('lsm lat error')
+            print(lsm, cube.coord('latitude').points[i])
+            sys.exit(0)
+            
+   
+        
+    return regrid_lsm_cube
+        
+#####################################################        
+  
+def locate_PI_with_plioJulyT(model, temp_req, lonreq, proxy_lat):
+    """
+    this subroutine will find locations in the preindustrial MAT file 
+    which have July temperature of temp_req
+    The site must be land and within 30deg of lonreq
+    temperature
+
+    """
+    
+    def get_near_tempreq(cube, errormargin, mask, lsm):
+        
+        indexes= []
+        cube_loc = cube.copy(data = np.zeros(np.shape(cube.data)))
+        for index, temp in np.ndenumerate(cube.data):
+            if (temp_req - errormargin < temp < temp_req + errormargin):
+                if mask.data[index] == 1.0:
+                    cube_loc.data[index] = 1.0
+                    indexes.append(index)
+                   
+        
+    
+        return indexes
+    
+    def get_mean_min(): 
+        """
+        gets the july temperature and the january temperature
+        from the pi cube for each index
+        """
+        jan_temps = []
+        mean_rain = []
+        lons = []
+        lats = []
+        
+        for ix in indexes:
+            jan = cube.data[0, ix[0], ix[1]]
+            mean = cubeprecip_annmean.data[ix[0], ix[1]]
+            jan_temps.append(jan)
+            mean_rain.append(mean)
+            lons.append(cubeprecip_annmean.coord('longitude').points[ix[1]])
+            lats.append(cubeprecip_annmean.coord('latitude').points[ix[0]])
+            
+        
+        return jan_temps, mean_rain, lons, lats
+    
+    # get data and LSM 
+    if model == 'MMM':
+        filename = (FILESTART + 'regridded100/' + 
+                    'NearSurfaceTemperature_multimodelmean_month.nc')
+        cube = iris.load_cube(filename, 'NearSurfaceTemperaturemean_pi')
+        filename = (FILESTART + 'regridded100/' + 
+                    'TotalPrecipitation_multimodelmean_month.nc')
+        cubeprecip = iris.load_cube(filename, 'TotalPrecipitationmean_pi')
+    else:
+        filename = (FILESTART + 'regridded100/' + model + 
+                    '/E280.NearSurfaceTemperature.mean_month.nc')
+        if model == 'GISS2.1G' or model == 'IPSLCM6A':
+            fieldname = 'air_temperature'
+        else:
+            fieldname = 'NearSurfaceTemperature'    
+        cube = iris.load_cube(filename, fieldname)
+        filename = (FILESTART + 'regridded100/' + model + 
+                    '/E280.TotalPrecipitation.mean_month.nc')
+        if model == 'GISS2.1G' or model == 'IPSLCM6A':
+            fieldname = 'precipitation_flux'
+        else:
+            fieldname = 'TotalPrecipitation'    
+        cubeprecip = iris.load_cube(filename, fieldname)
+        
+ 
+    if model == 'HadGEM3' or model == 'MMM':
+        cube_julymean =  cube.extract(iris.Constraint(time=7))
+    else:
+        cube_julymean =  cube.extract(iris.Constraint(month=7))
+    cubeprecip_annmean =  cubeprecip.collapsed(['time'], iris.analysis.MEAN)
+    
+    lsm = get_lsm_for_cube(cube)
+    mask = get_lsm_for_cube(cube)
+    for i, lon in enumerate(lsm.coord('longitude').points):
+        if lon < lonreq - 10.:
+            mask.data[:,i] = 0
+        if lon > lonreq + 10.:
+            mask.data[:,i] = 0
+    for j, lat in enumerate(lsm.coord('latitude').points):
+        if lat < proxy_lat - 50.:
+            mask.data[j,:] = 0
+       
+    
+    indexes = get_near_tempreq(cube_julymean, 2.0, mask, lsm)
+    mintemps, meanrain,  lons, lats  = get_mean_min()
+    
+    return mintemps, meanrain, lons, lats
+
+
+def locate_PI_with_plioMAT(model, temp_req, lonreq, proxy_lat):
+    """
+    this subroutine will find locations in the preindustrial MAT file 
+    which have MAT of temp_req
+    The site must be land and within 45deg of lonreq
+    temperature
+
+    """
+    
+    def get_near_tempreq(cube, tempreq, errormargin, mask, lsm):
+        
+        indexes= []
+        cube_loc = cube.copy(data = np.zeros(np.shape(cube.data)))
+        for index, temp in np.ndenumerate(cube.data):
+            if (tempreq - errormargin < temp < tempreq + errormargin):
+                if mask.data[index] == 1.0:
+                    cube_loc.data[index] = 1.0
+                    indexes.append(index)
+                  
+        #qplt.contourf(cube_loc)  
+        #iplt.contour(lsm, colors='black', linewidths=0.1)
+        #plt.scatter(lonreq, proxy_lat, color='red',transform=ccrs.Geodetic())
+        #plt.show()
+        
+    
+        return indexes
+    
+    def get_max_min():
+        """
+        gets the july temperature and the january temperature
+        from the pi cube for each index
+        """
+        jan_temps = []
+        july_temps = []
+        range_temps = []
+       
+        for ix in indexes:
+            jan = cube.data[0, ix[0], ix[1]]
+            jul = cube.data[6, ix[0], ix[1]]
+            jan_temps.append(jan)
+            july_temps.append(jul)
+            range_temps.append(jul - jan)
+            
+           
+      
+        return jan_temps, july_temps, range_temps
+    
+    # get data and LSM 
+    filename = FILESTART + 'regridded100/' + model + '/E280.NearSurfaceTemperature.mean_month.nc'
+    if model == 'GISS2.1G' or model == 'IPSLCM6A':
+        fieldname = 'air_temperature'
+    else:
+        fieldname = 'NearSurfaceTemperature'
+        
+    cube = iris.load_cube(filename, fieldname)
+    cube_annmean =  cube.collapsed(['time'],
+                                    iris.analysis.MEAN)
+    
+    lsm = get_lsm_for_cube(cube)
+    mask = get_lsm_for_cube(cube)
+    for i, lon in enumerate(lsm.coord('longitude').points):
+        if lon < lonreq - 30.:
+            mask.data[:,i] = 0
+        if lon > lonreq + 30.:
+            mask.data[:,i] = 0
+    for j, lat in enumerate(lsm.coord('latitude').points):
+        if lat < 0.:
+            mask.data[j,:] = 0
+       
+    
+   
+    indexes = get_near_tempreq(cube_annmean, temp_req, 1.0, mask, lsm)
+    maxtemps, mintemps, temprange = get_max_min()
+    
+    
+    return maxtemps, mintemps, temprange
+  
+def plot_scatter_temperatures(temp_xaxis, temp_yaxis, modelname, i,
+                              temp_xplio, temp_yplio, titlename,
+                              yaxistitle, xaxistitle,
+                              fileout):
+    """
+    does a scatter plot of the temperatures on a multi subplot figure
+    temp_xaxis and temp_yaxis is the preindustrial temperatures that 
+    will be plotted in blue
+    temp_xplio and temp_yplio is the pliocene temperature at the site that 
+    will be plotted in red
+
+    """
+    
+    if i == 0:
+        fig = plt.figure(figsize=(11.0, 11.0))
+        fig.suptitle(titlename, fontsize=20)
+        fig.text(0, 0.5, yaxistitle, rotation=90, fontsize=20, verticalalignment = 'center')
+        fig.text(0.6, 0.0, xaxistitle, fontsize=20, horizontalalignment = 'center')
+    
+    if modelname == 'MMM':
+        xplot = 1
+        yplot = 1
+        plotpos = 1
+    else:
+        xplot = 4
+        yplot = 5
+        plotpos = np.mod(i, xplot * yplot) + 1
+
+    plt.subplot(xplot, yplot, plotpos)
+    plt.scatter(temp_xaxis, temp_yaxis)
+    plt.scatter(temp_xplio, temp_yplio, color='red')
+    plt.title(modelname)
+        
+    if (plotpos == (xplot * yplot)
+        or i == len(MODELNAMES) - 1
+        or modelname == 'MMM'):
+       
+        plt.subplots_adjust(left=0.05, bottom=0.05, right=1.00, top=0.9,
+                            wspace=0.3, hspace=0.3)
+        plt.savefig(fileout, bbox_inches='tight')
+        plt.close()
+      
+def plot_locations_match(modellons, modellats, proxylon, proxylat, 
+                         modeltemps, fileout, modelnames, jandata,
+                         janplio):
+    """
+    this will plot the locations where the model has pi data the same as the 
+    pliocene site
+    """
+    def get_minmax(proxydata, modeldata):
+        """
+        gets the minimum or maximum of the model data or the proxy data
+        """
+        minval = proxydata
+        maxval = proxydata
+        for lons in modeldata:
+            minval = np.min([minval, np.min(lons)])
+            maxval = np.max([maxval, np.max(lons)])
+
+        return minval, maxval
+      
+        
+    if len(modelnames) > 1:
+        fig = plt.figure(figsize=(11.0, 11.0))
+        fig.suptitle(SITE_REQUIRED + 'All sites have same july temperature: pliocene (red) matches pi (blue)', fontsize=15)
+      
+    lonmin, lonmax = get_minmax(proxylon, modellons)
+    latmin, latmax = get_minmax(proxylat, modellats)
+
+
+    for i, model in enumerate(modelnames):
+        lons = modellons[i]
+        lats = modellats[i]
+       
+        left = False
+        right = False
+        top = False
+        bottom = False
+
+        if np.mod(i, 4) == 0:
+           left = True
+        if np.mod(i, 4) == 3:
+           tight = True
+        if i > 12:
+           bottom = True
+
+        if len(modelnames) == 1:
+            plt.subplot(1,1,1)
+        else:
+            plt.subplot(4,5,i+1)
+        #m=Basemap(llcrnrlon=lonmin-5.,urcrnrlon=lonmax+5.,
+        #          llcrnrlat=latmin -5.,
+        #          urcrnrlat=latmax+5.,projection='cyl',resolution='c')
+        #m.drawmapboundary
+        #m.drawcoastlines()
+        #parallels=np.arange(-90.,90.,20.)
+        #m.drawparallels(parallels,labels=[left,right,top,bottom],fontsize=10) # labels right
+        #meridians=np.arange(-180.,180.,20.)
+        #m.drawmeridians(meridians,labels=[left,right,top,bottom],fontsize=10)
+    
+        #ax = plt.axes(projection=ccrs.Robinson(central_longitude=0))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.set_extent([lonmin-5., lonmax + 5., latmin-5., latmax+5.])
+        ax.coastlines()
+        gl = ax.gridlines(draw_labels=True)
+        gl.xlabels_top = False
+        gl.left_labels = False
+
+       
+        if model == 'MMM':
+            V = np.arange(np.min(jandata), np.max(jandata), 2)
+            #V = np.arange(-40, 10, 5)
+            #mycmap = 'gist_earth'
+            mycmap = plt.get_cmap('gist_earth')
+            #rgb_cm = cmap.colors  # returns array-like color
+            norm = colors.BoundaryNorm(boundaries=V, ncolors=mycmap.N)
+  
+            print(jandata)
+            scatter = plt.scatter(lons, lats, c=jandata,  marker='o', s=20,
+                               norm = norm , cmap=mycmap, 
+                                transform=ccrs.Geodetic())
+
+           # plt.scatter(proxylon, proxylat, c=janplio,marker='s', s=50,
+           #                    norm = norm , cmap=mycmap, 
+           #                     transform=ccrs.Geodetic())
+            print(lons,lats)
+            print(proxylon, proxylat)
+            plt.text(proxylon, proxylat, 'x', fontsize=30, 
+                                transform=ccrs.Geodetic())
+            
+            plt.text(proxylon+2.0, proxylat - 0.5, SITE_REQUIRED, 
+                                transform=ccrs.Geodetic())
+           
+            cbar = plt.colorbar(scatter, orientation = 'horizontal')
+            cbar.set_label('cold month temperature (degC)')
+        else:
+            plt.scatter(proxylon, proxylat, c='red',marker='s', s=50)
+            plt.scatter(lons, lats, c='blue',  marker='o', s=10)
+       
+
+
+        if model == 'MMM':
+            plt.title('PI Locations with WMMT the same as' + 
+                      ' mPWP ' + SITE_REQUIRED)
+        else:
+            plt.title(model + ' ' + np.str(np.around(modeltemps[i])))
+
+
+    plt.subplots_adjust(left=0.05, bottom=0.05, right=1.00, top=0.9,
+                            wspace=0.3, hspace=0.3)
+    plt.savefig(fileout, bbox_inches='tight')
+    plt.close()
+
+  
+def main():
+    """
+    calling structure
+    a) get data from Ulrichs spreadsheet
+    b) get's proxy data
+    c) plots model data with proxy data on top
+    """
+ 
+#    #########################################
+#    # get data from Ulrichs spreadsheet
+    
+    proxy_temperature, proxy_lat, proxy_lon = get_land_obs()
+    
+    #################################################
+    # get Pliocene model data for each month of the year.
+    allmodel_Tseascyc = []
+    allmodel_Pseascyc = []
+    for model in MODELNAMES:
+        T_seascyc = get_model_data(EXPTNAME, model, proxy_lat, proxy_lon,'T')
+        P_seascyc = get_model_data(EXPTNAME, model, proxy_lat, proxy_lon,'P')
+        allmodel_Tseascyc.append(T_seascyc)
+        allmodel_Pseascyc.append(P_seascyc)
+       
+
+        
+    plot_seascyc_vs_proxy(proxy_temperature, allmodel_Tseascyc,
+                          proxy_lat, proxy_lon,EXPTNAME)
+        
+    
+    #################################################
+    # get PI model data for each month of the year.
+    allmodel_TseascycPI = []
+    allmodel_Tseascycanom = []
+    for i, model in enumerate(MODELNAMES):
+        T_seascyc = get_model_data(PI_EXPT, model, proxy_lat, proxy_lon,'T')
+        allmodel_TseascycPI.append(T_seascyc)
+       
+        allmodel_Tseascycanom.append(allmodel_Tseascyc[i] - T_seascyc)
+    
+   
+       
+    plot_seascyc_vs_proxy(-3.61, allmodel_TseascycPI,
+                          proxy_lat, proxy_lon, PI_EXPT)
+    plot_seascyc_vs_proxy(-999.999, allmodel_Tseascycanom,
+                          proxy_lat, proxy_lon, 'anom')
+    
+    ##############################################################
+    # find the PI locations which have the same MAT as the
+    # Pliocene temperature for our site.  
+    
+    titlename = ('Red - Pliocene Jan/july temperatures at ' + SITE_REQUIRED +  
+                 ', \n Blue - Preindustrial Jan/July temperatures for preindustrial sites which have the' + 
+                 ' same MAT as ' + SITE_REQUIRED)
+    fileout = (FILEOUTSTART + SITE_REQUIRED.replace(' ','_')  + 
+               '_Jan_July_T_for_this_MAT' + EXPTNAME + PLOTTYPE)
+    if proxy_lon < 0: proxy_lon = proxy_lon + 360.
+    for i, model in enumerate(MODELNAMES):
+        mean_plio_temp = np.mean(allmodel_Tseascyc[i])
+        
+
+        janT, julyT, T_seascyc_amp = locate_PI_with_plioMAT(model, mean_plio_temp, proxy_lon, proxy_lat)
+
+        plot_scatter_temperatures(janT, julyT, model, i,
+                                  allmodel_Tseascyc[i][0],
+                                  allmodel_Tseascyc[i][6],
+                                  titlename, 'July temperature',
+                                  'January temperature', fileout)
+        
+    
+    ##############################################################
+    # find the PI locations which have the same July as the
+    # Pliocene temperature for our site.  
+    
+    titlename = ('Red - Pliocene Jan/MAT temperatures at ' + SITE_REQUIRED +  
+                 ', \n Blue - Preindustrial Jan/MAT for PI sites which have the' + 
+                 ' same July temperature as ' + SITE_REQUIRED)
+    fileout = (FILEOUTSTART + SITE_REQUIRED.replace(' ','_')  + 
+               '_JanT_MAT_for_this_JulyT' + EXPTNAME + PLOTTYPE)
+    modellons = []
+    modellats = []
+    julytemp = []
+    modelpi_janT = []
+    for i, model in enumerate(MODELNAMES):
+        july_plio_temp = allmodel_Tseascyc[i][6]
+        mean_plio_precip = np.mean(allmodel_Pseascyc[i])
+        print(allmodel_Pseascyc[i])
+     
+        julytemp.append(july_plio_temp)
+        
+        janT, MAP, lons, lats = locate_PI_with_plioJulyT(model, july_plio_temp, proxy_lon, proxy_lat)
+        modellons.append(lons)
+        modellats.append(lats)
+        modelpi_janT.append(janT)
+       
+        plot_scatter_temperatures(janT, MAP, model, i,
+                                  allmodel_Tseascyc[i][0],
+                                  mean_plio_precip,
+                                  titlename, 'MAP',
+                                  'January temperature', fileout)
+
+    plt.close()
+    # plot the locations where pi is same as plio.
+    fileout =  FILEOUTSTART + SITE_REQUIRED.replace(' ','_') + 'locations_with_same_julyT' + EXPTNAME + PLOTTYPE
+       
+    plot_locations_match(modellons, modellats, proxy_lon, proxy_lat, julytemp, 
+                         fileout, MODELNAMES, modelpi_janT,'0')
+                        
+
+    ###################################################################
+    #  CHECK WHERE THE JULY TEMPERATURES IN PLIOCENE MATCH THE PI IN
+    #  THE MULTIMODELMEAN
+
+    MAPplio = np.mean(allmodel_Pseascyc)
+    print(MAPplio)
+#    sys.exit(0)
+    janplio = np.mean(allmodel_Tseascyc, axis=0)[0]
+    julplio = np.mean(allmodel_Tseascyc, axis=0)[6]
+    julplio = 19.0
+    (janTpi, MAPpi, 
+     lonspi, latspi) = locate_PI_with_plioJulyT('MMM', julplio, 
+                                                proxy_lon, proxy_lat)
+
+    fileout = (FILEOUTSTART + SITE_REQUIRED.replace(' ','_')  + 
+               '_MMM_analogies_' + EXPTNAME + PLOTTYPE)
+
+    plot_scatter_temperatures(janTpi, MAPpi, 'MMM', 0,
+                               janplio, MAPplio, 
+                               titlename, 'MAP (mm/day)',
+                               'January temperature', fileout)
+    plt.close()
+    fileout =  (FILEOUTSTART + SITE_REQUIRED.replace(' ','_') + 
+                 'locations_with_MMM_julyT' + EXPTNAME + PLOTTYPE)
+  
+    plot_locations_match([lonspi], [latspi], proxy_lon, 
+                          proxy_lat, [julplio], fileout, ['MMM'],
+                         janTpi, janplio)
+  #                       proxy_lat, [19.0], fileout, ['MMM'])
+ 
+
+
+
+
+    #########################
+    # some printouts for adding to paper
+
+    
+    allmeans = np.zeros(len(MODELNAMES))
+    coldmeans = np.zeros(len(MODELNAMES))
+    warmmeans = np.zeros(len(MODELNAMES))
+    for i, model in enumerate(MODELNAMES):
+        print('Jan, Jul mean', model, allmodel_Tseascyc[i][0],
+              allmodel_Tseascyc[i][6], np.mean(allmodel_Tseascyc[i][:]))
+        allmeans[i] = np.mean(allmodel_Tseascyc[i][:])
+        coldmeans[i] = np.min(allmodel_Tseascyc[i][:])
+        warmmeans[i] = np.max(allmodel_Tseascyc[i][:])
+  
+    print(SITE_REQUIRED, 'multmodelmean mean stdev',np.mean(allmodel_Tseascyc), np.mean(allmeans), np.std(allmeans))
+    print(np.shape(allmodel_Tseascyc))
+    print('mean annual cycle pliocene', np.mean(allmodel_Tseascyc, axis=0))
+    print('mean annual cycle pi', np.mean(allmodel_TseascycPI, axis=0))
+    print('standard deviation pliocene', np.std(allmodel_Tseascyc, axis=0))
+    #print('max annual cycle pliocene', np.max(allmodel_Tseascyc, axis=0))
+    #print('min annual cycle pliocene', np.min(allmodel_Tseascyc, axis=0))
+
+    datameanmin = 6.65
+    datameanmax = 7.65
+
+    datacoldmin = -9.47
+    datacoldmax = -6.73
+
+    datawarmmin = 15.3
+    datawarmmax = 20.5
+
+    correctcold = 0
+    correctwarm = 0
+    correctmean = 0
+    for i, model in enumerate(MODELNAMES):
+        if datameanmin - 2.0  < allmeans[i] < datameanmax + 2.0:
+            correctmean = correctmean + 1
+        if datacoldmin - 2.0 < coldmeans[i] < datacoldmax + 2.0:
+            correctcold = correctcold + 1
+        if datawarmmin - 2.0 < warmmeans[i] < datawarmmax + 2.0:
+            correctwarm = correctwarm + 1
+            print('correctwarm',model)
+
+    print('correct models', correctmean, correctwarm, correctcold)
+    print('mean annual cycle pliocene', np.mean(allmodel_Tseascyc))
+    print('mean annual cycle pi', np.mean(allmodel_TseascycPI))
+
+    print('got to end of program')
+##########################################################
+# main program
+
+
+LINUX_WIN = 'l'
+EXPTNAME = 'EOI400'
+PI_EXPT = 'E280'
+
+if LINUX_WIN == 'l':
+    FILESTART = '/nfs/hera1/earjcti/' 
+    FILEOUTSTART = '/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP2/vegetation/'
+    LAND_DATAFILE = ('/nfs/hera1/earjcti/PLIOMIP2/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+    PLOTTYPE =  '.eps'
+else:
+    FILESTART = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+    LAND_DATAFILE = (FILESTART + '/proxydata/' + 
+                 'PlioceneTerrestrial_IPCCAR6.xlsx')
+    PLOTTYPE = '.png'
+ 
+
+MODELNAMES = [
+              'CESM2', 'HadGEM3',
+              'IPSLCM6A', 
+              'COSMOS', 
+              'EC-Earth3.3', 'CESM1.2', 'IPSLCM5A',
+              'MIROC4m', 'IPSLCM5A2', 'HadCM3',
+              'GISS2.1G', 'CCSM4', 
+              'CCSM4-Utr', 'CCSM4-UoT', 
+              'NorESM-L',  'MRI2.3', 'NorESM1-F'
+              ]
+
+#MODELNAMES = [
+#              'CESM2', 'HadGEM3',
+#              'IPSLCM6A', 'CCSM4',
+#              'COSMOS', 
+#              'EC-Earth3.3', 'CESM1.2', 'IPSLCM5A',
+#              'MIROC4m', 'IPSLCM5A2', 'HadCM3',
+#              'CCSM4-Utr', 'CCSM4-UoT', 
+#              'NorESM-L',  'NorESM1-F'
+#              ]
+
+#MODELNAMES = ['COSMOS', 'HadCM3', 'MIROC4m']
+#
+ABSOLUTE_ANOMALY_IND = 'absolute' # do we want to compare the absolute value or the anomaly value
+FIELD = 'NearSurfaceTemperature'
+#FIELD = 'TotalPrecipitation'
+
+#SITE_REQUIRED = 'Lake Baikal'
+#SITE_REQUIRED = 'Lake Elgygytgyn'
+#ITE_REQUIRED = 'Meighen Island'
+SITE_REQUIRED = 'Beaver Pond'
+#SITE_REQUIRED = 'Flyes Leaf Bed'
+#ITE_REQUIRED = 'Lost Chicken Mine'
+#SITE_REQUIRED = 'James Bay Lowland'
+#SITE_REQUIRED = 'Pula Maar'
+#SITE_REQUIRED = 'Alpes-Maritimes'
+#SITE_REQUIRED = 'Tarragona'
+#SITE_REQUIRED = 'Rio Maior'
+#SITE_REQUIRED = 'Yallalie, Perth'
+
+main()

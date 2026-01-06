@@ -1,0 +1,407 @@
+#NAME
+#    Database_temperature_annual.py
+#PURPOSE 
+#
+#  This program will create database like files for annual averages.
+#  it is actually used for Dan Hills energy balance calculation
+#
+#  The program will also get 
+#         ?????_Annual_Average_a@pd_TotalPrecipitationRate.nc
+#         ?????_Annaul_Average_a@pd_TotalCloud.nc
+#
+#
+# Julia 8.2.2017
+# Julia 20.10.2018 ; included the ability to create database HadCM3 files
+# Julia 17.01.2025 ; copied from the CEMAC directory and adapted for pliomip3
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import sys
+from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+
+def get_glob_avg(varreq, latin, field):
+    """
+    gets the global average of the fields
+    """
+    zonalmean = np.mean(varreq, axis=1)
+    latrad = latin * 2. * np.pi / 360.
+    coslatrad = np.cos(latrad)
+   
+    globavg = (np.sum(zonalmean * coslatrad)  / np.sum(coslatrad))
+
+    if field == 'temp' or field =='temp_1':
+        globavg = globavg-273.15
+    if field == 'precip_1' or field =='precip':
+        globavg = globavg * 60. * 60. *24.
+   
+    return globavg
+
+
+#=====================================================
+def get_monthly_data(expt,startyear,endyear,field,HadCM3):
+
+# this function will extract the data and write out to a file
+
+    if HadCM3 == 'orig':
+        century=np.floor(startyear/100.)
+        choices = {10 : 'a', 11: 'b',  12: 'c',  13: 'd', 14: 'e', 
+                       15: 'f', 16: 'g', 17: 'h', 18: 'i', 19: 'j',  
+                       20: 'k', 21: 'l', 22: 'm', 23: 'n', 24: 'o',
+                       25: 'p', 26: 'q', 27: 'r', 28: 's', 29: 't',
+                       30: 'u', 31: 'v', 32: 'w', 33: 'x', 34: 'y', 35:'z'} 
+
+        extra=choices.get(century, np.str(np.int(century))) 
+          
+        sep = '@'
+        startyearuse=np.int(startyear - (century * 100))
+        endyearuse = np.int(endyear - (century * 100))
+    else:
+        sep = '#'
+        staryearuse=startyear
+        endyearuse=endyear
+        extra=''
+
+
+    outdir='/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Monthly_Average'
+    if field == 'SST' or field =='SeaIceConc':
+        infile='/nfs/hera1/earjcti/um/'+expt+'/pf/'+expt+'o'+sep+'pf'
+    else:
+        infile='/nfs/hera1/earjcti/um/'+expt+'/pcpd/'+expt+'a'+sep+'pd'
+    txtfile='/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_'+ field + str(startyear) + '_' + str(endyear)  +'_global_avg_monthly.txt'
+    ftxt=open(txtfile,'w')
+    ftxt.write('year,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec\n')
+
+    
+
+    # loop over all years
+    months=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+  
+    for year in range(startyearuse,endyearuse):
+        for i,month in enumerate(months):
+            if HadCM3 == 'y':
+                filename=infile+str(year).zfill(9)+month+'+.nc'
+            if HadCM3 == 'orig':
+                filename= infile + extra + str(year) + month + '.nc'
+            print(filename)
+            f=MFDataset(filename)
+            #print(f.variables)
+       
+            if year == startyearuse and i==0:
+                latin = f.variables['latitude'][:]
+                latsize=len(latin)
+                lonin = f.variables['longitude'][:]
+                lonsize=len(lonin)
+                allvar=np.ma.zeros((endyear-startyear,12,latsize,lonsize))
+                timeseries=np.zeros((12,(endyear-startyear)))  
+           
+            if field == 'SST':
+                varreq=f.variables['temp'][:]
+                allvar[year-startyearuse,i,:,:]=np.squeeze(varreq)
+            elif field == 'SeaIceConc':
+                varreq=f.variables['iceconc'][:]
+                allvar[year-startyearuse,i,:,:]=np.squeeze(varreq)
+            else:
+                varreq=f.variables[field][:]
+                allvar[year-startyearuse,i,:,:]=np.squeeze(varreq)
+
+      
+                globavg = get_glob_avg(np.squeeze(varreq), latin,field)
+
+        
+                timeseries[i,year-startyearuse]=globavg
+
+        ftxt.write(np.str(year)+','+np.str(timeseries[:,year-startyearuse]) + '\n')
+   
+        f.close()
+    ftxt.close()
+
+    avgvar=np.ma.mean(allvar,axis=0)
+    avgvar=np.ma.where(avgvar.mask == 1.0, -99999., avgvar)
+  
+    # write average variable out to a netcdf file
+
+    # set up filename
+
+    fout=(outdir+'_#pd_'+field+'_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    if ((field == 'temp_1' and HadCM3 !='y')
+         or (field == 'temp' and HadCM3 =='y')):
+        fout=(outdir+'_#pd_Temperature_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    if field == 'precip_1' or field == 'precip':
+        fout=(outdir+'_#pd_TotalPrecipitationRate_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    if field == 'field30':
+        fout=(outdir+'_#pd_TotalCloud_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    if field == 'SST':
+        fout=(outdir+'_#pf_SST_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    if field == 'SeaIceConc':
+        fout=(outdir+'_#pf_SST_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    print(fout)
+ 
+    f2=Dataset(fout,mode='w',format='NETCDF3_CLASSIC')
+    # create dimensions
+    lon=f2.createDimension('longitude',lonsize)
+    lat=f2.createDimension('latitude',latsize)
+    level=f2.createDimension('ht',1)
+    time=f2.createDimension('time',12)
+    # create variables
+    lons=f2.createVariable('longitude',np.float32,('longitude',))
+    lats=f2.createVariable('latitude',np.float32,('latitude',))
+    levels=f2.createVariable('ht',np.float32,('ht',))
+    times=f2.createVariable('time',np.float32,('time',))
+    if ((field == 'temp_1' and HadCM3 !='y')
+         or (field == 'temp' and HadCM3 =='y')):
+        varfield=f2.createVariable('temp',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"TEMPERATURE AT 1.5M"
+        unitsname=u"K"
+    if (field == 'temp_1' and HadCM3 =='y'):
+        varfield=f2.createVariable('temp',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"SURFACE TEMPERATURE AFTER TIMESTEP"
+        unitsname=u"K"
+    if field == 'precip_1' or field =='precip':
+        varfield=f2.createVariable('precip',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"TOTAL PRECIPITATION RATE KG/M2/S"
+        unitsname=u"kg m-2"
+    if field == 'field30':
+        varfield=f2.createVariable('field30',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"TOTAL CLOUD AMOUNT - RANDOM OVERLAP"
+        unitsname=u"0-1"
+    if field == 'field201':
+        varfield=f2.createVariable('field201',np.float32,
+                              ('time','ht','latitude','longitude'))
+        longname=u"OUTGOING SW RAD FLUX (TOA)"
+        unitsname=u"W m-2"
+    if field == 'field207_1':
+        varfield=f2.createVariable('field207_1',np.float32,
+                              ('time','ht','latitude','longitude'))
+        longname=u"CLEAR-SKY (II) UP SURFACE SW FLUX"
+        unitsname=u"W m-2"
+    if field == 'field200':
+        varfield=f2.createVariable('field200',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"INCOMING SW RAD FLUX (TOA): ALL TSS"
+        unitsname=u"W m-2"
+    if field == 'field207':
+        varfield=f2.createVariable('field207',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"CLEAR-SKY (II) UPWARD SW FLUX (TOA)"
+        unitsname=u"W m-2"
+    if field == 'ilr':
+        varfield=f2.createVariable('ilr',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"DOWNWARD LW RAD FLUX: SURFACE"
+        unitsname=u"W m-2"
+    if field == 'olr':
+        varfield=f2.createVariable('olr',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"OUTGOING LW RAD FLUX (TOA)"
+        unitsname=u"W m-2"
+    if field == 'p_1':
+        varfield=f2.createVariable('p_1',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"PSTAR AFTER TIMESTEP"
+        unitsname=u"Pa"
+    if field == 'csolr':
+        varfield=f2.createVariable('field207',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"CLEAR-SKY (II) UPWARD LW FLUX (TOA)"
+        unitsname=u"W m-2"
+    if field == 'longwave':
+        varfield=f2.createVariable('longwave',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"NET DOWN SURFACE LW RAD FLUX"
+        unitsname=u"W m-2"
+    if field == 'solar':
+        varfield=f2.createVariable('solar',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"NET DOWN SURFACE SW FLUX: SW TS ONLY"
+        unitsname=u"W m-2"
+    if field == 'field203':
+        varfield=f2.createVariable('field203',np.float32,
+                                   ('time','ht','latitude','longitude'))
+        longname=u"TOTAL DOWNWARD SURFACE SW FLUX"
+        unitsname=u"W m-2"
+    if field == 'field208':
+        varfield=f2.createVariable('field208',np.float32,
+                              ('time','ht','latitude','longitude'))
+        longname=u"CLEAR-SKY (II) DOWN SURFACE SW FLUX"
+        unitsname=u"W m-2"
+    if field == 'sh':
+        varfield=f2.createVariable('sh',np.float32,
+                              ('time','ht','latitude','longitude'))
+        longname=u"SURFACE & B.LAYER HEAT FLUXES"
+        unitsname=u"W m-2"
+    if field == 'lh':
+        varfield=f2.createVariable('lh',np.float32,
+                              ('time','ht','latitude','longitude'))
+        longname=u"SURFACE LATENT HEAT FLUX"
+        unitsname=u"W m-2"
+
+    if field == 'SST':
+        varfield=f2.createVariable('SST',np.float32,
+                              ('time','ht','latitude','longitude'),
+                               fill_value = -99999.)
+        longname=u"OCN TOP-LEVEL TEMPERATURE"
+        unitsname=u"K"
+    if field == 'SeaIceConc':
+        varfield=f2.createVariable('SeaIceConc',np.float32,
+                              ('time','ht','latitude','longitude'),
+                               fill_value = -99999.)
+        longname=u"Sea Ice Concentration"
+        unitsname=u"0-1"
+
+   
+    # create variable attributes
+    lons.setncatts({'units':u"degrees_east"}) 
+    lats.setncatts({'units':u"degrees_north"})
+    levels.setncatts({'units':u"m"})
+    times.setncatts({'units':u"days since 0000-01-01 00.00",\
+                         'calendar':"360_day"})
+    varfield.setncatts({'long_name': longname,\
+                                'units':unitsname})
+
+    # assign data to variables
+    lons[:]=lonin
+    lats[:]=latin
+    levels[:]=-1.0
+    times[:]=(np.arange(0,360,30))+15
+    varfield[:,0,:,:]=avgvar
+    
+        
+    f2.close()
+        
+
+
+
+    return 
+
+
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+#expt='xkvje'
+#startyear=2301
+#nyears=100
+#HadCM3='n'
+
+#expt='xogzl'
+#startyear=2980
+#nyears=50
+#HadCM3='y'
+
+#expt='xqbwc'
+#expts=['xqbwc','xqbwd','xqbwe','xqbwg','xqbwh','xqbwi','xqbwj','xqbwk','xqbwl',
+#       'xqbwm','xqbwr','xqbws','xqbwt']
+#expts=['xqbwh','xqbwi','xqbwj','xqbwk','xqbwl',
+#       'xqbwm','xqbwr','xqbws','xqbwt']
+#expts=['xqbwn']
+#startyear=3900
+#endyear=4000
+#HadCM3='y'
+
+HadCM3='orig' # y / orig /n
+expt='xozza'
+startyear=2450
+endyear=2500
+
+#for expt in expts:
+#    field='temp_1'
+#    get_monthly_data(expt,startyear,endyear,field)
+#sys.exit(0)
+
+#for expt in expts:
+#    field='SeaIceConc'
+#    get_monthly_data(expt,startyear,endyear,field)
+#sys.exit(0)
+
+
+#field='p_1'
+#for expt in expts:
+#    field = 'temp'
+#    get_monthly_data(expt,startyear,endyear,field)
+#sys.exit(0)
+
+#for expt in expts:
+field='SST'
+get_monthly_data(expt,startyear,endyear,field,HadCM3)
+#sys.exit(0)
+   
+#field='sh'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='lh'
+#get_monthly_data(expt,startyear,endyear,field)
+
+
+
+#field='olr'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='field200'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='field201'
+#get_monthly_data(expt,startyear,endyear,field)
+
+for expt in expts:
+    field='precip'
+    get_monthly_data(expt,startyear,endyear,field)
+##sys.exit(0)
+
+
+
+#temperature at 1.5m
+#for expt in expts:
+#    if HadCM3=='y':
+#        field='temp'   # temperature at 1.5m in HadCM3
+#    else:
+#        field='temp_1' # temperature at 1.5m in HadGEM
+#    get_monthly_data(expt,startyear,endyear,field)
+#sys.exit(0)
+
+
+
+#field='field207'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='ilr'
+#get_monthly_data(expt,startyear,endyear,field)
+#field='csolr'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='longwave'
+#get_monthly_data(expt,startyear,endyear,field)
+
+
+
+#field='field203'
+#get_monthly_data(expt,startyear,endyear,field)
+#field='solar'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='field30'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='field208'
+#get_monthly_data(expt,startyear,endyear,field)
+
+#field='field207_1'
+#get_monthly_data(expt,startyear,endyear,field)
+    
+
+#sys.exit()

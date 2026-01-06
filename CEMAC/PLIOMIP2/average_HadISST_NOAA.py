@@ -1,0 +1,419 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul 25 16:18:28 2019
+
+@author: earjcti
+This program will calculate a 30 year (1870-1900) average
+of HadISST or HadSST4 data and write it to a file.
+This can then be compared with modelled SST data
+
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+import iris
+import iris.analysis.cartography
+import iris.coord_categorisation
+import sys
+
+
+def get_var():
+    """
+    gets variable names depending on whether we are using
+    HadISST or HadSST4.0
+
+    returns, FILENAME, OUTSTART, FILECUBE
+    """
+
+    if DATASET == 'HadISST':
+        filename = '/nfs/hera1/earjcti/PLIOMIP2/HadISST/HadISST_sst.nc'
+        varname = 'sea_surface_temperature'
+        fieldname = 'SST'
+
+    if DATASET == 'HadSST4':
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/HadSST4/' +
+                    'HadSST.4.0.0.0_median.nc')
+        varname = 'Sea water temperature anomaly at a depth of 20cm'
+        fieldname = 'SST'
+
+
+    if DATASET == 'NOAAERSST5':
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/NOAAERSST5/' +
+                    'sst.mnmean.nc')
+        varname = 'Monthly Means of Sea Surface Temperature'
+        fieldname = 'SST'
+
+
+    if DATASET == 'CRUTEMP':
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/CRU_DATA/' +
+                    'cru_ts4.04.1901.2019.tmp.dat.nc')
+        varname = 'near-surface temperature'
+        fieldname = 'NearSurfaceTemperature'
+
+
+    if DATASET == 'CRUPRECIP':
+        filename = ('/nfs/hera1/earjcti/PLIOMIP2/CRU_DATA/' +
+                    'cru_ts4.04.1901.2019.pre.dat.nc')
+        varname = 'precipitation'
+        fieldname = 'TotalPrecipitation'
+
+
+    outstart = ('/nfs/hera1/earjcti/regridded/'
+                + DATASET + '/E280.' + fieldname + '.')
+    filecube = iris.load_cube(filename, varname)
+
+
+    return [filename, outstart, filecube]
+
+def extract_nyrs(cube, startyear, endyear):
+    """
+    Extract data between startyear and endyear
+    from a cube of monthly data
+
+    Parameters:
+    cube (iris cube): The cube containing a number of years
+    startyear,endyear  (integer): years we wish to extract
+
+    Returns:
+    newcube (iris cube): The cube containing the subset of data
+    """
+    cubelist = iris.cube.CubeList([])
+    for i, t_slice in enumerate(cube.slices(['latitude', 'longitude'])):
+        iris.coord_categorisation.add_year(t_slice, 'time', name='year')
+        year = t_slice.coord('year').points
+
+        if startyear <= year <= endyear:
+            print('processing', year)
+            t_slice.remove_coord('year')
+            t_slice.coord('time').bounds = None
+            t_slice2 = iris.util.new_axis(t_slice, 'time')
+            # we have missing data at lsm and also some points are -1000.
+            # change points that are -1000. to missing data
+            newdata = np.ma.masked_where(t_slice2.data < -900., t_slice2.data)
+            t_slice2.data = newdata
+            cubelist.append(t_slice2)
+
+    newcube = cubelist.concatenate_cube()
+
+    return newcube
+
+
+def cube_avg(cube):
+    """
+    Extract averaged data and standard deviation values from a cube
+
+    Parameters:
+    cube (iris cube): A cube with montly data that we average
+
+    Returns:
+    meanmonthcube (iris cube): the input cube averaged over each of the 12 calendar months
+    sdmonthcube (iris cube): the standard deviation on the values in meanmonthcube
+    meanyearcube (iris cube): annual average values for each calendar year
+    meancube (iris cube) : the long term mean value at each gridpoint
+    sdcube (iris cube): the interannual standard deviation on the mean at each gridpoint
+    """
+
+    meanmonthcube = cube.aggregated_by('month', iris.analysis.MEAN)
+    iris.util.promote_aux_coord_to_dim_coord(meanmonthcube, 'month')
+    sdmonthcube = cube.aggregated_by('month', iris.analysis.STD_DEV)
+
+    # mean and standard deviation for each year
+    meanyearcube = cube.aggregated_by('year', iris.analysis.MEAN)
+
+    # mean and interannual standard deviation over dataset
+    meancube = meanmonthcube.collapsed('time', iris.analysis.MEAN)
+    sdcube = meanyearcube.collapsed('time', iris.analysis.STD_DEV)
+
+    return [meanmonthcube, sdmonthcube, meanyearcube, sdcube, meancube]
+
+def mon_avg(cube):
+    """
+    get the monthly average data from a cube
+
+    Parameters:
+    cube (iris cube) contains monthly data (ie t=12)
+
+    Returns:
+    meanmon (np array) with mean global values for each of the 12 months
+    """
+
+    if (DATASET == 'HadISST' or DATASET == 'NOAAERSST5'
+        or DATASET == 'CRUTEMP' or DATASET == 'CRUPRECIP'):
+        cube.coord('latitude').guess_bounds()
+        cube.coord('longitude').guess_bounds()
+    grid_areas2 = iris.analysis.cartography.area_weights(cube)
+    tempcube = cube.collapsed(['latitude', 'longitude'],
+                              iris.analysis.MEAN, weights=grid_areas2)
+    meanmon = tempcube.data
+
+    return meanmon
+
+def get_monthly_sd(cube):
+    """
+    get monthly values of the standard deviation on the
+    globally averaged mean from a cube
+
+    Parameters:
+        cube (iris cube) : a cube with monthly data from the whole dataset
+                           (tdim=nyears*nmonths)
+    Returns:
+        stdevmon (numpy array) : an array with the monthly standard deviation
+                                 on the monthly global mean
+
+    """
+
+
+    stdevmon = np.zeros(12)
+    for mon in range(1, 13):
+        # mon_slice is the slice from this month.  It should have a time
+        # dimension of t where t is the number of years
+        mon_slice = cube.extract(iris.Constraint(month=mon))
+        if (DATASET == 'HadISST' or DATASET == 'NOAAERSST5'
+           or DATASET == 'CRUTEMP' or DATASET == 'CRUPRECIP'):
+            mon_slice.coord('latitude').guess_bounds()
+            mon_slice.coord('longitude').guess_bounds()
+        grid_areas = iris.analysis.cartography.area_weights(mon_slice)
+        mon_avg = mon_slice.collapsed(['latitude', 'longitude'],
+                                      iris.analysis.MEAN, weights=grid_areas)
+        stdevcube = mon_avg.collapsed(['time'], iris.analysis.STD_DEV)
+        stdevmon[mon-1] = stdevcube.data
+
+    return stdevmon
+
+
+
+def area_means(allmeancube, yearmeancube):
+    """
+    get the globally averaged mean and standard deviation
+    and latitudinal means and standard deviation
+
+    Parameters:
+    allmeancube (iris cube) lat/lon cube of temporal mean tdim=1
+    yearmeancube (iris cube)  lat/lon/time cube of yearly averages tdim=nyears
+
+    Returns
+    meanann (float) global long term mean
+    stdevann (float)  global long term standard deviation of the mean
+    mean lat (np.array(nlats) latitudinally averaged long term mean
+    stdevlat (np.array(nlats)standard deviation of the latitudinal mean
+
+    """
+
+    if (DATASET == 'HadISST' or DATASET == 'NOAAERSST5'
+           or DATASET == 'CRUTEMP' or DATASET == 'CRUPRECIP'):
+
+        allmeancube.coord('latitude').guess_bounds()
+        allmeancube.coord('longitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(allmeancube)
+    tempcube = mean_data.collapsed(['latitude', 'longitude'],
+                                   iris.analysis.MEAN, weights=grid_areas)
+    meanann = tempcube.data
+
+
+    # get mean for each latitude
+    tempcube = allmeancube.collapsed(['longitude'], iris.analysis.MEAN)
+    meanlat = tempcube.data
+    meanlat = np.squeeze(meanlat)
+
+
+    # get standard deviation
+    # 1. mean for each year
+
+    if (DATASET == 'HadISST' or DATASET == 'NOAAERSST5'
+           or DATASET == 'CRUTEMP' or DATASET == 'CRUPRECIP'):
+
+        yearmeancube.coord('latitude').guess_bounds()
+        yearmeancube.coord('longitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(yearmeancube)
+    tempcube = yearmeancube.collapsed(['latitude', 'longitude'],
+                                      iris.analysis.MEAN, weights=grid_areas)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevann = stdevcube.data
+
+
+    # get standard deviation for each latitude
+    tempcube = yearmeancube.collapsed(['longitude'], iris.analysis.MEAN)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    #stdevann=stdevcube.data
+    stdevlat = stdevcube.data
+    stdevlat = np.squeeze(stdevlat)
+
+    return [meanann, stdevann, meanlat, stdevlat]
+
+
+def textout(meanmon, stdevmon):
+    """
+    write out all the means to a text file
+    this includes global means monthly means and latitudinal means
+    """
+    textfile = OUTSTART + 'data.txt'
+    file1 = open(textfile, "w")
+    file1.write('global annual mean and standard deviation\n')
+    file1.write('------------------------------------------\n')
+    file1.write(np.str(np.round(meanann, 2)) + ',' +
+                np.str(np.round(stdevann, 3)) + '\n')
+
+    # write monthly means and standard deviation
+    file1.write('monthly means and standard deviations \n')
+    file1.write('----------------------------------------')
+    file1.write('month    mean    sd  \n')
+
+    for i in range(0, 12):
+        file1.write(np.str(i+1) + ','+np.str(np.round(meanmon[i], 2)) + ','
+                    + np.str(np.round(stdevmon[i], 3))+'\n')
+
+    # write latitudinal means and standard deviation
+    file1.write('zonal means and standard deviations \n')
+    file1.write('----------------------------------------\n')
+    file1.write('latitude    mean    sd  \n')
+
+    for i in range(0, len(meanlat)):
+        file1.write(np.str(mean_data.coord('latitude').points[i]) +
+                    ',' + np.str(np.round(meanlat[i], 2)) +
+                    ',' + np.str(np.round(stdevlat[i], 3)) + '\n')
+
+    file1.close()
+
+def plot_to_check(cube):
+    """
+    A test program to check that we have averaged properly.
+    """
+
+
+    #global mean
+    plt.subplot(2, 2, 1) # global mean from each year
+    #subcube=subcube_mean_mon.copy(data=)  # set up structure of subcube
+
+    if cube.coord('latitude').has_bounds():
+        cube.coord('latitude').bounds
+    else:
+        cube.coord('latitude').guess_bounds()
+
+    if cube.coord('longitude').has_bounds():
+        cube.coord('longitude').bounds
+    else:
+        cube.coord('longitude').guess_bounds()
+
+    grid_areas = iris.analysis.cartography.area_weights(cube)
+    newcube = cube.collapsed(['latitude', 'longitude'],
+                             iris.analysis.MEAN, weights=grid_areas)
+    nt = len(newcube.data)
+    nyears = np.int(nt / 12)
+    print(nyears)
+
+    for i in range(0, nyears):
+        tstart = i * 12
+        tend = (i+1) * 12
+        plotdata = newcube.data[tstart:tend]
+        plt.plot(plotdata, color='r')
+
+    # global mean from average
+
+    grid_areas = iris.analysis.cartography.area_weights(mean_mon_data)
+    temporal_mean = mean_mon_data.collapsed(['latitude', 'longitude'],
+                                            iris.analysis.MEAN, weights=grid_areas)
+
+    plt.plot(temporal_mean.data, color='b', label='avg')
+    plt.title('globavg HadISST')
+    plt.legend()
+
+
+
+
+    # check at 30N
+    plt.subplot(2, 2, 2)
+
+    bounds = cube.coord('latitude').bounds
+    nbounds = cube.coord('latitude').nbounds
+    nbounds, dummy = np.shape(bounds)
+    for i in range(0, nbounds):
+        if (bounds[i, 0] >= 32. >= bounds[i, 1] or bounds[i, 0] <= 32. < bounds[i, 1]):
+            index = i
+
+    subcube = cube[:, index, :]
+    cube_avg_30N = subcube.collapsed(['longitude'], iris.analysis.MEAN)
+
+    for i in range(0, nyears):
+        tstart = i*12
+        tend = (i+1)*12
+        plotdata = cube_avg_30N.data[tstart:tend]
+        plt.plot(plotdata, color='r')
+
+    #mean at 30N
+    slice_30N = mean_mon_data.extract(iris.Constraint(latitude=32))
+    mean_30N = slice_30N.collapsed(['longitude'], iris.analysis.MEAN)
+
+
+    plt.plot(mean_30N.data, color='b', label='avg')
+    plt.title('average at 30N by month')
+    plt.legend()
+    plt.show()
+    plt.close()
+
+def writeout():
+    """
+    write the monthly mean and global mean cubes out to a netcdf file
+    """
+
+    outfile = OUTSTART + 'mean_month.nc'
+    iris.save(mean_mon_data, outfile, netcdf_format='NETCDF3_CLASSIC',
+              fill_value=2.0E20)
+
+    outfile = OUTSTART + 'sd_month.nc'
+    iris.save(sd_mon_data, outfile, netcdf_format='NETCDF3_CLASSIC',
+              fill_value=2.0E20)
+
+    outfile = OUTSTART + 'allmean.nc'
+    iris.save(mean_data, outfile, netcdf_format='NETCDF3_CLASSIC',
+              fill_value=2.0E20)
+
+    outfile = OUTSTART + 'allstdev.nc'
+    iris.save(sd_data, outfile, netcdf_format='NETCDF3_CLASSIC',
+              fill_value=2.0E20)
+
+
+
+##########################################################
+# MAIN PROGRAM
+
+"""
+This program will average over the first 30 years of the HadISST
+dataset and write results out to a file
+"""
+
+DATASET = 'CRUPRECIP' # HadISST HadSST4 NOAAERSST5 CRUTEMP CRUPRECIP
+
+# read in HadISST data
+FILENAME, OUTSTART, FILECUBE = get_var()
+
+# extract the years from filecube likely 30 years
+#cube30 = extract_nyrs(FILECUBE, 1870, 1899) # where available
+cube30 = extract_nyrs(FILECUBE, 1901, 1930)
+
+# create averages
+ # add year and month time axis
+iris.coord_categorisation.add_month_number(cube30, 'time', name='month')
+iris.coord_categorisation.add_year(cube30, 'time', name='year')
+mean_mon_data, sd_mon_data, mean_year_data, sd_data, mean_data = cube_avg(cube30)
+
+# create info about each month and get average monthly data
+# stdevmon is a numpy array of standard deviation, monthly_mean is a numpy array
+# of means
+monthly_mean = mon_avg(mean_mon_data)
+monthly_standard_deviation = get_monthly_sd(cube30)
+
+
+# get global and latitinal means for writing to text file
+# plot for
+
+meanann, stdevann, meanlat, stdevlat = area_means(mean_data, mean_year_data)
+
+# write means to a text file
+textout(monthly_mean, monthly_standard_deviation)
+
+# write iris cubes out to a file
+writeout()
+
+# plot to check we have averaged properly
+plot_to_check(cube30)

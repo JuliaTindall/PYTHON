@@ -1,0 +1,115 @@
+ &nam_config
+  ICAL = 2,
+  ISIZE = 64,
+  L32BIT = .FALSE.,
+  VERSION = 4.5,
+  LBIGENDOUT = .TRUE.,
+  LWFIO = .FALSE.,
+  NNCFILES = 3
+  NCFILES = "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/create_um_ancil/qrfrac_pi_lsm_P4_ice.nc","/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/create_um_ancil/qrparm.piorog.plioice.nc","/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/create_um_ancil/qrclim.pismow.plioice.nc"
+ /
+
+ &nam_gridconfig
+  LVARGRID = .FALSE.,
+  IAVERT = 0,
+  IOVERT = 0,
+  LDEEPSOIL = .TRUE.,
+  NSOILLEV = 4,
+  SOILLEV(1) = 0.1,
+  SOILLEV(2) = 0.25,
+  SOILLEV(3) = 0.65,
+  SOILLEV(4) = 2.0
+ /
+
+ &nam_ozone
+ /
+
+ &nam_smow
+  LSMOW = .TRUE.,
+  SMOW_FILEIN = "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/create_um_ancil/qrclim.pismow.plioice.nc",
+  SMOW_NCSNOWDEPTHNAME = "snowdepth",
+  LSMOW_CALCSNOWEDGE = .TRUE.,
+  SMOW_NCSOILMOISTURENAME = "sm_1",
+  SMOW_FILEOUT = "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COMMON/create_um_ancil/qrclim.pismow_plioice",
+  LSMOW_PERIODIC = .TRUE.,
+  ISMOW_MASK = 0,
+  ISMOW_TIMEUSAGE1 = 0,
+  ISMOW_TIMEUSAGE2 = 0,
+  ISMOW_STARTDATE(1) = 0000,
+  ISMOW_STARTDATE(2) = 1,
+  ISMOW_STARTDATE(3) = 16,
+  ISMOW_STARTDATE(4) = 0,
+  ISMOW_STARTDATE(5) = 0,
+  ISMOW_STARTDATE(6) = 0,
+  ISMOW_NTIMES = 12,
+  ISMOW_INTERVAL = 1,
+  ISMOW_INTUNIT = 1,
+  LSMOW_MM = .TRUE.
+ /
+
+ &nam_slt
+ /
+
+ &nam_soil
+ /
+
+ &nam_veg
+ /
+
+ &nam_vegfrac
+ /
+
+ &nam_vegfunc
+ /
+
+ &nam_vegdist
+ /
+
+ &nam_sst
+ /
+
+ &nam_ice
+ /
+
+ &nam_orog
+ /
+
+ &nam_mask
+ /
+
+ &nam_lfrac
+ /
+
+ &nam_ausrmulti
+ /
+
+ &nam_ausrancil
+ /
+
+ &nam_ts1
+ /
+
+ &nam_flux
+ /
+
+ &nam_ousrmulti
+ /
+
+ &nam_ousrancil
+ /
+
+ &nam_genanc_config
+  NANCFILES = 1
+ /
+
+ &nam_genanc
+  LGENANC_FILE(1) = .FALSE.,
+
+ /
+
+ &nam_astart
+ /
+
+ &nam_ostart
+ /
+

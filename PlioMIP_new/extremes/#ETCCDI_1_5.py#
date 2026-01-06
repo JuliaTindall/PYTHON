@@ -1,0 +1,150 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 07.02.2022 by Julia
+
+We are looking at ETCCDI Climate change indicies.  This program will write
+indices 1-4 to a file.  These are:
+
+1. FD: Number of frost days:  Annual count of days when TN (daily minimum temperature) < 0degC
+2. SU: Number of summer days:  Annual count of days when TX (daily maimum temperature) > 25degC
+3. ID: Icing days:  Annual count of days when TX (daily maximum temperature) < 0degC
+4. TR, Number of tropical nights.  Annual count of days when TN (daily minimum temperature) > 20degC
+
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def get_HCM3_year_data(filestart,year):
+    """
+    reads in the maximum  and minimum temperature for the year and puts it in 
+    a single cube
+    """
+    maxTcubelist = iris.cube.CubeList([])
+    minTcubelist = iris.cube.CubeList([])
+    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    for month in months:
+        filename = filestart + np.str(year).zfill(2) + month + '.nc'
+        # load in data
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        maxTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_1'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        minTcube = cube[0]
+
+        variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == 'temp_2'))
+        cube = iris.load(filename, constraints=variable_constraint)
+        meanTcube = cube[0]
+
+        # check you have got maxT, meanT and minT in correct order        
+        if np.max(maxTcube.data) < np.max(meanTcube.data):
+            print('cubes not in right order')
+            sys.exit(0)
+
+        if np.max(meanTcube.data) < np.max(minTcube.data):
+            print('cubes not in right order2')
+            sys.exit(0)
+
+        maxTcubelist.append(maxTcube-273.15)
+        minTcubelist.append(minTcube-273.15)
+
+    equalise_attributes(maxTcubelist)
+    equalise_attributes(minTcubelist)
+    maxTyearcube = maxTcubelist.concatenate_cube(maxTcubelist)
+    minTyearcube = minTcubelist.concatenate_cube(minTcubelist)
+  
+    return maxTyearcube, minTyearcube
+   
+
+def get_HadCM3_diagnostics(expt, extra):
+    """
+    gets the diagnostics (frost days, summer days, icing days tropical nights
+    from HadCM3)
+    """
+    filestart = '/nfs/hera1/earjcti/um/' + expt + '/pb/' + expt + 'a@pb' + extra
+  
+    for year in range(0, 3):
+        yearuse = np.str(year).zfill(2)
+        maxTcube, minTcube  = get_HCM3_year_data(filestart, year)
+
+        print(minTcube.data)
+        frost = np.where(minTcube.data < 0, 1.0, 0)
+        frostcube = minTcube.copy(data = frost)
+        frostdays = frostcube.collapsed('t',iris.analysis.SUM)
+        frostdayscube = iris.util.squeeze(frostdays)
+        frostdayscube.long_name = 'frost days'
+        frostdayscube.units = None
+        print(frostdayscube.data)
+        qplt.contourf(frostdayscube)
+        plt.show()
+        sys.exit(0)
+
+        
+
+
+           
+    
+##########################################################
+# main program
+MODELNAME = 'HadCM3'  # 'CESM2', 'IPSLCM6A', 'COSMOS', 'EC-Earth3.3', 
+                      # 'CESM1.2', 'IPSLCM5A', 'MIROC4m', 'IPSLCM5A2',
+                      # 'HadCM3', 'GISS2.1G', 'CCSM4',  'CCSM4-Utr', 
+                      # 'CCSM4-UoT','NorESM-L', 'MRI2.3', 'NorESM1-F'
+            
+if MODELNAME == 'HadCM3':
+    (FD__cube, SU_cube, ID_cube, TR_cube) = get_HadCM3_diagnostics('tenvj','o')
+ 
+
+# set up cubelists to store data
+mpwp_sdev_cubes = iris.cube.CubeList([])
+pi_sdev_cubes = iris.cube.CubeList([])
+ratio_sdev_cubes = iris.cube.CubeList([])
+
+#################################################
+# get standard deviation data
+
+for model, modelname in enumerate(MODELNAMES):
+    model_plio_cube = getmodelfield(modelname, 'EOI400')
+    model_pi_cube = getmodelfield(modelname, 'E280')
+  
+    if modelname == 'EC-Earth3.1' and FIELDNAME == 'SST':
+       model_pi_cube.coord('latitude').bounds = None
+       model_pi_cube.coord('longitude').bounds = None
+
+    model_anom_cube = model_plio_cube - model_pi_cube
+
+    mpwp_sdev_cubes.append(model_plio_cube)
+    pi_sdev_cubes.append(model_pi_cube)
+    ratio_sdev_cubes.append(model_plio_cube / model_pi_cube)
+
+##################################################
+# plot the cubes for the model anomalies relative to the mean
+
+#obj = Plotalldata('mPWP', mpwp_sdev_cubes)
+#obj.plotdata()
+
+#obj = Plotalldata('PI', pi_sdev_cubes)
+#obj.plotdata()
+
+#obj = Plotalldata('ratio', ratio_sdev_cubes)
+#obj.plotdata()
+
+
+################################################################
+# get mean ratios 
+# note that the mean standard deviation is the square root of the sum
+# of the variances
+
+mean_ratio, mean_pi_sd, mean_plio_sd = get_mean(pi_sdev_cubes, mpwp_sdev_cubes)
+plot_mmm(mean_ratio, mean_pi_sd, mean_plio_sd,'y')
+plot_mmm(mean_ratio, mean_pi_sd, mean_plio_sd,'n')
+
+
+#

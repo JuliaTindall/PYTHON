@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/users/jctindall/programs/PYTHON/on_zeus/TAMARA/ISCCP/map_ipsl_to_ISCCP.py", line 10, in <module>
+    import iris.plot as iplt
+  File "/apps/jasmin/jaspy/miniconda_envs/jaspy3.10/m3-4.9.2/envs/jaspy3.10-m3-4.9.2-r20220721/lib/python3.10/site-packages/iris/plot.py", line 17, in <module>
+    import cartopy.crs as ccrs
+  File "/apps/jasmin/jaspy/miniconda_envs/jaspy3.10/m3-4.9.2/envs/jaspy3.10-m3-4.9.2-r20220721/lib/python3.10/site-packages/cartopy/__init__.py", line 108, in <module>
+    import cartopy.feature  # noqa: F401  (flake8 = unused import)
+  File "/apps/jasmin/jaspy/miniconda_envs/jaspy3.10/m3-4.9.2/envs/jaspy3.10-m3-4.9.2-r20220721/lib/python3.10/site-packages/cartopy/feature/__init__.py", line 18, in <module>
+    import cartopy.io.shapereader as shapereader
+  File "/apps/jasmin/jaspy/miniconda_envs/jaspy3.10/m3-4.9.2/envs/jaspy3.10-m3-4.9.2-r20220721/lib/python3.10/site-packages/cartopy/io/shapereader.py", line 43, in <module>
+    import fiona
+  File "/apps/jasmin/jaspy/miniconda_envs/jaspy3.10/m3-4.9.2/envs/jaspy3.10-m3-4.9.2-r20220721/lib/python3.10/site-packages/fiona/__init__.py", line 86, in <module>
+    from fiona.collection import BytesCollection, Collection
+  File "/apps/jasmin/jaspy/miniconda_envs/jaspy3.10/m3-4.9.2/envs/jaspy3.10-m3-4.9.2-r20220721/lib/python3.10/site-packages/fiona/collection.py", line 11, in <module>
+    from fiona.ogrext import Iterator, ItemsIterator, KeysIterator
+  File "<frozen importlib._bootstrap>", line 404, in parent
+KeyboardInterrupt

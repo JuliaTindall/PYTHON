@@ -1,0 +1,141 @@
+"""
+#NAME
+#    pacific_zonal_gradient.py
+#PURPOSE 
+#
+#  This program will plot the gradient across the pacific for each experiment
+#  
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import math
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+import iris.plot as iplt
+#from netCDF4 import Dataset, MFDataset
+import sys
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+def get_Pacific_temps(expt):
+    """
+    gets the mean 20-20 temperature by longitude across the Pacific
+    """
+    tempfile = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+                expt + '_Annual_Average_#pd_Temperature_3900_4000.nc')
+    temp_cube = iris.load_cube(tempfile)
+    temp_cube=iris.util.squeeze(temp_cube)
+    temp_cube.coord('latitude').guess_bounds()
+    temp_cube.coord('longitude').guess_bounds()
+    grid_areas=iris.analysis.cartography.area_weights(temp_cube)
+    for j,lat in enumerate(temp_cube.coord('latitude').points):
+        if (lat > 20.0 or lat < -20.0):
+            grid_areas[j,:]=0.0
+
+   
+    # 20N-20S mean
+    temp_mean_cube = temp_cube.collapsed(['latitude'],
+                                         iris.analysis.MEAN,
+                                         weights=grid_areas)
+    pac_constraint = iris.Constraint(longitude=lambda cell:
+                                     150.0 < cell < 260.0)                     
+    trop_pac_mean = temp_mean_cube.extract(pac_constraint)
+    trop_pac_mean.data = trop_pac_mean.data - 273.15
+    trop_pac_mean.units='degC'
+    
+    return (trop_pac_mean)
+                                 
+
+
+
+
+
+
+CONTROL='xqbwc'
+EXPTS=['xqbwc','xqbwd','xqbwg','xqbwr','xqbwl','xqbwm',
+       'xqbwi','xqbwj','xqbwk','xqbwn','xqbwo','xqbwt','xqbws']
+EXPTNAMES={'xqbwc':'PI', 'xqbwd':'LP','xqbwg':'EP',
+           'xqbwr':'LP_alt','xqbwl':'PI400','xqbwm':'PI560',
+           'xqbwi':'LP280','xqbwj':'LP490','xqbwk':'LP560',
+           'xqbwn':'LP_highNH_orb','xqbwo':'LP_lowNH_orb',
+           'xqbwt':'PI_dyn-veg','xqbws':'LP_dyn-veg'}
+#EXPTS=['xqbwc','xqbwd','xqbwg','xqbwr']
+
+pac_temp_cubelist = CubeList([])
+exptnames_used=[]
+for expt in EXPTS:
+    pacific_temperature_cube = get_Pacific_temps(expt)
+    pac_temp_cubelist.append(pacific_temperature_cube)
+
+
+
+# plot all the pacific temperatures
+for i,cube in enumerate(pac_temp_cubelist):
+   qplt.plot(cube,label=EXPTS[i])
+
+plt.show() 
+
+print('need to change to SST')
+sys.exit(0)
+
+# plot as a bar chart with NH and SH next to each other
+x=np.arange(len(EXPTS))
+width=0.35 # the width of the bars
+bar_colors=['tab:blue','tab:orange']
+fig,ax=plt.subplots(layout='constrained')
+#plot NH
+for i,amp in enumerate(NH_amplification):
+    if i == 0:
+        rects=ax.bar(x,NH_amplification,width,label='Northern Hemisphere',
+                    color=bar_colors[0])
+    else:
+        rects=ax.bar(x,NH_amplification,width,color=bar_colors[0])
+#    ax.bar_label(rects,EXPTS[i],padding=3)
+for i,amp in enumerate(SH_amplification):
+    if i == 0:
+        rects=ax.bar(x+width,SH_amplification,width,label='Southern Hemisphere',
+                     color=bar_colors[1])
+    else:
+        rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
+# labels
+ax.set_title('Polar Amplification')
+ax.set_ylabel('Amplification Factor')
+ax.set_xticks(x+0.2,exptnames_used,rotation=90)
+ax.legend(loc='lower left',ncol=2,bbox_to_anchor=(-0.05, -0.3))
+ax.set_ylim(1.0,4.0)
+ax.set_xlim(-0.5,11.75)
+
+# put some colors dividing the experiments
+plt.axvspan(-0.5,2.75,facecolor='pink',alpha=0.2)
+plt.axvspan(2.75,7.75,facecolor='yellow',alpha=0.2)
+plt.axvspan(7.75,9.75,facecolor='purple',alpha=0.2)
+plt.axvspan(9.75,11.75,facecolor='green',alpha=0.2)
+plt.axvline(x=2.75,ymin=0.0,ymax=1.0,color='black')
+plt.axvline(x=7.75,ymin=0.0,ymax=1.0,color='black')
+plt.axvline(x=9.75,ymin=0.0,ymax=1.0,color='black')
+plt.text(-0.25,3.75,'core and extension')
+plt.text(4.0, 3.75,'CO2 sensitivity')
+plt.text(8.0,3.75,'orbital')
+plt.text(10.0,3.75,'vegetaton')
+
+#plot the data again because of the background
+for i,amp in enumerate(NH_amplification):
+    rects=ax.bar(x,NH_amplification,width,color=bar_colors[0])
+for i,amp in enumerate(SH_amplification):
+    rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
+
+plt.show()
+           
+           

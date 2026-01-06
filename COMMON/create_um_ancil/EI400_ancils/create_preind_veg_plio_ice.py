@@ -1,0 +1,160 @@
+#NAME
+#    create_P4_enh_veg_pi_ice.py
+#PURPOSE 
+#
+#  This program will create a netcdf file that can be inputted into xancil to create
+#  a vegetation ancil file.
+#  The file will have P4 vegetation types but E280 ice sheets.
+
+# Import necessary libraries
+
+import numpy as np
+import sys
+import iris
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+from iris.experimental.equalise_cubes import equalise_attributes
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+def get_new_orog(list_to_change, list_to_change_Antarctica):
+    """
+    changes the orography file to zero in the regions where the ice has gone
+    """
+
+    orog_cubelist = iris.load('/nfs/hera1/earjcti/ancil/preind2/qrparm.orog.nc')
+ 
+    new_orog = iris.cube.CubeList([])
+    
+    for cube in orog_cubelist:
+        data = cube.data
+        for coords in list_to_change:
+            data[0,0,coords[0],coords[1]] = 0.0
+        for coords in list_to_change_Antarctica:
+            data[0,0,coords[0],coords[1]] = 0.0
+        new_orog.append(cube.copy(data = data))
+    
+    iris.save(new_orog,'qrparm.piorog.plioice.nc')
+
+
+def get_new_smow(list_to_change, list_to_change_Antarctica):
+    """
+    changes the smow file.  We will put smnow amount after timestep to zero
+    """
+
+    smow_cubelist = iris.load('/nfs/hera1/earjcti/ancil/preind2/qrclim.smow.nc')
+    plio_file = '/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_mb_qrclim.smow.nc'
+    snowname = 'SNOW AMOUNT AFTER TIMESTEP     KG/M2'
+    snow_amount_plio = iris.load_cube(plio_file,snowname)
+    snow_plio = snow_amount_plio.data
+ 
+    new_smow = iris.cube.CubeList([])
+    
+    for cube in smow_cubelist:
+        data = cube.data
+
+        if cube.long_name == snowname:
+            for coords in list_to_change:
+                data[:,:,coords[0],coords[1]] = 0.0
+            for coords in list_to_change_Antarctica:
+                    data[:,:,coords[0],coords[1]] = 0.0
+
+            # if snow is 1 and is zero in the pliocene runs then change
+            for k in range(0,12):
+                for j in range(0,73):
+                    for i in range(0,96):
+                        if (data[k,0,j,i] > 10000 and
+                            snow_plio[k,0,j,i] < 10000):
+                        
+                            data[k,0,j,i] = 0.0
+
+            
+        newdata = np.where(data > 1E15, -999.999, data)
+        new_smow.append(cube.copy(data = newdata))
+    
+    iris.save(new_smow,'qrclim.pismow.plioice.nc',fill_value = -999.999)
+
+
+
+def change_veg():
+    """
+    changes the ice sheets to pliocene keeps veg as pi
+    """
+
+    # read in the data  (ice data)
+    EOI400_vegfile = '/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_mb_qrfrac.type.nc'
+    E280_vegstart = '/nfs/hera1/earjcti/ancil/preind2/qrfrac/qrfractype.PMIP_'
+
+    # get eoi400
+    EOI400_cube_orig = iris.load_cube(EOI400_vegfile)
+    EOI400_cube = iris.util.squeeze(EOI400_cube_orig)
+
+    #get e280
+
+    cubelist = iris.cube.CubeList([])
+    for i in range(1,10):
+        cube = iris.load_cube(E280_vegstart + np.str(i) + '.nc')
+        cube.coord('t').points=i
+        cubelist.append(cube)
+
+    equalise_attributes(cubelist)
+    iris.util.unify_time_units(cubelist)
+    E280_cube_orig = cubelist.concatenate_cube()
+    E280_cube = iris.util.squeeze(E280_cube_orig)
+
+
+    # find a location where the PI_ice  is different to the Plio_ice
+    # if pi ice has disapeared change it to bare soil
+
+    EOI400_data = EOI400_cube.data
+    E280_data = E280_cube.data
+    nlev,nlat,nlon = np.shape(E280_data)
+
+    list_to_change = []
+    list_to_change_Antarctica = []
+
+    for j in range(0,nlat):
+        for i in range(0,nlon):
+            if EOI400_data[8,j,i] != E280_data[8,j,i]:
+                if E280_data[8,j,i] == 1.0 and EOI400_data[8,j,i]==0:
+                    E280_data[8,j,i] = EOI400_data[8,j,i]
+                    E280_data[7,j,i] = 1.0
+                    list_to_change.append([j,i])
+                else:
+                    print('to change',i,j,
+                              EOI400_data[8,j,i],E280_data[8,j,i])
+                    sys.exit(0)
+            if E280_data[8,j,i] == 1.0 and EOI400_data.mask[8,j,i] == True:
+                E280_data[8,j,i] = 0.0
+                E280_data[7,j,i] = 1.0
+                list_to_change_Antarctica.append([j,i])
+
+            if E280_data[8,j,i] > 1.0E36:
+                E280_data[:,j,i] = -999.999
+
+    # save new vegetation file
+    new_cube = EOI400_cube.copy(data = E280_data)
+    iris.save(new_cube,'qrfrac_pi_lsm_P4_ice.nc',fill_value=-999.999)
+        
+    return list_to_change, list_to_change_Antarctica
+
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+ice_changed,ice_changed_Antarctica = change_veg()
+
+#get smow cube alter in region of missing ice sheet sand write to file
+#get_new_smow(ice_changed, ice_changed_Antarctica)
+
+#get new orog_cube and reduce missing ice sheets to zero write to file
+#get_new_orog(ice_changed, ice_changed_Antarctica)
+
+# slt - we will keep this as it is because it will spin up.
+# soil.MOSES - we will keep this as it is because it will spin up
+# pft keep as is - not currently used because dyn veg
+# keep disturbed fraction of veg as it is (ie 0)
+

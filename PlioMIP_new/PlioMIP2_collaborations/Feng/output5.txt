@@ -1,0 +1,21 @@
+nohup: ignoring input
+/nfs/hera1/earjcti/um/tenvm/evap/tenvm.evap.070.nc
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PlioMIP_new/PlioMIP2_collaborations/Feng/avg_evap.py", line 93, in <module>
+    avgcubes = get_avg_evap_mine()
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PlioMIP_new/PlioMIP2_collaborations/Feng/avg_evap.py", line 31, in get_avg_evap_mine
+    cube = iris.load_cube(filename)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 334, in load_cube
+    cubes = _load_collection(uris, constraints, callback).cubes()
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 271, in _load_collection
+    result = _CubeFilterCollection.from_cubes(cubes, constraints)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/cube.py", line 104, in from_cubes
+    for cube in cubes:
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 256, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 193, in load_files
+    all_file_paths = expand_filespecs(filenames)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 174, in expand_filespecs
+    raise IOError(msg)
+OSError: One or more of the files specified did not exist:
+    * "/nfs/hera1/earjcti/um/tenvm/evap/tenvm.evap.070.nc" didn't match any files

@@ -1,0 +1,266 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_MOC_Atlantification_paper
+#PURPOSE
+#    This program is partially based on plot_MOC.  However it will obtain 
+# a publication quality MOC plot for the Atlantification paper (1st Author Rahaman)
+#
+# search for 'main program' to find end of functions
+# Julia 14/1/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import scipy.signal as sig
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+import sklearn.decomposition as sk
+from sklearn.preprocessing import normalize
+
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+
+
+
+# functions start here
+def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,
+             cbarname,pcplot,ygrid,xgrid,yuse,xuse,yspan,xspan):
+    
+    depuse=dep/1000.
+    lats, depths = np.meshgrid(lat,depuse)
+
+    plotdata2 = np.ma.array(plotdata, mask=plotdata < -100) 
+    
+    
+    plt.subplot2grid((ygrid,xgrid),(yuse,xuse),colspan=yspan,rowspan=xspan)
+
+    #V=np.arange(minval,maxval,valinc)
+    V=np.arange(-15.,16.,1.)
+    plt.gca().patch.set_color('0.1')
+    if pcplot =='pc':
+        cs = plt.contourf(lats,depths,plotdata2,V,cmap='RdBu_r',extend='both')
+    else:
+        cs = plt.contourf(lats,depths,plotdata2,V,extend='both',cmap='rainbow')
+        contourvals=[-15,-12,-9,-6,-3,0,3,6,9,12,15]
+        #contourvals=np.arange(-15,16,1)
+        plt.contour(lats,depths,plotdata,contourvals)
+   
+    plt.gca().invert_yaxis()
+    plt.title(titlename,loc='left')
+    plt.tick_params(axis='both',labelsize=8)
+    plt.ylabel('depth (km)',fontsize=10)
+   
+    #locs,labels=plt.xticks()
+    #labs2=[]
+    #print(locs,labels)
+    locs=np.arange(-90,90,20)
+    labs2=[]
+    for i in range(0,len(locs)):
+        if locs[i]<0:
+            labs2.append(np.str(locs[i])+'S')
+        else:
+            labs2.append(np.str(locs[i])+'N')
+        print(np.str(locs[i]))
+    print(labs2)
+   
+    plt.xticks(locs,labs2)
+    print(locs,labs2)
+    
+    
+   
+    plt.xlim(-30,90)
+    print(plotdata)
+    
+    if yuse==0 and xuse==0:
+        plt.subplot2grid((ygrid,xgrid),(ygrid-1,xgrid-xspan-2),colspan=yspan,rowspan=xspan)
+        plt.gca().set_visible(False)
+        cbar = plt.colorbar(cs,orientation="horizontal",fraction=0.7)
+        cbar.set_label(cbarname)
+
+
+
+#end def plotdata
+
+
+
+
+
+##################################################
+def plot_avg_moc(expt_name,extra,yearstart,yearend,ending):
+
+    nyears=yearend-yearstart+1
+    figcount=0
+    for year in range(yearstart,yearend):
+        print(year,extra,expt_name)
+        if year >= 10:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+        else:
+            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+        f=Dataset(datasetname)
+        lat = f.variables['latitude'][:]
+        depth = f.variables['depth'][:]
+        ndepth=len(depth)
+        nlat=len(lat)
+        AMOC=f.variables['Merid_Atlantic'][:]
+        AMOC=np.squeeze(AMOC)
+        if year == yearstart:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+
+        allAMOC[year-yearstart,:,:]=AMOC
+        f.close()
+
+    avgAMOC=np.mean(allAMOC,axis=0)
+    
+    return(lat,depth,avgAMOC)
+    
+    
+#end def plot_avg_MOC
+#======================================================
+def amoc_diff(expt_name,cntl_name,AMOC_e,AMOC_c,lat,depth):
+# this function will difference two AMOCs
+    AMOC_diff=AMOC_e-AMOC_c
+    titlename='diff '+expt_name+'  and '+cntl_name
+    plotdata(AMOC_diff,-99,lat,depth,titlename,-2,2.5,0.5,0.0,'n','Sv','avg')
+    plt.tight_layout()
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/'+expt_name+'-'+cntl_name+'_avg.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+    
+#end def amoc_diff
+
+    
+    
+#end def plot_all_MOC
+#######################################
+# do principal component analysis to find the periods over which the MOC varies
+
+
+
+
+################################
+# main program
+
+
+##################################
+# plot average of the MOC
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xjplc=3205-km5c, xjpld=3060 (K1), xjple=2950 (G17), xjplf=3155 (KM3)
+
+extra = {
+        "xjplc" : "6",
+        "xibol" : "y",
+        "xiboi" : "y",
+        "xjpld" : "6",
+        "xjple" : "6",
+        "xjplf" : "6",
+        "xogzb" : "w",
+        }
+
+yearend = {
+        "xjplc" : "11",
+        "xibol" : "c1",
+        "xiboi" : "c1",
+        "xjpld" : "11",
+        "xjple" : "11",
+        "xjplf" : "11",
+        "xogzb" : "c1",
+        }
+
+timeperiod = {
+        "xjplc" : "KM5C",
+        "xibol" : "KM5C",
+        "xiboi" : "PreInd",
+        "xjpld" : "K1",
+        "xjple" : "G17",
+        "xjplf" : "KM3",
+        "xogzb" : "max",
+        }
+
+ygrid=3
+xgrid=5
+xspan=1
+yspan=2
+
+exptname='xjple'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+lat=retdata[0]
+depth=retdata[1]
+AMOC=retdata[2]
+
+
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,0,0,yspan,xspan)
+        
+
+exptname='xjpld'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,0,yspan,yspan,xspan)
+
+
+exptname='xjplf'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,1,0,yspan,xspan)
+
+
+#exptname='xogzb'
+exptname='xjplc'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,1,yspan,yspan,xspan)
+
+
+
+exptname='xiboi'
+retdata=plot_avg_moc(exptname,extra.get(exptname),70,99,yearend.get(exptname))
+AMOC=retdata[2]
+titlename=timeperiod.get(exptname)
+plotdata(AMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',
+         ygrid,xgrid,2,0,yspan,xspan)
+
+
+
+#retdata=plot_avg_moc('xibol','y',70,99,'c1')
+#xibol_AMOC=retdata[2]
+
+#plt.show()
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/MOC_atlantification.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/timeslices/plot_MOC/MOC_atlantification.png'
+plt.savefig(fileout)
+plt.close()
+
+
+
+
+
+
+
+
+
+
+
+####
+

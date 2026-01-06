@@ -1,0 +1,72 @@
+#!/usr/bin/env python2.7
+#NAME
+#   quick program to check whether I have regridded Noresm correctly for katya
+
+
+import os
+import numpy as np
+#import matplotlib as mp
+import matplotlib.pyplot as plt
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+#from netCDF4 import Dataset, MFDataset
+import iris
+import iris.analysis.cartography
+#import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#import subprocess
+
+
+
+
+################################
+# main program
+
+preind_file = '/nfs/hera1/earjcti/regridded/NorESM-L/timeseries/E280.SST.0-200_timeseries_Katya_no_ann_cycle.nc'
+plio_file = '/nfs/hera1/earjcti/regridded/NorESM-L/timeseries/EOI400.SST.0-200_timeseries_Katya_no_ann_cycle.nc'
+
+preind_cube = iris.load_cube(preind_file)
+plio_cube = iris.load_cube(plio_file)
+
+#=========================================================
+# plot global mean to look for a drift
+#preind_cube.coord('longitude').guess_bounds()
+#preind_cube.coord('latitude').guess_bounds()
+#preind_gridareas = iris.analysis.cartography.area_weights(preind_cube)#
+
+#preind_mean_cube = preind_cube.collapsed(['latitude','longitude'],
+#                                         iris.analysis.MEAN, 
+#                                         weights=preind_gridareas)
+#plio_mean_cube = plio_cube.collapsed(['latitude','longitude'],
+#                                         iris.analysis.MEAN, 
+#                                         weights=preind_gridareas)
+
+#plt.subplot(2,1,1)
+#plt.plot(preind_mean_cube.data)
+#plt.subplot(2,1,2)
+#plt.plot(plio_mean_cube.data)
+#plt.show()
+
+#============================================================
+# extract a temperature in the NINO3.4 region
+# use longitude =210, latitude = 0.5
+latcube = preind_cube.extract(iris.Constraint(latitude=0.5))
+preind_pointcube = latcube.extract(iris.Constraint(longitude=210.))
+
+
+latcube = plio_cube.extract(iris.Constraint(latitude=0.5))
+plio_pointcube = latcube.extract(iris.Constraint(longitude=210.))
+
+
+plt.subplot(2,1,1)
+plt.plot(preind_pointcube.data[0:120])
+plt.subplot(2,1,2)
+plt.plot(plio_pointcube.data[0:120])
+plt.show()
+
+
+
+sys.exit(0)
+
+####
+

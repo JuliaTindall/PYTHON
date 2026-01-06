@@ -1,0 +1,42 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 29.03.2022 by Julia
+
+We are trying to plot cloud regiemes based on Williams and Webb 2008.
+
+We should have extracted:
+1. cloud albedo
+2. cloud top pressure
+3. total cloud cover
+
+use this to get cloud regiemes at a site
+"""
+import numpy as np
+import iris
+from iris.experimental.equalise_cubes import equalise_attributes
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+def get_data():
+    """
+    extracts the data at the nearest gridbox
+    """
+
+    cubelist = iris.load(FILEIN)
+    print(cubelist)
+    
+
+
+
+#SITENAME = 'Beaver Pond'
+#SITELAT = 79.0   # 79N
+#SITELON = 278.0  # 82W 278E
+
+SITENAME = 'York'
+SITELAT = 54.0
+SITELON = -1.0
+FILEIN = 'test.nc'
+
+albedo_cube, tcc_cube, ctp_cube = get_data()

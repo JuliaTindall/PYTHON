@@ -1,0 +1,29 @@
+nohup: ignoring input
+W_mm_dpth
+insitu_T_mm_dpth
+W_ym_dpth
+ucurrTot_ym_dpth
+vcurrTot_ym_dpth
+srfSalFlux_ym_uo
+temp_ym_dpth
+salinity_ym_dpth
+otracer16_ym_dpth
+otracer16_ym_dpth_1
+streamFn_ym_uo
+iceconc_ym_uo
+icedepth_ym_uo
+anomSaltFlux_ym_uo
+0: upward_sea_water_velocity / (cm s-1) (t: 12; depth: 1; latitude: 73; longitude: 96)
+1: sea_water_temperature / (K)         (t: 12; depth_1: 20; latitude: 73; longitude: 96)
+2: upward_sea_water_velocity / (cm s-1) (depth_2: 19; latitude: 73; longitude: 96)
+3: eastward_sea_water_velocity / (cm s-1) (depth_1: 20; latitude: 72; longitude: 96)
+4: northward_sea_water_velocity / (cm s-1) (depth_1: 20; latitude: 72; longitude: 96)
+5: Stash code = 30323 / (m s-1)        (unspecified: 1; latitude: 73; longitude: 96)
+6: sea_water_temperature / (degC)      (depth_1: 20; latitude: 73; longitude: 96)
+7: sea_water_salinity / (unknown)      (depth_1: 20; latitude: 73; longitude: 96)
+8: OCN EXTRACER 17: CONVEN ------- / (unknown) (depth_1: 20; latitude: 73; longitude: 96)
+9: OCN EXTRACER 18: CONVEN ------- / (unknown) (depth_1: 20; latitude: 73; longitude: 96)
+10: ocean_barotropic_streamfunction / (cm3 s-1) (unspecified: 1; latitude: 73; longitude: 96)
+11: sea_ice_area_fraction / (unknown)   (unspecified: 1; latitude: 73; longitude: 96)
+12: sea_ice_thickness / (m)             (unspecified: 1; latitude: 73; longitude: 96)
+13: P-E FLUX CORRECTION       KG/M2/S  A / (kg m-2 s-1) (unspecified: 1; latitude: 73; longitude: 96)

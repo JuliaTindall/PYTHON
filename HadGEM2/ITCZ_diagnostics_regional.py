@@ -1,0 +1,1256 @@
+#!/usr/bin/env python2.7
+#NAME
+#    ITCZ diagnostics
+#PURPOSESS
+#    This program will find the ITCZ in a given region based on the 
+#    Stanfield et al 2015 definition.  It will find the centerline width 
+#    and intensity and plot these by season for the Pliocene and the PI.
+#
+# search for 'main program' to find end of functions
+# Julia August 2018
+#
+# Notes This program is like ITCZ_diagnostics_regional.  However it allows
+# the ITCZ to be discontinuous.
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid, maskoceans
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,land_ocn_ind,lonmin,lonmax,latmin,latmax):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno !=99:        plt.subplot(2,2,fileno+1)
+
+
+    if land_ocn_ind == 'l':
+        plotnew=maskoceans(lons,lats,plotdata)
+        plotdata=plotnew
+        if cbarname=='mm/day':
+            minval=minval/2.
+            maxval=maxval/2.
+            valinc=valinc/2.
+
+    map=Basemap(llcrnrlon=lonmin,urcrnrlon=lonmax,llcrnrlat=latmin,urcrnrlat=latmax,projection='cyl',resolution='c')
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    
+    # set up for drawing gridlines
+    if lonmax-lonmin <= 60:
+        londiff=10
+    else:
+        londiff=30
+     
+   
+    if latmax-latmin <= 60:
+        latdiff=10
+    else:
+        latdiff=30
+
+    parallels=np.arange(-90,90,latdiff)
+    meridians=np.arange(-180,360,londiff)
+
+   
+    map.drawparallels(parallels,labels=[False,True,False,False])
+    map.drawmeridians(meridians,labels=[False,False,False,True])
+
+
+    plotdata2=plotdata
+    #plotdata=maskoceans(x,y,plotdata)
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu',extend='both')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='ra':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(plotdata))
+                    if uselog=='nb':  # use bluescale
+                        cmapuse='Blues'
+                    else:
+                        cmapuse='rainbow'
+                    cs = map.contourf(x,y,plotdata,V,cmap=cmapuse,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=20)
+        cbar.ax.tick_params(labelsize=20)
+        plt.title(titlename,loc='left',fontsize=20)
+   
+
+    plotdata=plotdata2
+
+    if land_ocn_ind == 'l':
+        map.drawmapboundary(fill_color='white')
+    else:
+        map.drawmapboundary
+
+#end def plotdata
+
+def find_ITCZ(exptname,extra,monthname,threshold,land_ocean_ind,latmin,latmax,lonmin,lonmax,regionname):
+   
+#  to find the ITCZ we find precipitation in the given region.
+#  we then find the longest continuous stretch of precipitation above a certain
+#  threshold for each longitude.  The monthly thresholds are 4mm/day from 
+#  January to April and 6mm/day from May-December
+
+
+  # get land mask and put on correct grid
+
+    fm=Dataset('/nfs/hera1/earjcti/um/HadGEM_ancils/qrparm.mask.nc')
+    lsmlon=fm.variables['longitude'][:]
+    lsmlat=fm.variables['latitude'][:]
+    lsm=fm.variables['lsm'][:]
+    lsm=np.squeeze(lsm)
+    #lsm,lsmlon = shiftgrid(180.,lsm,lsmlon,start=False)
+    fm.close()
+
+   # read in data from multiple files and calculate average precipitation
+   # in mm/day
+
+    print('/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/precip_data/'+exptname+'a@pd'+extra+'[5-9]?'+monthname+'_precip.nc')
+
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/precip_data/'+exptname+'a@pd'+extra+'[5-9]?'+monthname+'_precip.nc')
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    aprecip=f.variables['precip_1'][:]
+    aprecip=np.squeeze(aprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+    f.close()
+
+    avg_precip=np.mean(aprecip,axis=0)
+    avg_precip=avg_precip * 60. * 60. * 24. 
+
+   
+   # shift grid as appropriate
+
+    if lonmin < 0:
+        # shift data
+        avg_precip,lon=shiftgrid(180.,avg_precip,lon,start=False)
+        lsm,lsmlon=shiftgrid(180.,lsm,lsmlon,start=False)
+
+
+    # mask out land or ocean as appropriate.
+
+
+    if land_ocean_ind == 'l':
+        if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+            avg_precip=avg_precip * lsm
+        else:
+            print('error lon/lat of land sea mask dont match')
+            plotdata(avg_precip,99,lon,lat,'precip in region',0.0,10.0,0.5,0,'n','mm/day','b',-180,180,-90,90)
+
+            plt.show()
+            sys.exit()
+
+    if land_ocean_ind == 'o':
+        if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+            avg_precip=avg_precip * np.abs(lsm-1.0)
+            #plt.figure()
+            #plotdata(avg_precip,99,lon,lat,'precip in region',0.0,10.0,0.5,0,'n','mm/day','b',-180,360,-90,90)
+
+            #plt.figure()
+            #plotdata(lsm,99,lsmlon,lsmlat,'lsm',0.0,1.0,0.5,0,'n','mm/day','b',-180,360,-90,90)
+
+            #plt.show()
+            #sys.exit()
+        
+        else:
+            print('error lon/lat of land sea mask dont match')
+            plotdata(avg_precip,0,lon,lat,'precip in region',0.0,10.0,0.5,0,'n','mm/day','b',-180,360,-90,90)
+
+            plotdata(lsm,1,lsmlon,lsmlat,'lsm',0.0,1.0,0.5,0,'n','mm/day','b',-180,360,-90,90)
+
+            plt.show()
+            sys.exit()
+        
+    # decompose grid to given region
+
+
+   
+    nlon=0
+    nlat=0
+    lat_first=-99
+    lon_first=-99
+
+    for i in range (0,len(lon)):
+        if lonmin <= lon[i] <= lonmax:
+            nlon=nlon+1
+            if lon_first==-99:
+                lon_first=i
+
+
+    for j in range (0,len(lat)):
+        if latmin <= lat[j] <= latmax:
+            nlat=nlat+1
+            if lat_first==-99:
+                lat_first=j
+
+
+    AOI_precip=np.zeros((nlat,nlon))
+    AOI_lon=np.zeros(nlon)
+    AOI_lat=np.zeros(nlat)
+
+
+    
+  
+
+    for i in range(0,len(lon)):
+        if lonmin<= lon[i] <= lonmax:
+          AOI_lon[i-lon_first]=lon[i]
+          for j in range(len(lat)-1,0,-1):
+              if latmin <= lat[j] <= latmax:
+                  if i==lon_first:
+                      AOI_lat[j-lat_first]=lat[j]
+                  AOI_precip[j-lat_first,i-lon_first]=avg_precip[j,i]
+
+
+     #area of interest check 
+
+    #titlename='first check'
+    #plt.figure()
+    #plotdata(avg_precip,99,lon,lat,'globe',0.0,10.0,0.5,0,'n','mm/day','b',-180,360,-90,90)
+    #plt.figure()
+    #print(lon)
+    #print(AOI_lon)
+    #plotdata(AOI_precip,99,AOI_lon,AOI_lat,titlename,0.0,10.0,0.5,0,'n','mm/day','b',0,360,-90,90)
+    #plt.show()
+    #sys.exit()
+  
+    
+              
+    
+    
+    # for each longitude find the longest continuous band of precipitation 
+    # above the threshold
+
+
+    #for j in range(0,len(AOI_lat)):
+    #    print('ju0',AOI_lat[j],AOI_precip[j,58])
+
+    max_count_lons=np.zeros(len(AOI_lon),dtype=int)
+    upper_bound_index=np.zeros(len(AOI_lon),dtype=int)
+    lower_bound_index=np.zeros(len(AOI_lon),dtype=int)
+    most_intense_precip_index=np.zeros(len(AOI_lon),dtype=int)
+
+   
+    for i in range(0,len(AOI_lon)):
+        count_lons=0
+        max_val=0
+        jmax=len(AOI_lat)-1
+        jmin=0
+        # check it is not picking up mid latitude storm tracks in pacific
+        # or atlantic by reducing range to -20 20 ignore for south america
+        if ((AOI_lon[i] > 180. or AOI_lon[i] < 0) and (regionname != 'SouthAmerica')):
+                jmax=(np.abs(AOI_lat-20.)).argmin()
+                jmin=(np.abs(AOI_lat+20.)).argmin()
+        # process
+        for j in range(jmax,jmin,-1):
+            # set up j-1 and j+1 for checking values either side
+            jmin1=j-1
+            jpl1=j+1
+            if jmin1 < 0:
+                jmin1=0
+            if jpl1 > len(AOI_lat)-1:
+                jpl1=len(AOI_lat)-1
+            # check precipitation greater than threshold but include if there
+            # is only a single latitude blip
+            if (AOI_precip[j,i] >= threshold or 
+                (AOI_precip[jmin1,i] > threshold and 
+                 AOI_precip[jpl1,i] > threshold)): 
+                count_lons=count_lons+1
+                # if the number of longitude is greater than the previous 
+                # maximum then this is the new ITCZ.  However we are 
+                # constraining the
+                # lower bound latitude to be less than 20N
+                if (count_lons > max_count_lons[i]
+                   and AOI_lat[j] < 20.):
+                    max_count_lons[i]=count_lons
+                    lower_bound_index[i]=j
+                    if AOI_precip[j,i] > max_val: # find most intense precip
+                                                  #in north itcz
+                        max_val=AOI_precip[j,i]
+                        most_intense_precip_index[i]=j
+         
+            else:
+                count_lons=0
+     
+
+         
+         
+     
+        #############################################                           
+        # set up upper bound
+        upper_bound_index[i]=lower_bound_index[i]+max_count_lons[i]-1
+        if max_count_lons[i]==0:
+            upper_bound_index[i]=lower_bound_index[i]
+    
+
+
+    print('j1',upper_bound_index[1],lower_bound_index[1])
+     
+
+    ################################################
+    #  HERE WE HAVE LOTS OF CHECKS TO MAKE SURE THAT THE
+    #  MPWP AND THE PI ARE COMPARIABLE
+
+    #################################################
+    # September-January make sure that the northern branch
+    # of the ITCZ in the western Pacific is included at the
+    # upper bound (ie don't have ITCZ jumping between NH and SH)
+    # this may mean it is not totally continuous in latitude
+    imin=(np.abs(AOI_lon-150.)).argmin()
+    imax=(np.abs(AOI_lon-230.)).argmin()
+    if monthname in ['ot','nv','dc','ja','my','jn','sp']:
+        for i in range(imin,imax):
+            if AOI_lat[upper_bound_index[i]] < 0: # in southern hemisphere
+                # set to previous one.  This will be in NH.
+                upper_bound_index[i]=upper_bound_index[i-1]
+                # if new upper bound index has precipitation
+                # greater than threshold see if you can expand northwards
+                if AOI_precip[upper_bound_index[i],i] >= threshold:
+                    jmin=upper_bound_index[i]
+                    jmax=len(AOI_lat)
+                    for j in range(jmin,jmax):
+                        if AOI_precip[j,i] >= threshold:
+                            upper_bound_index[i]=j # move northwards
+                        else:
+                            break # no longer try and move northwards
+                # if new upper bound index has precipitation that is less
+                # then the threshold then you will have to move it
+                # southwards
+                if AOI_precip[upper_bound_index[i],i] < threshold:
+                    jmax=upper_bound_index[i]
+                    jmin=0
+                    for j in range(jmax,jmin,-1):
+                        if AOI_precip[j,i] >= threshold:
+                            upper_bound_index[i]=j # move southwards
+                            break
+  
+ 
+    #################################################
+    # July-November  make sure that the SPCZ is included in the
+    # lower branch to make consistencies between the two climates
+    # however use a threshold of 6mm/day on the SPCZ
+    # (ie don't have ITCZ lower bound jumping between NH and SH)
+    # this may mean it is not totally continuous in latitude
+    imin=(np.abs(AOI_lon-150.)).argmin()
+    imax=(np.abs(AOI_lon-230.)).argmin()
+    if monthname in ['jl','ag','sp','ot','nv']:
+        for i in range(imin,imax):
+            if AOI_lat[lower_bound_index[i]] > 0: # in nothern hemisphere
+                # set to previous one.  This will be in SH.
+                lower_bound_index[i]=lower_bound_index[i-1]
+                # if new lower bound index has precipitation
+                # greater than 6mmday see if you can expand southwards
+                if AOI_precip[lower_bound_index[i],i] >= 6:
+                    jmax=lower_bound_index[i]
+                    jmin=0
+                    for j in range(jmax,jmin,-1):
+                        if AOI_precip[j,i] >= 6:
+                            lower_bound_index[i]=j # move southwards
+                        else:
+                            break # no longer try and move northwards
+                # if new lower bound index has precipitation that is less
+                # then the threshold then you will have to move it
+                # northwards
+                if AOI_precip[lower_bound_index[i],i] < 6:
+                    jmin=lower_bound_index[i]
+                    jmax=len(AOI_lat)
+                    for j in range(jmin,jmax):
+                        if AOI_precip[j,i] >= 6:
+                            lower_bound_index[i]=j # move northwards
+                            break
+
+    #################################################
+    # January-Feb make sure that the northern branch
+    # of the ITCZ in the mid Atlantic is included at the
+    # upper bound (ie don't have ITCZ jumping between NH and SH)
+    # this may mean it is not totally continuous in latitude
+    imin=(np.abs(AOI_lon+35.)).argmin() # for -35, - -10
+    imax=(np.abs(AOI_lon+10.)).argmin()
+    if imin == imax:   # then use 325-350
+        imin=(np.abs(AOI_lon-325.)).argmin() # for -35, - -10
+        imax=(np.abs(AOI_lon-350.)).argmin()
+  
+    if monthname in ['ja','fb']:
+        for i in range(imin,imax):
+            if AOI_lat[upper_bound_index[i]] < 0: # in southern hemisphere
+                # set to previous one.  This will be in NH.
+                upper_bound_index[i]=upper_bound_index[i-1]
+                # if new upper bound index has precipitation
+                # greater than threshold see if you can expand northwards
+                if AOI_precip[upper_bound_index[i],i] >= threshold:
+                    jmin=upper_bound_index[i]
+                    jmax=len(AOI_lat)
+                    for j in range(jmin,jmax):
+                        if AOI_precip[j,i] >= threshold:
+                            upper_bound_index[i]=j # move northwards
+                        else:
+                            break # no longer try and move northwards
+                # if new upper bound index has precipitation that is less
+                # then the threshold then you will have to move it
+                # southwards
+                if AOI_precip[upper_bound_index[i],i] < threshold:
+                    jmax=upper_bound_index[i]
+                    jmin=0
+                    for j in range(jmax,jmin,-1):
+                        if AOI_precip[j,i] >= threshold:
+                            upper_bound_index[i]=j # move southwards
+                            break
+  
+             
+
+    ##################################################
+    #  correct a very small (=< 4 gridboxes of longitude) discontinuity
+    #  in the upper bound
+
+    for i in range(1,len(AOI_lon)-4):
+        # if large distance between this and previous
+        upper_bound_difference=np.abs(upper_bound_index[i]-upper_bound_index[i-1])
+        if  upper_bound_difference> 6 and upper_bound_index[i-1] != 0:
+            
+            # if later the upper bound returns to previous position
+            # then find a better location for the upper bound index
+            diff_plus1=(np.abs(upper_bound_index[i+1]-upper_bound_index[i-1]))
+            diff_plus2=(np.abs(upper_bound_index[i+2]-upper_bound_index[i-1]))
+            diff_plus3=(np.abs(upper_bound_index[i+3]-upper_bound_index[i-1]))
+            diff_plus4=(np.abs(upper_bound_index[i+4]-upper_bound_index[i-1]))
+            if  (diff_plus1 < upper_bound_difference / 2
+            or diff_plus2  < upper_bound_difference / 2
+            or diff_plus3  < upper_bound_difference / 2
+            or diff_plus4  < upper_bound_difference / 2):
+                # initially set to same as previous
+                upper_bound_index[i]=upper_bound_index[i-1]
+                # if new upper bound index has precipitation
+                # greater than threshold see if you can expand northwards
+                if AOI_precip[upper_bound_index[i],i] >= threshold:
+                    jmin=upper_bound_index[i]
+                    jmax=len(AOI_lat)
+                    for j in range(jmin,jmax):
+                        if AOI_precip[j,i] >= threshold:
+                            upper_bound_index[i]=j # move northwards
+                        else:
+                            break # no longer try and move northwards
+                # if new upper bound index has precipitation that is less
+                # then the threshold then you will have to move it
+                # southwards
+                if AOI_precip[upper_bound_index[i],i] < threshold:
+                    jmax=upper_bound_index[i]
+                    jmin=0
+                    for j in range(jmax,jmin,-1):
+                        if AOI_precip[j,i] >= threshold:
+                            upper_bound_index[i]=j # move southwards
+                            break
+                   
+
+    ##################################################
+    #  correct a very small (=< 4 gridboxes of longitude) discontinuity
+    #  in the lower bound
+
+    for i in range(1,len(AOI_lon)-4):
+        # if large distance between this and previous
+        lower_bound_difference=np.abs(lower_bound_index[i]-lower_bound_index[i-1])
+        if  lower_bound_difference> 6:
+            
+            # if later the lower bound returns to previous position
+            # then find a better location for the lower bound index
+            diff_plus1=(np.abs(lower_bound_index[i+1]-lower_bound_index[i-1]))
+            diff_plus2=(np.abs(lower_bound_index[i+2]-lower_bound_index[i-1]))
+            diff_plus3=(np.abs(lower_bound_index[i+3]-lower_bound_index[i-1]))
+            diff_plus4=(np.abs(lower_bound_index[i+4]-lower_bound_index[i-1]))
+            if  (diff_plus1 < lower_bound_difference / 2
+            or diff_plus2  < lower_bound_difference / 2
+            or diff_plus3  < lower_bound_difference / 2
+            or diff_plus4  < lower_bound_difference / 2):
+                # initially set to same as previous
+                lower_bound_index[i]=lower_bound_index[i-1]
+                # if new lower bound index has precipitation
+                # greater than threshold see if you can expand southwards
+                if AOI_precip[lower_bound_index[i],i] >= threshold:
+                    jmax=lower_bound_index[i]
+                    jmin=0
+                    for j in range(jmax,jmin):
+                        if AOI_precip[j,i] >= threshold:
+                            lower_bound_index[i]=j # move southwards
+                        else:
+                            break # no longer try and move southwards
+                # if new lower bound index has precipitation that is less
+                # then the threshold then you will have to move it
+                # northwards
+                if AOI_precip[lower_bound_index[i],i] < threshold:
+                    jmin=lower_bound_index[i]
+                    jmax=len(AOI_lat)
+                    for j in range(jmin,jmax):
+                        if AOI_precip[j,i] >= threshold:
+                            lower_bound_index[i]=j # move northwards
+                            break
+                   
+
+    #####################################################
+    # check that most intense precipitation is between upperbound
+    # and lower bound
+    for i in range(0,len(AOI_lon)):
+        if ((most_intense_precip_index[i] < lower_bound_index[i]) or
+            (most_intense_precip_index[i] > upper_bound_index[i])):
+            max_val=0
+            for j in range(lower_bound_index[i],upper_bound_index[i]+1):
+                if AOI_precip[j,i] > max_val: # find most intense precip
+                                                  #in north itcz
+                    max_val=AOI_precip[j,i]
+                    
+                    most_intense_precip_index[i]=j
+         
+    #area of interest check 
+
+    plt.figure()
+    titlename=exptname+' '+monthname
+   
+    if exptname == 'xkvje':
+        titlename='PI: '+monthname
+    if exptname == 'xkvjg':
+        titlename='mPWP: '+monthname
+
+    plotdata(AOI_precip,99,AOI_lon,AOI_lat,titlename,0.0,10.0,0.5,0,'nb','mm/day','b',lonmin-5,lonmax+5,latmin-5,latmax+5)
+
+   
+   
+    
+    #for i in range(0,len(AOI_lon)):
+    #    print('ju2',i,AOI_lon[i],AOI_lat[lower_bound_index[i]],AOI_lat[upper_bound_index[i]])
+    #sys.exit()
+      
+    # get rid of places where ITCZ is not defined 
+    AOI_lat_max_intens=AOI_lat[most_intense_precip_index]
+    AOI_lat_upper=AOI_lat[upper_bound_index]
+    AOI_lat_lower=AOI_lat[lower_bound_index]
+
+    for i in range(0,len(AOI_lat_max_intens)):
+        if AOI_lat_upper[i]==AOI_lat_lower[i] and AOI_lat_upper[i]==latmin:
+            AOI_lat_max_intens[i]=np.nan
+            AOI_lat_upper[i]=np.nan
+            AOI_lat_lower[i]=np.nan
+         
+    # overplot lower and upper bounds
+  
+    
+    plt.plot(AOI_lon,AOI_lat_upper,color='orange',linewidth=3)
+    plt.plot(AOI_lon,AOI_lat_lower,color='red',linewidth=3,linestyle='dashed')
+    plt.plot(AOI_lon,AOI_lat_max_intens,color='white',linewidth=3,linestyle='dotted')
+  
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/map_'+exptname+'_'+monthname+'.eps'
+
+    plt.savefig(fileout)
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/map_'+exptname+'_'+monthname+'.tiff'
+
+    plt.savefig(fileout)
+    plt.close()
+
+
+    lon_res=AOI_lon[1]-AOI_lon[0]
+    lat_res=AOI_lat[1]-AOI_lat[0]
+   
+    max_AOI_precip=np.zeros(len(AOI_lon))
+    mean_AOI_precip=np.zeros(len(AOI_lon)) # in mm/day (kg/m2/day)
+    total_AOI_precip=np.zeros(len(AOI_lon)) # in kg/day (so we need to multiply by area of gridbox)
+    for i in range(0,len(AOI_lon)):
+        max_AOI_precip[i]=AOI_precip[most_intense_precip_index[i],i]
+        weightamt=0.
+        for j in range(lower_bound_index[i],upper_bound_index[i]+1):
+            mean_AOI_precip[i]=(mean_AOI_precip[i]+
+                      AOI_precip[j,i]*np.cos(np.radians(AOI_lat[j])))
+            weightamt=weightamt + np.cos(np.radians(AOI_lat[j]))
+            total_AOI_precip[i]=(total_AOI_precip[i]+
+               AOI_precip[j,i]*111000.*lon_res*np.cos(np.radians(AOI_lat[j]))
+                              *111000.*lat_res)
+            
+        mean_AOI_precip[i]=mean_AOI_precip[i] / weightamt
+
+   
+  
+  
+    retdata=[AOI_lon,AOI_lat_max_intens,AOI_lat_upper,AOI_lat_lower,max_AOI_precip,mean_AOI_precip,total_AOI_precip]
+
+
+    return retdata
+
+
+#end def find_ITCZ
+
+
+     
+
+
+#end def seasmean
+
+################################
+# main program
+
+monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+#monthnames=['ja']
+
+threshold=np.zeros(12,dtype=float)
+#threshold[0]=4.
+#threshold[1]=4.
+#threshold[2]=4.
+#threshold[3]=4.
+#threshold[4]=6.
+#threshold[5]=6.
+#threshold[6]=6.
+#threshold[7]=6.
+#threshold[8]=6.
+#threshold[9]=6.
+#threshold[10]=6.
+#threshold[11]=6.
+threshold[:]=4.
+
+# set up atlantic ocean region
+#regionname='AtlanticOcean'
+#land_ocean_ind='o'  # l land, o ocean, b both
+#latmin=-20
+#latmax=20
+#lonmin=-60
+#lonmax=20
+
+
+
+# set up indian ocean region
+#regionname='IndianOcean'
+#land_ocean_ind='o'  # l land, o ocean, b both
+#latmin=-20
+#latmax=30
+#lonmin=30
+#lonmax=120
+
+# set up indian ocean region
+#regionname='IndianOceanLand'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-20
+#latmax=30
+#lonmin=60
+#lonmax=90
+#threshold[:]=4.
+
+# set up global region
+#regionname='Globe'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-30
+#latmax=45
+#lonmin=0.
+#lonmax=358.125
+#threshold[:]=4.
+
+# set up Africa land region
+#regionname='Africa'
+#land_ocean_ind='l'  # l land, o ocean, b both
+#latmin=-30
+#latmax=35
+#lonmin=-20.
+#lonmax=45
+#threshold[:]=2
+
+# set up central america land region
+regionname='CentralAmerica'
+land_ocean_ind='l'  # l land, o ocean, b both
+latmin=-25.
+latmax=25.
+lonmin=-120.
+lonmax=-80.
+threshold[:]=0
+
+# set up East Atlantic land region
+#regionname='EastAtlantic'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-25.
+#latmax=25.
+#lonmin=-120.
+#lonmax=-80.
+#threshold[:]=4
+
+# set up indian region
+#regionname='Indian'
+#land_ocean_ind='l'  # l land, o ocean, b both
+#latmin=10.
+#latmax=30.
+#lonmin=70
+#lonmax=110
+#threshold[:]=0
+
+
+# set up east asian
+#regionname='EastAsia'
+#land_ocean_ind='l'  # l land, o ocean, b both
+#latmin=0.
+#latmax=50.
+#lonmin=60
+#lonmax=150
+#threshold[:]=2
+
+# set up Indonesia
+#regionname='Indonesia'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-12.
+#latmax=10.
+#lonmin=110
+#lonmax=150
+#threshold[:]=0
+
+# set up  Indonesia land
+#regionname='IndonesiaLand'
+#land_ocean_ind='l'  # l land, o ocean, b both
+#latmin=-10.
+#latmax=0.
+#lonmin=130
+#lonmax=150
+#threshold[:]=0
+
+# set up Australia land
+#regionname='Australia'
+#land_ocean_ind='l'  # l land, o ocean, b both
+#latmin=-30.
+#latmax=-12.
+#lonmin=110
+#lonmax=160
+#threshold[:]=1
+
+# set up South America land
+#regionname='SouthAmerica'
+#land_ocean_ind='l'  # l land, o ocean, b both
+#latmin=-20.
+#latmax=15.
+#lonmin=-80.
+#lonmax=-30.
+#threshold[:]=4
+
+
+# set up western Pacific
+#regionname='WesternPacific'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-30.
+#latmax=30.
+#lonmin=150.
+#lonmax=200.
+#threshold[:]=4
+
+# set up Eastern Pacific
+#regionname='EasternPacific'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-30.
+#latmax=30.
+#lonmin=-120.
+#lonmax=-90
+#threshold[:]=4
+
+# set up Eastern Pacific extended region for looking at central America
+#regionname='EastPacificExt'
+#land_ocean_ind='b'  # l land, o ocean, b both
+#latmin=-10.
+#latmax=30.
+#lonmin=-120.
+#lonmax=-60
+#threshold[:]=4
+
+
+# get data for all months
+for i in range(0,len(monthnames)):
+ 
+    ITCZ_data=find_ITCZ('xkvje','n',monthnames[i],threshold[i],land_ocean_ind,latmin,latmax,lonmin,lonmax,regionname)
+    if i == 0:
+        AOI_lon=ITCZ_data[0]
+        # location of rainfall arrays
+        max_intensity_lat_pi=np.zeros((12,len(AOI_lon)))
+        max_intensity_lat_plio=np.zeros((12,len(AOI_lon)))
+        upper_bound_pi=np.zeros((12,len(AOI_lon)))
+        upper_bound_plio=np.zeros((12,len(AOI_lon)))
+        lower_bound_pi=np.zeros((12,len(AOI_lon)))
+        lower_bound_plio=np.zeros((12,len(AOI_lon)))
+        # amount of rainfall arrays
+        max_intensity_amt_pi=np.zeros((12,len(AOI_lon)))
+        max_intensity_amt_plio=np.zeros((12,len(AOI_lon)))
+        mean_itcz_precip_amt_pi=np.zeros((12,len(AOI_lon)))
+        mean_itcz_precip_amt_plio=np.zeros((12,len(AOI_lon)))
+        total_itcz_precip_amt_pi=np.zeros((12,len(AOI_lon)))
+        total_itcz_precip_amt_plio=np.zeros((12,len(AOI_lon)))
+    max_intensity_lat_pi[i,:]=ITCZ_data[1]
+    upper_bound_pi[i,:]=ITCZ_data[2]
+    lower_bound_pi[i,:]=ITCZ_data[3]
+    max_intensity_amt_pi[i,:]=ITCZ_data[4]
+    mean_itcz_precip_amt_pi[i,:]=ITCZ_data[5]
+    total_itcz_precip_amt_pi[i,:]=ITCZ_data[6]
+
+   
+    ITCZ_data=find_ITCZ('xkvjg','n',monthnames[i],threshold[i],land_ocean_ind,latmin,latmax,lonmin,lonmax,regionname)
+   
+    max_intensity_lat_plio[i,:]=ITCZ_data[1]
+    upper_bound_plio[i,:]=ITCZ_data[2]
+    lower_bound_plio[i,:]=ITCZ_data[3]
+    max_intensity_amt_plio[i,:]=ITCZ_data[4]
+    mean_itcz_precip_amt_plio[i,:]=ITCZ_data[5]
+    total_itcz_precip_amt_plio[i,:]=ITCZ_data[6]
+
+
+# plot the maximum intensity latitude for each longitude for pliocene
+# and preindustrial for each month
+
+for i in range(0,len(monthnames)):
+   plt.subplot(3,4,i+1)
+   plt.plot(AOI_lon,max_intensity_lat_pi[i,:],label='pi')
+   plt.plot(AOI_lon,max_intensity_lat_plio[i,:],label='plio')
+   if i == len(monthnames)-1:
+       plt.legend()
+   titlename=monthnames[i]
+   plt.title(titlename)
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/max_intensity.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/max_intensity.tiff'
+plt.savefig(fileout)
+plt.close()
+
+
+# plot upper range and lower range.
+for i in range(0,len(monthnames)):
+   plt.subplot(3,4,i+1)
+   plt.plot(AOI_lon,upper_bound_pi[i,:],label='pi_upper')
+   plt.plot(AOI_lon,lower_bound_pi[i,:],label='pi_lower')
+   plt.plot(AOI_lon,upper_bound_plio[i,:],label='plio_upper')
+   plt.plot(AOI_lon,lower_bound_plio[i,:],label='plio_lower')
+   if i == len(monthnames)-1:
+       plt.legend()
+   titlename=monthnames[i]
+   plt.title(titlename)
+    
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/bound_range.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/bound_range.tiff'
+plt.savefig(fileout)
+plt.close()
+
+# plot some averages over area by month
+
+mean_loc_max_intensity_plio=np.zeros(len(monthnames))
+mean_loc_max_intensity_pi=np.zeros(len(monthnames))
+mean_loc_upper_bound_plio=np.zeros(len(monthnames))
+mean_loc_upper_bound_pi=np.zeros(len(monthnames))
+mean_loc_lower_bound_plio=np.zeros(len(monthnames))
+mean_loc_lower_bound_pi=np.zeros(len(monthnames))
+mean_amt_max_intensity_plio=np.zeros(len(monthnames))
+mean_amt_max_intensity_pi=np.zeros(len(monthnames))
+mean_amt_itcz_plio=np.zeros(len(monthnames))
+mean_amt_itcz_pi=np.zeros(len(monthnames))
+total_amt_itcz_plio=np.zeros(len(monthnames))
+total_amt_itcz_pi=np.zeros(len(monthnames))
+for mon in range(0,len(monthnames)):
+    mean_loc_max_intensity_plio[mon]=np.nanmean(max_intensity_lat_plio[mon,:])
+    mean_loc_max_intensity_pi[mon]=np.nanmean(max_intensity_lat_pi[mon,:])
+    mean_loc_upper_bound_plio[mon]=np.nanmean(upper_bound_plio[mon,:])
+    mean_loc_upper_bound_pi[mon]=np.nanmean(upper_bound_pi[mon,:])
+    mean_loc_lower_bound_plio[mon]=np.nanmean(lower_bound_plio[mon,:])
+    mean_loc_lower_bound_pi[mon]=np.nanmean(lower_bound_pi[mon,:])
+    mean_amt_max_intensity_plio[mon]=np.nanmean(max_intensity_amt_plio[mon,:])
+    mean_amt_max_intensity_pi[mon]=np.nanmean(max_intensity_amt_pi[mon,:])
+    mean_amt_itcz_plio[mon]=np.nanmean(mean_itcz_precip_amt_plio[mon,:])
+    mean_amt_itcz_pi[mon]=np.nanmean(mean_itcz_precip_amt_pi[mon,:])
+    total_amt_itcz_plio[mon]=np.sum(total_itcz_precip_amt_plio[mon,:])
+    total_amt_itcz_pi[mon]=np.sum(total_itcz_precip_amt_pi[mon,:])
+
+#####################################
+# plot latitude of maximum intensity
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,mean_loc_max_intensity_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,mean_loc_max_intensity_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('latitude maximum ITCZ intensity',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('latitude',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,mean_loc_max_intensity_plio-mean_loc_max_intensity_pi,label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='black',linestyle='dotted') # line at equator
+ax2a.set_ylabel('latitude difference',color='r',fontsize=15)
+
+# make sure both x and y axis are symetrical about zero
+ax2a.set_ylim([-2.,2.])
+ax2a.set_xlim([1.,12.])
+
+ymax=np.max((mean_loc_max_intensity_plio,mean_loc_max_intensity_pi))
+ymin=np.min((mean_loc_max_intensity_plio,mean_loc_max_intensity_pi))
+ymax=np.max((ymax,np.abs(ymin)))
+ymax=np.ceil(ymax)
+ymin=ymax * (-1.0)
+ax1a.set_ylim([ymin,ymax])
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+ax2a.legend(lines1+lines2,labels1+labels2,loc=4,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/loc_max_intensity_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/loc_max_intensity_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+
+#####################################
+# plot latitude of northern limit
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,mean_loc_upper_bound_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,mean_loc_upper_bound_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('Northern boundary of ITCZ',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('latitude',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,mean_loc_upper_bound_plio-mean_loc_upper_bound_pi,label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='black',linestyle='dotted') # line at equator
+ax2a.set_ylabel('latitude difference',color='r',fontsize=15)
+
+# make sure both x and y axis are symetrical about zero
+ax2a.set_xlim([1.,12.])
+
+ymax=np.max((mean_loc_upper_bound_plio,mean_loc_upper_bound_pi))
+ymin=np.min((mean_loc_upper_bound_plio,mean_loc_upper_bound_pi))
+ymax=np.max((ymax,np.abs(ymin)))
+ymax=np.ceil(ymax)
+ymin=ymax * (-1.0)
+
+ymax2=np.max((mean_loc_upper_bound_plio-mean_loc_upper_bound_pi))
+ymin2=np.min((mean_loc_upper_bound_plio-mean_loc_upper_bound_pi))
+ymax2=np.max((ymax2,np.abs(ymin2)))
+ymax2=np.ceil(ymax2)
+ymin2=ymax2 * (-1.0)
+ax1a.set_ylim([ymin,ymax])
+ax2a.set_ylim([ymin2,ymax2])
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+ax2a.legend(lines1+lines2,labels1+labels2,loc=4,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/loc_upper_bound_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/loc_upper_bound_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+
+#####################################
+# plot latitude of southern limit
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,mean_loc_lower_bound_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,mean_loc_lower_bound_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('Southern boundary of ITCZ',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('latitude',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,mean_loc_lower_bound_plio-mean_loc_lower_bound_pi,label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='black',linestyle='dotted') # line at equator
+ax2a.set_ylabel('latitude difference',color='r',fontsize=15)
+
+# make sure both x and y axis are symetrical about zero
+ax2a.set_xlim([1.,12.])
+
+ymax=np.max((mean_loc_lower_bound_plio,mean_loc_lower_bound_pi))
+ymin=np.min((mean_loc_lower_bound_plio,mean_loc_lower_bound_pi))
+ymax=np.max((ymax,np.abs(ymin)))
+ymax=np.ceil(ymax)
+ymin=ymax * (-1.0)
+
+ymax2=np.max((mean_loc_lower_bound_plio-mean_loc_lower_bound_pi))
+ymin2=np.min((mean_loc_lower_bound_plio-mean_loc_lower_bound_pi))
+ymax2=np.max((ymax2,np.abs(ymin2)))
+ymax2=np.ceil(ymax2)
+ymin2=ymax2 * (-1.0)
+ax1a.set_ylim([ymin,ymax])
+ax2a.set_ylim([ymin2,ymax2])
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+ax2a.legend(lines1+lines2,labels1+labels2,loc=4,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/loc_lower_bound_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/loc_lower_bound_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+
+#####################################
+# plot median ITCZ position (halfway between northern boundary and southern boundary
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,(mean_loc_upper_bound_plio+mean_loc_lower_bound_plio)/2.0,label='mPWP',color='blue')
+ax1a.plot(xvals,(mean_loc_upper_bound_pi+mean_loc_lower_bound_pi)/2.0,label='PI',color='blue',linestyle='dashed')
+plt.title('latitude of ITCZ centre',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('latitude',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,(((mean_loc_upper_bound_plio+mean_loc_lower_bound_plio)/2.0)-(mean_loc_upper_bound_pi+mean_loc_lower_bound_pi)/2.0),label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='red',linestyle='dotted') # line at equator
+ax2a.set_ylabel('latitude difference',color='r',fontsize=15)
+
+
+
+# set axis limits
+ax2a.set_xlim([1.,12.])
+
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+if regionname == 'AtlanticOcean':
+    location=3
+else:
+    location=4
+ax2a.legend(lines1+lines2,labels1+labels2,loc=location,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/median_loc_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/median_loc_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+#####################################
+# plot width of ITCZ
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,mean_loc_upper_bound_plio-mean_loc_lower_bound_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,mean_loc_upper_bound_pi-mean_loc_lower_bound_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('average width of ITCZ',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('latitude',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,(mean_loc_upper_bound_plio-mean_loc_lower_bound_plio)-(mean_loc_upper_bound_pi-mean_loc_lower_bound_pi),label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='red',linestyle='dotted') # line at equator
+ax2a.set_ylabel('latitude difference',color='r',fontsize=15)
+
+
+
+# set axis limits
+ax2a.set_xlim([1.,12.])
+
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+if regionname == 'AtlanticOcean':
+    location=3
+else:
+    location=4
+ax2a.legend(lines1+lines2,labels1+labels2,loc=location,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/width_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/width_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+###############################################################
+# we will now plot intensity by month.
+# 1. average amount of rain at the location of maximum intensity.
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,mean_amt_max_intensity_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,mean_amt_max_intensity_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('rain amount at max ITCZ intensity',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('mm/day',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,mean_amt_max_intensity_plio-mean_amt_max_intensity_pi,label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='red',linestyle='dotted') # line at equator
+ax2a.set_ylabel('mm/day',color='r',fontsize=15)
+
+# set axis limits
+ax2a.set_xlim([1.,12.])
+ax1a.set_ylim([0.,np.max((mean_amt_max_intensity_plio,mean_amt_max_intensity_pi))])
+
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+ax2a.legend(lines1+lines2,labels1+labels2,loc=4,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/rainfall_max_intensity_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/rainfall_max_intensity_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+#######################################
+# 2. mean amount of rain in mm/day
+# not sure about plotting this does it mean anything
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,mean_amt_itcz_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,mean_amt_itcz_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('mean ITCZ intensity',fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('mm/day',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,mean_amt_itcz_plio-mean_amt_itcz_pi,label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='red',linestyle='dotted') # line at equator
+ax2a.set_ylabel('mm/day',color='r',fontsize=15)
+
+# set axis limits
+
+ax2a.set_xlim([1.,12.])
+ax1a.set_ylim([0.,np.max((mean_amt_itcz_plio,mean_amt_itcz_pi))])
+
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+ax2a.legend(lines1+lines2,labels1+labels2,loc=4,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/mean_rainfall_ITCZ_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/mean_rainfall_ITCZ_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+# 3. total amount of rain in kg
+
+
+
+fig, ax1a =plt.subplots()  
+xvals=np.arange(1,13,1,dtype=int)
+ax1a.plot(xvals,total_amt_itcz_plio,label='mPWP',color='blue')
+ax1a.plot(xvals,total_amt_itcz_pi,label='PI',color='blue',linestyle='dashed')
+plt.title('total ITCZ rainfall in '+regionname,fontsize=20)
+ax1a.set_xlabel('month number',fontsize=15)
+ax1a.set_ylabel('kg',color='blue',fontsize=15)
+ax2a=ax1a.twinx()
+ax2a.plot(xvals,total_amt_itcz_plio-total_amt_itcz_pi,label='mPWP-PI',color='r')
+ax2a.plot([0,12],[0,0],color='red',linestyle='dotted') # line at equator
+ax2a.set_ylabel('kg',color='r',fontsize=15)
+
+# set axis limits
+
+ax2a.set_xlim([1.,12.])
+ax1a.set_ylim([0.,np.max((total_amt_itcz_plio,total_amt_itcz_pi))])
+
+ax1a.tick_params(axis='y',colors='blue',labelsize=15)
+ax2a.tick_params(axis='y',colors='r',labelsize=15)
+ax1a.tick_params(axis='x',labelsize=15)
+ax1a.spines['left'].set_color('blue')
+ax2a.spines['right'].set_color('r')
+
+
+
+# ask matplot lib for the plotted objects and their labels
+lines1,labels1=ax1a.get_legend_handles_labels()
+lines2,labels2=ax2a.get_legend_handles_labels()
+ax2a.legend(lines1+lines2,labels1+labels2,loc=4,fontsize=15,framealpha=0.0)
+
+plt.tight_layout()
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/total_rainfall_ITCZ_by_month.eps'
+plt.savefig(fileout)
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/'+regionname+'/total_rainfall_ITCZ_by_month.tiff'
+plt.savefig(fileout)
+plt.close()
+
+
+sys.exit()
+####
+

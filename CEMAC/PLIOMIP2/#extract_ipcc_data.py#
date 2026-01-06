@@ -1,0 +1,249 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 18 10:42:28 2020
+
+IPCC were not happy with all the data that we had in the supplementary and
+have asked for it extracted as spreadsheet.  This program will do this. 
+
+This is superceeded by calculate_land_sea_contrast.py
+
+@author: julia
+"""
+
+
+import pandas as pd
+import numpy as np
+import sys
+
+def get_global_temperature_anomaly():
+    """
+    
+    extract model name and global_tanom from data_for_fig1a
+    
+    """
+    
+    data = [['CESM2',19.31,0.21,14.14,0.2],
+            ['IPSLCM6A',16.02,0.23,12.54,0.25],
+            ['COSMOS',16.83,0.48,13.5,0.46],
+            ['EC-Earth3.3',18.17,0.15,13.33,0.19],
+            ['CESM1.2',17.33,0.17,13.3,0.21],
+            ['IPSLCM5A',14.38,0.22,12.09,0.27],
+            ['MIROC4m',15.91,0.18,12.77,0.22],
+            ['IPSLCM5A2',15.33,0.27,13.16,0.34],
+            ['HadCM3',16.95,0.2,14.06,0.21],
+            ['GISS2.1G',15.91,0.31,13.78,0.27],
+            ['CCSM4',15.98,0.15,13.37,0.19],
+            ['CCSM4-Utr',18.52,0.13,13.78,0.27],
+            ['CCSM4-UoT',16.8,0.13,13.01,0.21],
+            ['NorESM-L',14.57,0.13,12.48,0.14],
+            ['MRI2.3',15.12,0.26,12.67,0.2],
+            ['NorESM1-F',16.22,0.15,14.49,0.14]]
+    
+    modelnames = ['Simulated Temperature Changes', 'Fraction of Global Area']
+    global_tanom = ['GLOBAL', 1.0]
+    
+    for row in data:
+        modelnames.append(row[0])
+        plio_temp = row[1]
+        pi_temp = row[3]
+        temp_anom = plio_temp - pi_temp
+        global_tanom.append(temp_anom)
+        
+    
+    return [modelnames, global_tanom]
+
+def get_global_land_sea():
+    """
+    
+    extract model name and global_tanom from data_for_fig3b
+    
+    """
+    
+    data = [['CESM2',6.58,4.69,4.23,3.52],
+            ['IPSLCM6A',4.61,3.14,2.72,2.21],
+            ['COSMOS',4.97,2.74,3.33,2.35],
+            ['EC-Earth3.3',6.64,4.21,3.9,2.96],
+            ['CESM1.2',5.09,3.72,2.89,2.46],
+            ['IPSLCM5A',3.37,1.96,2.17,1.62],
+            ['MIROC4m',4.63,2.6,2.95,2.14],
+            ['IPSLCM5A2',3.15,1.87,1.99,1.51],
+            ['HadCM3',4.47,2.34,2.97,1.69],
+            ['GISS2.1G',2.57,2.08,1.46,1.09],
+            ['CCSM4',3.51,2.36,1.64,1.42],
+            ['CCSM4-Utr',5.6,4.5,2.9,2.67],
+            ['CCSM4-UoT',4.77,3.51,2.32,2.13],
+            ['NorESM-L',2.64,2.0,0.95,1.08],
+            ['MRI2.3',3.71,2.04,2.04,1.42],
+            ['NorESM1-F',2.52,1.52,1.13,1.07]]
+    
+    modelnames = ['Simulated Temperature Changes', 'Fraction of Global Area']
+    global_landanom = ['GLOBAL (over land)', 1.0]
+    global_seaanom = ['GLOBAL (over ocean)', 1.0]
+    
+    for row in data:
+        modelnames.append(row[0])
+        global_landanom.append(row[1])
+        global_seaanom.append(row[2])
+        
+        
+    land_dict = {} # set up dictionaries for new dataframe row
+    sea_dict = {}
+    for i, model in enumerate(modelnames):
+        land_dict[model] = global_landanom[i]
+        sea_dict[model] = global_seaanom[i]
+    
+        
+    return [land_dict, sea_dict]
+
+
+def get_latitude_bands_global(glob_l_s_ind):
+    """
+    data from data-for_supp_2
+    """
+    
+    if glob_l_s_ind == 'g':
+        data = [['CESM2',10.78,4.57,3.74,3.8,5.62,10.52],
+                ['IPSLCM6A',8.68,2.87,2.14,2.5,3.79,7.73],
+                ['COSMOS',6.87,2.01,2.45,2.76,3.88,7.26],
+                ['EC-Earth3.3',8.45,3.37,3.07,3.67,6.64,11.36],
+                ['CESM1.2',9.32,3.67,2.58,2.68,4.19,9.76],
+                ['IPSLCM5A',4.11,1.29,1.5,2.03,3.04,5.18],
+                ['MIROC4m',6.41,2.05,2.3,2.48,3.59,7.07],
+                ['IPSLCM5A2',4.34,1.41,1.49,1.79,2.59,4.89],
+                ['HadCM3',6.55,1.85,1.83,2.36,3.92,5.22],
+                ['GISS2.1G',7.32,2.38,1.26,1.2,1.79,3.93],
+                ['CCSM4',6.28,2.57,1.46,1.56,2.85,6.6],
+                ['CCSM4-Utr',12.89,4.56,2.82,2.71,5.25,10.45],
+                ['CCSM4-UoT',8.97,3.6,2.06,2.31,4.2,9.96],
+                ['NorESM-L',7.59,2.26,1.11,1.06,1.66,4.82],
+                ['MRI2.3',5.39,1.05,1.47,1.84,3.17,7.37],
+                ['NorESM1-F',3.18,1.58,1.12,1.1,1.87,5.02]]
+        titleend = ''
+        frac = [0.067, 0.183, 0.25, 0.25, 0.183, 0.067]
+        
+    if glob_l_s_ind == 'l':
+        data = [['CESM2',6.7,4.61,4.4,4.47,6.1,10.17],
+                ['IPSLCM6A',4.55,2.61,2.6,3.01,4.03,7.34],
+                ['COSMOS',5.82,2.11,3.9,3.31,3.92,7.32],
+                ['EC-Earth3.3',5.24,3.92,4.13,4.68,7.14,10.7],
+                ['CESM1.2',4.77,3.24,3.03,3.16,4.39,8.95],
+                ['IPSLCM5A',1.63,1.61,1.98,2.5,2.97,4.97],
+                ['MIROC4m',4.1,2.37,3.43,3.02,3.95,7.18],
+                ['IPSLCM5A2',1.51,1.74,1.95,2.2,2.55,4.72],
+                ['HadCM3',3.43,2.51,3.25,3.07,4.4,5.22],
+                ['GISS2.1G',4.19,2.19,1.64,1.6,1.43,3.17],
+                ['CCSM4',2.69,2.04,1.71,1.96,2.94,6.36],
+                ['CCSM4-Utr',7.68,3.72,3.2,2.86,5.3,9.61],
+                ['CCSM4-UoT',3.48,2.74,2.3,2.95,4.59,9.02],
+                ['NorESM-L',5.31,1.71,1.14,0.94,1.71,4.67],
+                ['MRI2.3',2.94,1.92,2.21,2.23,2.82,6.63],
+                ['NorESM1-F',0.36,1.56,1.31,1.2,1.83,5.03]]
+        titleend = ' (over land)'
+        frac = [0.118, 0.312, 0.247, 0.196, 0.037, 0.09]
+    
+    if glob_l_s_ind == 's':
+        data = [['CESM2',9.23,4.55,3.53,3.53,5.35,11.17],
+                ['IPSLCM6A',6.91,2.87,2.02,2.33,3.87,8.69],
+                ['COSMOS',3.85,1.98,2.01,2.55,4.04,7.36],
+                ['EC-Earth3.3',6.53,3.31,2.77,3.27,6.41,12.45],
+                ['CESM1.2',7.89,3.69,2.46,2.51,4.27,11.27],
+                ['IPSLCM5A',1.78,1.25,1.36,1.86,3.37,5.09],
+                ['MIROC4m',3.92,2.01,1.96,2.27,3.44,6.97],
+                ['IPSLCM5A2',2.24,1.36,1.35,1.64,2.89,4.82],
+                ['HadCM3',4.45,1.79,1.4,2.07,3.63,5.36],
+                ['GISS2.1G',5.1,2.37,1.15,1.04,2.41,4.98],
+                ['CCSM4',5.03,2.59,1.41,1.43,3.03,6.86],
+                ['CCSM4-Utr',12.35,4.6,2.72,2.68,5.44,11.26],
+                ['CCSM4-UoT',8.51,3.64,2.02,2.09,4.08,11.16],
+                ['NorESM-L',5.25,2.28,1.11,1.15,1.91,4.96],
+                ['MRI2.3',2.77,0.97,1.26,1.69,3.73,7.45],
+                ['NorESM1-F',1.31,1.57,1.08,1.08,2.18,5.19]]
+        titleend = ' (over sea)'
+        frac = [0.045, 0.129, 0.251, 0.273, 0.244, 0.057]
+    
+    modelnames = ['Simulated Temperature Changes','Fraction of Global Area']
+    l60S_90S = ['90-60oS ' + titleend, frac[5]]
+    l30S_60S = ['60-30oS ' + titleend, frac[4]]
+    l0_30S = ['30oS-0 ' + titleend, frac[3]]
+    l30N_0N = ['0-30oN ' + titleend, frac[2]]
+    l60N_30N = ['30-60oN ' + titleend, frac[1]]
+    l90N_60N = ['60-90oN' + titleend, frac[0]]
+    
+    for row in data:
+        modelnames.append(row[0])
+        l60S_90S.append(row[1])
+        l30S_60S.append(row[2])
+        l0_30S.append(row[3])
+        l30N_0N.append(row[4])
+        l60N_30N.append(row[5])
+        l90N_60N.append(row[6])
+    
+    dict_60S90S = {} # set up dictionaries for new dataframe row
+    dict_30S60S = {}
+    dict_0S30S = {}
+    dict_30N0 = {}
+    dict_60N30N = {}
+    dict_90N60N = {}
+    
+    for i, model in enumerate(modelnames):
+        print(l60S_90S[i], model, i)
+        dict_60S90S[model] = l60S_90S[i]
+        dict_30S60S[model] = l30S_60S[i]
+        dict_0S30S[model] = l0_30S[i]
+        dict_30N0[model] = l30N_0N[i]
+        dict_60N30N[model] = l60N_30N[i]
+        dict_90N60N[model] = l90N_60N[i]
+    
+        
+    return [dict_60S90S, dict_30S60S, dict_0S30S, dict_30N0,
+            dict_60N30N, dict_90N60N]
+
+    
+################################
+modelnames, global_tanom = get_global_temperature_anomaly()
+land_dfrow, sea_dfrow =  get_global_land_sea()
+[glob_60S90S, glob_30S60S, glob_0S30S, glob_30N0,
+            glob_60N30N, glob_90N60N] = get_latitude_bands_global('g')
+[land_60S90S, land_30S60S, land_0S30S, land_30N0,
+            land_60N30N, land_90N60N] = get_latitude_bands_global('l')
+[sea_60S90S, sea_30S60S, sea_0S30S, sea_30N0,
+            sea_60N30N, sea_90N60N] = get_latitude_bands_global('s')
+
+#print(len(modelnames))
+#print(len(global_tanom))
+#print(modelnames)
+#print(global_tanom)
+print(land_dfrow)
+
+# create the dataframe
+df = pd.DataFrame([global_tanom], columns = modelnames, dtype=float)
+df = df.append([land_dfrow], ignore_index=True)
+df = df.append(sea_dfrow, ignore_index=True)
+df = df.append(glob_90N60N,ignore_index= True)
+df = df.append(land_90N60N,ignore_index= True)
+df = df.append(sea_90N60N,ignore_index= True)
+df = df.append(glob_60N30N, ignore_index= True)
+df = df.append(land_60N30N, ignore_index= True)
+df = df.append(sea_60N30N, ignore_index= True)
+df = df.append(glob_30N0,ignore_index= True)
+df = df.append(land_30N0,ignore_index= True)
+df = df.append(sea_30N0,ignore_index= True)
+df = df.append(glob_0S30S, ignore_index= True)
+df = df.append(land_0S30S, ignore_index= True)
+df = df.append(sea_0S30S, ignore_index= True)
+df = df.append(glob_30S60S, ignore_index= True)
+df = df.append(land_30S60S, ignore_index= True)
+df = df.append(sea_30S60S, ignore_index= True)
+df = df.append(glob_60S90S, ignore_index= True)
+df = df.append(land_60S90S, ignore_index= True)
+df = df.append(sea_60S90S, ignore_index= True)
+
+
+
+# save dataframe as a csv file
+df.to_csv('C:/Users/julia/OneDrive/WORK/MY_PAPERS/PlioMIP2/IPCC_box/' + 
+          'mPWP_CMIP6_land_sea_by_latitude_jct.csv')
+    
+    
+
+

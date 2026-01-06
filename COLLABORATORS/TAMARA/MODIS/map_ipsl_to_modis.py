@@ -1,0 +1,551 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 29.03.2022 by Julia
+
+this will attempt to map the IPSL data onto the MODIS cloud regiemes
+"""
+import numpy as np
+import iris
+import iris.plot as iplt
+from iris.cube import CubeList as CubeList
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import cartopy
+import cartopy.crs as ccrs
+import sys
+
+def plot_MODIS_cloud_regiemes(MODIS_cube):
+    """
+    plots the MODIS cloud regiemes for reference
+    """
+    fig = plt.figure(figsize=[15,15])
+
+    plotno=0
+    for i in range(0,11):
+        plotno=plotno+1
+        CR_cube = MODIS_cube[:, :, i]
+        CR_cube.coord('cloud top pressure dimension').rename('ctp')
+        CR_cube.coord('cloud optical thickness dimension').rename('tau')
+        fig.add_subplot(4,3,plotno)
+        cs = plt.pcolormesh(CR_cube.data)
+        cbar = plt.colorbar(cs)
+        plt.yticks(ticks=np.arange(7),labels = CR_cube.coord('ctp').points)
+        plt.xticks(ticks=np.arange(6),labels = CR_cube.coord('tau').points,rotation=45)
+        plt.title('CR ' + str(i+1))
+       
+    plt.tight_layout()
+    plt.savefig('MODIS_cloud_regiemes.png')
+   
+def reformat_hist(orighist):
+    """
+    note the MODIS data has 6 categories of cloud optical thickness
+    the cosp2 histograms have 7.  Combine the lower two catogeries so that
+    they match.  
+    """
+
+    auxcoordpoints = np.copy(orighist.coord('atmosphere_optical_thickness_due_to_cloud').points)
+    auxcoordpoints[0] = 0.635
+    auxcoordpoints[1] = 0.635
+  
+    taucoord = iris.coords.AuxCoord(points = auxcoordpoints, long_name = 'tau')
+
+    
+    orighist.add_aux_coord(taucoord, data_dims = 1)
+    
+    newhist = orighist.aggregated_by(taucoord, iris.analysis.SUM)
+    iris.util.promote_aux_coord_to_dim_coord(newhist,'tau')
+
+    return newhist
+
+def find_euclidian_distances(in_hist, MODIS_cube):
+
+    """
+    in_hist is shape 7,6
+    MODIS_cube shape is 7, 6, 12
+    finds 12 MODIS climate regiemes and finds the euclidian distance between
+    the input histogram and each modis climate regieme
+    """
+   
+    sum_squares_clear = np.sum(np.square(in_hist.data))
+   
+    sum_sq_CR = np.zeros(11)
+    for i in range(0,11):
+        CR_cube = MODIS_cube[:, :, i]
+        anomaly = in_hist.data - CR_cube.data
+        sum_sq_CR[i] = np.sum(np.square(anomaly))
+       
+    return sum_squares_clear, sum_sq_CR
+ 
+def get_ind_cloud_regieme(hist, MODIS_CR_cube):
+    """
+    we have a histogram (hist) from ipsl
+    we will calculate the euclidean distance from this histogram to 
+    each of the histograms in the MODIS_CR.
+    we will figure out which is the minimum euclidean distance and
+    pass this back as the cloud regieme.  
+    """
+    R_hist = reformat_hist(hist) # reformat histogram for
+                                 # comparing to MODIS
+   
+    # gets the euclidian distances between CR and each of the 12 MODIS
+    # climate regiemes.  (Will return 12 numbers)
+    (euclidian_distances_clear,
+     euclidian_distance_CR)= find_euclidian_distances(R_hist, MODIS_CR_cube)
+
+
+    
+    #cs = plt.pcolormesh(R_hist.data)
+    #cbar = plt.colorbar(cs)
+    #plt.yticks(ticks=np.arange(7),labels = R_hist.coord('pressure2').points)
+    #plt.xticks(ticks=np.arange(6),labels = R_hist.coord('tau').points,rotation=45)
+
+    #print('distances',euclidian_distances_clear)
+    #for i, dist in enumerate(euclidian_distance_CR):
+    #    print(i+1,dist)
+    # add the cloud regieme with the lowest euclidian distance
+    if euclidian_distances_clear == 0:
+        CR_ass = 11 # clear sky
+    else:
+        CR_ass = np.argmin(euclidian_distance_CR)
+
+    #print('assigned cloud regieme is',CR_ass)
+
+    #plt.show()
+    #sys.exit(0)
+    return CR_ass, R_hist
+
+def get_mean_histogram(histogram_cubelist, CR_no, dummy_cube):
+    """
+    we are passed a list of all the histograms that are in this cubelist
+    we want to find the mean and pass it back
+    """
+    # first check that the histogram is not empty
+    if len(histogram_cubelist) <= 0:
+        mean_cube = dummy_cube.copy()
+    elif len(histogram_cubelist) == 1:
+        mean_cube = histogram_cubelist[0]
+    else:
+        cubes_2 = CubeList([])
+        for i,cube in enumerate(histogram_cubelist):
+            cube.coord('time').points = i
+            cubes_2.append(cube)
+        iris.util.equalise_attributes(cubes_2)
+        iris.util.unify_time_units(cubes_2)
+        cube = cubes_2.merge_cube()
+        print(cube)
+        mean_cube = cube.collapsed('time',iris.analysis.MEAN)
+
+    print(CR_no)
+    mean_cube.long_name = 'mean histogram for CR ' + str(CR_no)
+
+    return mean_cube
+        
+def get_all_cloud_regiemes(ipsl_cube, MODIS_CR_cube):
+    """
+    get the cloud regiemes.  Put into a cube showing all the ipsl histograms in each cloud regieme
+    """
+
+
+    ipsl_cube.coord('atmosphere_optical_thickness_due_to_cloud').bounds = None
+    ipsl_cube.coord('pressure2').points = ipsl_cube.coord('pressure2').points / 100.
+
+    iris.util.promote_aux_coord_to_dim_coord(ipsl_cube,'atmosphere_optical_thickness_due_to_cloud')
+    lats = ipsl_cube.coord('latitude').points
+    lons = ipsl_cube.coord('longitude').points
+    for time in range(ndays):
+        cloud_regieme_tally = np.zeros(12) # to store the number in each CR
+        CR1_cubes = CubeList([])   
+        CR2_cubes = CubeList([])
+        CR3_cubes = CubeList([])   
+        CR4_cubes = CubeList([])
+        CR5_cubes = CubeList([])   
+        CR6_cubes = CubeList([])
+        CR7_cubes = CubeList([])   
+        CR8_cubes = CubeList([])
+        CR9_cubes = CubeList([])   
+        CR10_cubes = CubeList([])
+        CR11_cubes = CubeList([])   
+        CR_clear_cubes = CubeList([])
+
+        CR_map_array = np.zeros((len(lats),len(lons)))
+        for lat in range(0,len(lats)):
+      #  for lat in range(30,31):
+            print(lats[lat])
+            for lon in range(0,len(lons)):
+                hist = ipsl_cube[time, :, :, lat,lon]
+                hist.attributes = None
+                hist.cell_methods = None
+                hist.remove_coord('latitude')
+                hist.remove_coord('longitude')
+
+                cloud_amount = np.sum(hist.data)
+                if np.isfinite(cloud_amount):
+                   cloud_regieme, newhist = get_ind_cloud_regieme(hist,MODIS_CR_cube)
+                   cloud_regieme_tally[cloud_regieme] = cloud_regieme_tally[cloud_regieme] + 1
+                   CR_map_array[lat,lon] = cloud_regieme + 1
+                else:
+                   cloud_regieme=-99999       
+                                
+                if cloud_regieme == 0:  # CR1
+                    CR1_cubes.append(newhist)
+                elif cloud_regieme == 1:  # CR2
+                    CR2_cubes.append(newhist)
+                elif cloud_regieme == 2:  # CR3
+                    CR3_cubes.append(newhist)
+                elif cloud_regieme == 3:  # CR4
+                    CR4_cubes.append(newhist)
+                elif cloud_regieme == 4:  # CR5
+                    CR5_cubes.append(newhist)
+                elif cloud_regieme == 5:  # CR6
+                    CR6_cubes.append(newhist)
+                elif cloud_regieme == 6:  # CR7
+                    CR7_cubes.append(newhist)
+                elif cloud_regieme == 7:  # CR8
+                    CR8_cubes.append(newhist)
+                elif cloud_regieme == 8:  # CR9
+                    CR9_cubes.append(newhist)
+                elif cloud_regieme == 9:  # CR10
+                    CR10_cubes.append(newhist)
+                elif cloud_regieme == 10:  # CR11
+                    CR11_cubes.append(newhist)
+                elif cloud_regieme == 11:  # clear
+                    CR_clear_cubes.append(hist)
+
+        dummy_hist = hist.copy(data = hist.data * 0.0)
+        mean_CR1 = get_mean_histogram(CR1_cubes,1, dummy_hist)
+        mean_CR2 = get_mean_histogram(CR2_cubes,2, dummy_hist)
+        mean_CR3 = get_mean_histogram(CR3_cubes,3, dummy_hist)
+        mean_CR4 = get_mean_histogram(CR4_cubes,4, dummy_hist)
+        mean_CR5 = get_mean_histogram(CR5_cubes,5, dummy_hist)
+        mean_CR6 = get_mean_histogram(CR6_cubes,6, dummy_hist)
+        mean_CR7 = get_mean_histogram(CR7_cubes,7, dummy_hist)
+        mean_CR8 = get_mean_histogram(CR8_cubes,8, dummy_hist)
+        mean_CR9 = get_mean_histogram(CR9_cubes,9, dummy_hist)
+        mean_CR10 = get_mean_histogram(CR10_cubes,10, dummy_hist)
+        mean_CR11 = get_mean_histogram(CR11_cubes,11, dummy_hist)
+      #  mean_CR12 = get_mean_histogram(CR12_cubes,12)
+
+        CR_map_array_cube =  ipsl_cube[0, 0, 0, :,:].copy(data=CR_map_array)
+
+        cubelist = CubeList([mean_CR1,mean_CR2, mean_CR3, mean_CR4,
+                             mean_CR5,mean_CR6, mean_CR7, mean_CR8,
+                             mean_CR9,mean_CR10, mean_CR11,
+                             CR_map_array_cube])
+
+        filename = ('/home/users/jctindall/cloud_regiemes/'+ preind_plio_ind  + '_' + np.str(daystart + time) + '.nc')
+
+
+        iris.save(cubelist,filename, netcdf_format = "NETCDF3_CLASSIC")
+
+                                        
+    # check how many assigned to each cloud regieme
+    for i,CR in enumerate(cloud_regieme_tally):
+        print(str(i+1), CR, CR *100. / np.sum(cloud_regieme_tally))
+
+
+def get_CR_details(CRday_cubes):
+    """
+    This subroutine has details about cloud regiemes for each day.
+    CRdaycubes contains
+    a) a map showing which cloud regieme is dominant for each gridbox
+    b) a picture of what each cloud regieme looks like for this day 
+        (averaged over the globe)
+    Firstly find how many gridboxes are for each cloud regieme
+    Next extract each cloud regieme and put in a single cube
+    """
+
+    for cube in CRday_cubes:
+        print(cube.long_name)
+        if cube.long_name == 'mean histogram for CR 1':
+            CR1_cube = cube
+        if cube.long_name == 'mean histogram for CR 2':
+            CR2_cube = cube
+        if cube.long_name == 'mean histogram for CR 3':
+            CR3_cube = cube
+        if cube.long_name == 'mean histogram for CR 4':
+            CR4_cube = cube
+        if cube.long_name == 'mean histogram for CR 5':
+            CR5_cube = cube
+        if cube.long_name == 'mean histogram for CR 6':
+            CR6_cube = cube
+        if cube.long_name == 'mean histogram for CR 7':
+            CR7_cube = cube
+        if cube.long_name == 'mean histogram for CR 8':
+            CR8_cube = cube
+        if cube.long_name == 'mean histogram for CR 9':
+            CR9_cube = cube
+        if cube.long_name == 'mean histogram for CR 10':
+            CR10_cube = cube
+        if cube.long_name == 'mean histogram for CR 11':
+            CR11_cube = cube
+        if cube.long_name == 'ISCCP Cloud Area Fraction':
+            CR_map_cube = cube
+
+   # qplt.contourf(CR_map_cube)
+    CR_map_data = CR_map_cube.data
+    cr_no = np.zeros(13)
+    for CR in range(0,12):
+        cr_no[CR] = np.sum(np.where(CR_map_data == CR+1, 1.0, 0.0))
+
+    CR_cubelist = CubeList([CR1_cube, CR2_cube, CR3_cube, CR4_cube,
+                                              CR5_cube, CR6_cube, CR7_cube, CR8_cube,
+                                              CR9_cube, CR10_cube, CR11_cube])
+ 
+    return (cr_no, CR_cubelist)
+
+def plot_avg_cloud_regieme():
+    """
+    plots the average of the histograms in each cloud regieme
+    the histograms are from the cosp2 test data
+    they are all in a file
+    """
+
+    filestart = '/home/users/jctindall/cloud_regiemes/' + preind_plio_ind
+    fig = plt.figure(figsize=[15,15])
+    plotno=0
+
+    total_in_CR = np.zeros(13)
+    firsttimein = 'y'
+    sum_of_CR_cubelist = CubeList([])
+
+    for day in range (daystart,daystart + ndays):
+        filename = filestart + '_' + str(day) + '.nc'
+        try:
+            CRday_cubes = iris.load(filename)
+            print('found ' + filename)
+            
+        except:
+            print('not found ' + filename)
+            continue
+
+        number_in_CR, day_CR_cubelist = get_CR_details(CRday_cubes)
+        print(day_CR_cubelist)
+
+        # set up for averaging
+        total_in_CR = total_in_CR + number_in_CR
+
+        for CR in range(0,11):
+            cube = day_CR_cubelist[CR]
+            cubetot = cube.copy(data=cube.data * number_in_CR[CR])
+            if firsttimein == 'y':
+                sum_of_CR_cubelist.append(cubetot)
+                print('appending CR', len(sum_of_CR_cubelist))
+            else:
+                if number_in_CR[CR] > 0:
+                    sum_of_CR_cubelist[CR].data = sum_of_CR_cubelist[CR].data + cubetot.data
+        firsttimein = 'n'
+    
+    # find average of each cloud regieme
+    CR_cubelist = CubeList([])
+    print(len(sum_of_CR_cubelist))
+    for CR, cube in enumerate(sum_of_CR_cubelist):
+        newcube = cube.copy(data = cube.data / total_in_CR[CR])
+        CR_cubelist.append(newcube)
+
+    print(len(CR_cubelist),len(sum_of_CR_cubelist))
+       
+    for CR,CR_cube in enumerate(CR_cubelist):
+        percentage = np.round(total_in_CR[CR] * 100.  / np.sum(total_in_CR),2)
+        print(CR+1, total_in_CR[CR], percentage)
+        # plot it
+        fig.add_subplot(4,3,CR+1)
+        cs = plt.pcolormesh(CR_cube.data)
+        cbar = plt.colorbar(cs)
+        plt.yticks(ticks=np.arange(7),labels =CR_cube.coord('pressure2').points)
+        plt.xticks(ticks=np.arange(6),labels = CR_cube.coord('tau').points,rotation=45)
+        plt.title('CR :' + str(CR+1) + ' number:' + str(np.round(total_in_CR[CR])) + ' (' + str(percentage) + '%)')
+
+    plt.tight_layout()
+    plt.savefig('figures/isccp_CR_' + preind_plio_ind +'_' + str(daystart) + '_' + str(daystart + ndays) + '.eps')
+    plt.savefig('figures/isccp_CR_' + preind_plio_ind +'_' + str(daystart) + '_' + str(daystart + ndays) + '.pdf')
+
+
+def plot_map_RFO_cloud_regieme():
+    """ 
+    plots a map for each cloud regieme showing where it occurs
+    """
+
+    filestart = '/home/users/jctindall/cloud_regiemes/' + preind_plio_ind
+    fig = plt.figure(figsize=[15,15])
+    plotno=0
+
+    firsttimein = 'y'
+    CR_cubelist = CubeList([])
+
+    for day in range (daystart,daystart + ndays):
+        print('day',day)
+        filename = filestart + '_' + str(day) + '.nc'
+        try:
+            CRday_cubes = iris.load_cube(filename,'ISCCP Cloud Area Fraction')
+            print('found ' + filename)
+            
+        except:
+            print('not found ' + filename)
+            continue
+
+        # we have the data.  Now create a cube for each cloud regieme
+        CRday_data = CRday_cubes.data
+        for CR in range(1,13):
+            crdata = np.where(CRday_data==CR, 1.0, 0.0)
+            crcube = CRday_cubes.copy(data=crdata)
+            crcube.long_name = 'cloud_regieme_' + str(CR) + '_cloud_area_percentage'
+
+            if firsttimein == 'y':
+                CR_cubelist.append(crcube)
+            else:
+                print(CR)
+                CR_cubelist[CR-1].data = CR_cubelist[CR-1].data + crcube.data
+        firsttimein = 'n'
+
+
+    # CR_cubelist contains 12 cubes each showing a map of where the cloud
+    # regiemes are
+
+   
+   # jucmap= ListedColormap(["white", "mistyrose", "lightpink", "pink", "plum", "mediumpurple","cornflowerblue","skyblue","aqua","cyan","turquoise","springgreen","greenyellow","yellow","orange","red"])
+    jucmap= ListedColormap(["white", "lavenderblush", "pink", "lightpink", "plum", "mediumpurple","mediumslateblue","turquoise","lightskyblue","aquamarine","springgreen","lime","palegreen", "greenyellow","gold","orange","red"])
+    V = [0,1,2,3,4,6,8,10,13,16,20,25,30,40,50,70,90]
+
+    fig, axs = plt.subplots(nrows=4,ncols=3,
+                           #subplot_kw={'projection': ccrs.Mollweide(central_longitude=180.)},
+                           subplot_kw={'projection': ccrs.PlateCarree(central_longitude=180.)},
+                           figsize=(11.0,11.0))
+    axs=axs.flatten() # axs is 2d array flatten to 1d array.
+
+    for CR,cube in enumerate(CR_cubelist):
+        cube.data = cube.data * 100 / ndays
+
+        # plot a map of each cloud regieme
+
+        lats = cube.coord('latitude').points
+        lons = cube.coord('longitude').points
+        print('plotting CR',CR)
+        cs = axs[CR].contourf(lons,lats,cube.data,cmap=jucmap,levels=V,
+                              extend='max',transform=ccrs.PlateCarree(),
+                             norm=colors.BoundaryNorm(boundaries=V,ncolors=16))
+        #cbar = axs[CR].colorbar(cs,orientation='horizontal',ticks=V)
+        axs[CR].coastlines()
+        axs[CR].set_title('CR :' + str(CR+1))
+
+    fig.subplots_adjust(bottom=0.2)
+    cbar_ax = fig.add_axes([0.10, 0.15, 0.80, 0.03])
+    fig.colorbar(cs, cax=cbar_ax,orientation='horizontal',ticks=V)
+        
+   # plt.tight_layout()
+    plt.savefig('figures/isccp_CR_RFO_' + preind_plio_ind +'_' + str(daystart) + '_' + str(daystart + ndays) + '.eps')
+    plt.savefig('figures/isccp_CR_RFO_' + preind_plio_ind +'_' + str(daystart) + '_' + str(daystart + ndays) + '.pdf')
+    iris.save(CR_cubelist,'figures/isccp_CR_RFO_' + preind_plio_ind +'_' + str(daystart) + '_' + str(daystart + ndays) + '.nc',netcdf_format="NETCDF3_CLASSIC")
+
+
+
+def plot_map_RFO_anomaly():
+    """ 
+    plots a map for each cloud regieme anomaly.  (To run this section
+    you will previously need to have run the plot_map_RFO_cloud_regieme
+    section for both the Pliocene and the preindustrial.  This will produce
+    the required files
+    """
+
+    pifile = 'figures/isccp_CR_RFO_PREIND_' + str(daystart) + '_' + str(daystart + ndays) + '.nc'
+    pliofile = 'figures/isccp_CR_RFO_PLIO_' + str(daystart) + '_' + str(daystart + ndays) + '.nc'
+
+    picubelist = iris.load(pifile)
+    pliocubelist = iris.load(pliofile)
+
+    anomcubelist = CubeList([])
+
+    for CR in range(1,13):
+
+        namereq = 'cloud_regieme_' + str(CR) + '_cloud_area_percentage'
+        
+        for cube in picubelist:
+            if cube.long_name ==namereq:
+                picube = cube
+        for cube in pliocubelist:
+            if cube.long_name ==namereq:
+                pliocube = cube
+        anomcube = pliocube - picube
+        anomcubelist.append(anomcube)
+            
+       
+    fig = plt.figure(figsize=[15,15])
+    plotno=0
+
+
+    # CR_cubelist contains 12 cubes each showing a map of where the cloud
+    # regiemes are
+
+   
+    jucmap= ListedColormap(["white", "lavenderblush", "pink", "lightpink", "plum", "mediumpurple","mediumslateblue","turquoise","lightskyblue","aquamarine","springgreen","lime","palegreen", "greenyellow","gold","orange","red"])
+    #V = [0,1,2,3,4,6,8,10,13,16,20,25,30,40,50,70,90]
+    V = np.arange(-10,11,1)
+
+    fig, axs = plt.subplots(nrows=4,ncols=3,
+                           #subplot_kw={'projection': ccrs.Mollweide(central_longitude=180.)},
+                           subplot_kw={'projection': ccrs.PlateCarree(central_longitude=180.)},
+                           figsize=(11.0,11.0))
+    axs=axs.flatten() # axs is 2d array flatten to 1d array.
+
+    for CR,cube in enumerate(anomcubelist):
+        # plot a map of each cloud regieme
+
+        lats = cube.coord('latitude').points
+        lons = cube.coord('longitude').points
+        print('plotting CR',CR)
+        cs = axs[CR].contourf(lons,lats,cube.data,cmap='RdBu_r',levels=V,
+                              extend='both',transform=ccrs.PlateCarree())
+#                             norm=colors.BoundaryNorm(boundaries=V,ncolors=16))
+        #cbar = axs[CR].colorbar(cs,orientation='horizontal',ticks=V)
+        axs[CR].coastlines()
+        axs[CR].set_title('CR :' + str(CR+1))
+
+    fig.subplots_adjust(bottom=0.2)
+    cbar_ax = fig.add_axes([0.10, 0.15, 0.80, 0.03])
+    fig.colorbar(cs, cax=cbar_ax,orientation='horizontal',ticks=V)
+        
+   # plt.tight_layout()
+    plt.savefig('figures/isccp_CR_RFO_anom_' + str(daystart) + '_' + str(daystart + ndays) + '.eps')
+    plt.savefig('figures/isccp_CR_RFO_anom_' + str(daystart) + '_' + str(daystart + ndays) + '.pdf')
+
+
+    
+########    START OF PROGRAM ########################
+# modis cloud regieme has index ctp, cot, cr
+MODIS_CR_cube = iris.load_cube('MODIS_cloud_regiemes.nc')
+#plot_MODIS_cloud_regiemes(MODIS_CR_cube)
+
+#isccp histogram has index ctp, cot, loc
+
+preind_plio_ind = 'PREIND' #  optionS PREIND PLIO
+ndays=360
+daystart = 1
+
+filestart = '/home/users/jctindall/cloud_regiemes/clisccp_CFday_IPSL-CM6A-LR_'
+if preind_plio_ind == 'PREIND':
+    filename = filestart + 'piControl_r1i2p1f1_gr_20750101-20981231.nc'
+if preind_plio_ind == 'PLIO':
+    filename = filestart + 'midPliocene-eoi400_r1i1p1f1_gr_20250101-20491231.nc'
+
+cubes = iris.load(filename)
+cube = cubes[0]
+ipsl_cube = cube[daystart:daystart + ndays,:,:,:,:]
+cube = 0
+
+
+####################################################################
+# get the cloud regieme for each histogram and group the histograms
+# this program will also write them out to a file
+
+#get_all_cloud_regiemes(ipsl_cube, MODIS_CR_cube)
+
+
+##################################################################
+# plot the average histogram from the test data in each cloud regieme.
+# it uses the files written out in the previous steop
+
+plot_avg_cloud_regieme()
+#plot_map_RFO_cloud_regieme()
+#plot_map_RFO_anomaly()

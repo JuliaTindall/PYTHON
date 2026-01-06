@@ -1,0 +1,455 @@
+#!/usr/bin/env python2.7
+#NAME
+#    ITCZ diagnostics
+#PURPOSESS
+#    This program is based on ITCZ_diagnostics.py (described below)
+#    However it will try and find the southern branch so instead of using 
+#    2S-21N we will use 25S-2N
+#    have also changed threshold to 6 for all months
+#
+#    ORIGINAL description
+#    This program will find the ITCZ in the North Pacific using the 
+#    Stanfield et al 2015 definition.  It will find the centerline width 
+#    and intensity and plot these by season for the Pliocene and the PI.
+#
+# search for 'main program' to find end of functions
+# Julia May 2018
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid, maskoceans
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,land_ocn_ind):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno !=99:        plt.subplot(2,2,fileno+1)
+
+
+    if land_ocn_ind == 'l':
+        plotnew=maskoceans(lons,lats,plotdata)
+        plotdata=plotnew
+        if cbarname=='mm/day':
+            minval=minval/2.
+            maxval=maxval/2.
+            valinc=valinc/2.
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+    map=Basemap(llcrnrlon=170.0,urcrnrlon=260.0,llcrnrlat=-30.0,urcrnrlat=5.0,projection='cyl',resolution='c')
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+
+    plotdata2=plotdata
+    #plotdata=maskoceans(x,y,plotdata)
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu',extend='both')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='ra':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=20)
+        cbar.ax.tick_params(labelsize=20)
+        plt.title(titlename,loc='left',fontsize=20)
+   
+
+    plotdata=plotdata2
+
+    if land_ocn_ind == 'l':
+        map.drawmapboundary(fill_color='white')
+    else:
+        map.drawmapboundary
+
+#end def plotdata
+
+def find_ITCZ(exptname,extra,monthname,threshold):
+#  to find the ITCZ we find precipitation in a box  2N-21S 180W-110 W.
+#  we then find the longest continuous stretch of precipitation above a certain
+#  threshold for each longitude.  The monthly thresholds are 4mm/day from 
+#  January to April and 6mm/day from May-December
+
+   # read in data from multiple files and calculate average precipitation
+   # in mm/day
+
+    print('/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/precip_data/'+exptname+'a@pd'+extra+'[5-9]?'+monthname+'_precip.nc')
+
+    f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/precip_data/'+exptname+'a@pd'+extra+'[5-9]?'+monthname+'_precip.nc')
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+    aprecip=f.variables['precip_1'][:]
+    aprecip=np.squeeze(aprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+    f.close()
+
+    avg_precip=np.mean(aprecip,axis=0)
+    avg_precip=avg_precip * 60. * 60. * 24. 
+
+    # decompose grid to 180W-110W (180E-250E) 2S-21N
+
+    nlon=0
+    nlat=0
+    lat_first=0
+    lon_first=0
+
+    for i in range (0,len(lon)):
+        if 180 <= lon[i] <= 250:
+            nlon=nlon+1
+            if lon_first==0:
+                lon_first=i
+
+
+    for j in range (0,len(lat)):
+        if -25.0 <= lat[j] <= 2:
+            nlat=nlat+1
+            if lat_first==0:
+                lat_first=j
+
+
+    print(lat_first,lon_first)
+    AOI_precip=np.zeros((nlat,nlon))
+    AOI_lon=np.zeros(nlon)
+    AOI_lat=np.zeros(nlat)
+
+
+    for i in range(0,len(lon)):
+        if 180<= lon[i] < 250:
+          AOI_lon[i-lon_first]=lon[i]
+          for j in range(0,len(lat)):
+              if -25.0 <= lat[j] <= 2:
+                  if i==lon_first:
+                      AOI_lat[j-lat_first]=lat[j]
+                  AOI_precip[j-lat_first,i-lon_first]=avg_precip[j,i]
+
+    
+
+    
+
+    # for each longitude find the longest continuous band of precipitation 
+    # above the threshold
+
+
+    max_count_lons=np.zeros(len(AOI_lon),dtype=int)
+    upper_bound_latitude=np.empty(len(AOI_lon),dtype=float)
+    lower_bound_latitude=np.empty(len(AOI_lon),dtype=float)
+    upper_bound_index=np.empty(len(AOI_lon),dtype=int)
+    lower_bound_index=np.empty(len(AOI_lon),dtype=int)
+    most_intense_precip_latitude=np.empty(len(AOI_lon),dtype=float)
+    most_intense_precip_index=np.empty(len(AOI_lon),dtype=int)
+
+    upper_bound_latitude[:]=np.nan
+    lower_bound_latitude[:]=np.nan
+    most_intense_precip_latitude[:]=np.nan
+
+    latres=AOI_lat[1]-AOI_lat[0]
+    for i in range(0,len(AOI_lon)):
+        count_lons=0
+        max_val=0
+        for j in range(len(AOI_lat)-1,0,-1):
+            if AOI_precip[j,i] >= threshold: # check greater then threshold
+                count_lons=count_lons+1
+                if count_lons > max_count_lons[i]: # set up maximum
+                    max_count_lons[i]=count_lons
+                    lower_bound_latitude[i]=AOI_lat[j]
+                    lower_bound_index[i]=j
+                    if AOI_precip[j,i] > max_val: # find most intense precip
+                                                  #in north itcz
+                        max_val=AOI_precip[j,i]
+                        most_intense_precip_latitude[i]=AOI_lat[j]
+                        most_intense_precip_index[i]=j
+         
+            else:
+                count_lons=0
+          
+        upper_bound_latitude[i]=lower_bound_latitude[i]+(
+            (max_count_lons[i]-1)*latres)
+        upper_bound_index[i]=lower_bound_index[i]+max_count_lons[i]-1
+
+        #print(AOI_lon[i],i,upper_bound_latitude[i],lower_bound_latitude[i],max_count_lons[i],most_intense_precip_latitude[i])
+        #for j in range(0,len(AOI_lat)):
+        #          print(AOI_lat[j],AOI_precip[j,i])
+        #sys.exit()
+
+    #area of interest check 
+
+    titlename=exptname+' '+monthname
+    plotdata(AOI_precip,99,AOI_lon,AOI_lat,titlename,0.0,10.0,0.5,0,'n','mm/day','b')
+
+
+    plt.plot(AOI_lon,upper_bound_latitude,color='orange',linewidth=3)
+    plt.plot(AOI_lon,lower_bound_latitude,color='red',linewidth=3)
+    plt.plot(AOI_lon,most_intense_precip_latitude,color='white',linewidth=3)
+
+    # overplot lower and upper bounds
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/map_south_'+exptname+'_'+monthname+'.eps'
+    plt.savefig(fileout)
+    plt.close()
+
+
+    lon_res=AOI_lon[1]-AOI_lon[0]
+    lat_res=AOI_lat[1]-AOI_lat[0]
+   
+    max_AOI_precip=np.zeros(len(AOI_lon))
+    mean_AOI_precip=np.zeros(len(AOI_lon)) # in mm/day (kg/m2/day)
+    total_AOI_precip=np.zeros(len(AOI_lon)) # in kg/day (so we need to multiply by area of gridbox)
+    for i in range(0,len(AOI_lon)):
+        if most_intense_precip_latitude[i]>=-90:  # hopefully false for nan
+            max_AOI_precip[i]=AOI_precip[most_intense_precip_index[i],i]
+            weightamt=0.
+            for j in range(lower_bound_index[i],upper_bound_index[i]+1):
+                mean_AOI_precip[i]=(mean_AOI_precip[i]+
+                      AOI_precip[j,i]*np.cos(np.radians(AOI_lat[j])))
+                weightamt=weightamt + np.cos(np.radians(AOI_lat[j]))
+                total_AOI_precip[i]=(total_AOI_precip[i]+
+                  AOI_precip[j,i]*111000.*lon_res*np.cos(np.radians(AOI_lat[j]))
+                              *111000.*lat_res)
+            
+            mean_AOI_precip[i]=mean_AOI_precip[i] / weightamt
+
+   
+    retdata=[AOI_lon,most_intense_precip_latitude,upper_bound_latitude,lower_bound_latitude,max_AOI_precip,mean_AOI_precip,total_AOI_precip]
+    return retdata
+
+
+#end def find_ITCZ
+
+
+     
+
+
+#end def seasmean
+
+################################
+# main program
+
+monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+
+threshold=np.zeros(12,dtype=float)
+threshold[0]=4.
+threshold[1]=4.
+threshold[2]=4.
+threshold[3]=4.
+threshold[4]=6.
+threshold[5]=6.
+threshold[6]=6.
+threshold[7]=6.
+threshold[8]=6.
+threshold[9]=6.
+threshold[10]=6.
+threshold[11]=6.
+threshold[:]=6  # have changed threshold to 6
+
+# get data for all months
+for i in range(0,len(monthnames)):
+ 
+    ITCZ_data=find_ITCZ('xkvje','n',monthnames[i],threshold[i])
+    if i == 0:
+        AOI_lon=ITCZ_data[0]
+        # location of rainfall arrays
+        max_intensity_lat_pi=np.zeros((12,len(AOI_lon)))
+        max_intensity_lat_plio=np.zeros((12,len(AOI_lon)))
+        upper_bound_pi=np.zeros((12,len(AOI_lon)))
+        upper_bound_plio=np.zeros((12,len(AOI_lon)))
+        lower_bound_pi=np.zeros((12,len(AOI_lon)))
+        lower_bound_plio=np.zeros((12,len(AOI_lon)))
+        # amount of rainfall arrays
+        max_intensity_amt_pi=np.zeros((12,len(AOI_lon)))
+        max_intensity_amt_plio=np.zeros((12,len(AOI_lon)))
+        mean_itcz_precip_amt_pi=np.zeros((12,len(AOI_lon)))
+        mean_itcz_precip_amt_plio=np.zeros((12,len(AOI_lon)))
+        total_itcz_precip_amt_pi=np.zeros((12,len(AOI_lon)))
+        total_itcz_precip_amt_plio=np.zeros((12,len(AOI_lon)))
+    max_intensity_lat_pi[i,:]=ITCZ_data[1]
+    upper_bound_pi[i,:]=ITCZ_data[2]
+    lower_bound_pi[i,:]=ITCZ_data[3]
+    max_intensity_amt_pi[i,:]=ITCZ_data[4]
+    mean_itcz_precip_amt_pi[i,:]=ITCZ_data[5]
+    total_itcz_precip_amt_pi[i,:]=ITCZ_data[6]
+
+  
+   
+    ITCZ_data=find_ITCZ('xkvjg','n',monthnames[i],threshold[i])
+    max_intensity_lat_plio[i,:]=ITCZ_data[1]
+    upper_bound_plio[i,:]=ITCZ_data[2]
+    lower_bound_plio[i,:]=ITCZ_data[3]
+    max_intensity_amt_plio[i,:]=ITCZ_data[4]
+    mean_itcz_precip_amt_plio[i,:]=ITCZ_data[5]
+    total_itcz_precip_amt_plio[i,:]=ITCZ_data[6]
+
+# plot the maximum intensity latitude for each longitude for pliocene
+# and preindustrial for each month
+
+for i in range(0,len(monthnames)):
+   plt.subplot(3,4,i+1)
+   plt.plot(AOI_lon,max_intensity_lat_pi[i,:],label='pi')
+   plt.plot(AOI_lon,max_intensity_lat_plio[i,:],label='plio')
+   if i == len(monthnames)-1:
+       plt.legend()
+   titlename=monthnames[i]
+   plt.title(titlename)
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/max_intensity_south.eps'
+plt.savefig(fileout)
+plt.close()
+
+
+ # plot upper range and lower range.
+for i in range(0,len(monthnames)):
+   plt.subplot(3,4,i+1)
+   plt.plot(AOI_lon,upper_bound_pi[i,:],label='pi_upper')
+   plt.plot(AOI_lon,lower_bound_pi[i,:],label='pi_lower')
+   plt.plot(AOI_lon,upper_bound_plio[i,:],label='plio_upper')
+   plt.plot(AOI_lon,lower_bound_plio[i,:],label='plio_lower')
+   if i == len(monthnames)-1:
+       plt.legend()
+   titlename=monthnames[i]
+   plt.title(titlename)
+    
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/bound_range_south.eps'
+plt.savefig(fileout)
+plt.close()
+ 
+
+# plot some averages over area by month
+
+mean_loc_max_intensity_plio=np.zeros(len(monthnames))
+mean_loc_max_intensity_pi=np.zeros(len(monthnames))
+mean_loc_upper_bound_plio=np.zeros(len(monthnames))
+mean_loc_upper_bound_pi=np.zeros(len(monthnames))
+mean_loc_lower_bound_plio=np.zeros(len(monthnames))
+mean_loc_lower_bound_pi=np.zeros(len(monthnames))
+mean_amt_max_intensity_plio=np.zeros(len(monthnames))
+mean_amt_max_intensity_pi=np.zeros(len(monthnames))
+mean_amt_itcz_plio=np.zeros(len(monthnames))
+mean_amt_itcz_pi=np.zeros(len(monthnames))
+total_amt_itcz_plio=np.zeros(len(monthnames))
+total_amt_itcz_pi=np.zeros(len(monthnames))
+for mon in range(0,len(monthnames)):
+    mean_loc_max_intensity_plio[mon]=np.nanmean(max_intensity_lat_plio[mon,:])
+    mean_loc_max_intensity_pi[mon]=np.nanmean(max_intensity_lat_pi[mon,:])
+    mean_loc_upper_bound_plio[mon]=np.nanmean(upper_bound_plio[mon,:])
+    mean_loc_upper_bound_pi[mon]=np.nanmean(upper_bound_pi[mon,:])
+    mean_loc_lower_bound_plio[mon]=np.nanmean(lower_bound_plio[mon,:])
+    mean_loc_lower_bound_pi[mon]=np.nanmean(lower_bound_pi[mon,:])
+    mean_amt_max_intensity_plio[mon]=np.nanmean(max_intensity_amt_plio[mon,:])
+    mean_amt_max_intensity_pi[mon]=np.nanmean(max_intensity_amt_pi[mon,:])
+    mean_amt_itcz_plio[mon]=np.nanmean(mean_itcz_precip_amt_plio[mon,:])
+    mean_amt_itcz_pi[mon]=np.nanmean(mean_itcz_precip_amt_pi[mon,:])
+    total_amt_itcz_plio[mon]=np.nansum(total_itcz_precip_amt_plio[mon,:])
+    total_amt_itcz_pi[mon]=np.nansum(total_itcz_precip_amt_pi[mon,:])
+
+plt.subplot(2,2,1)  
+plt.plot(mean_loc_max_intensity_plio,label='plio')
+plt.plot(mean_loc_max_intensity_pi,label='pi')
+plt.title('lat maximum ITCZ intensity')
+plt.xlabel('month number')
+plt.ylabel('latitude')
+plt.legend()
+
+
+plt.subplot(2,2,2)  
+plt.plot(mean_loc_upper_bound_plio,label='plio')
+plt.plot(mean_loc_upper_bound_pi,label='pi')
+plt.title('north lat of ITCZ')
+plt.xlabel('month number')
+plt.ylabel('latitude')
+plt.legend()
+
+
+plt.subplot(2,2,4)  
+plt.plot(mean_loc_lower_bound_plio,label='plio')
+plt.plot(mean_loc_lower_bound_pi,label='pi')
+plt.title('south lat of ITCZ')
+plt.xlabel('month number')
+plt.ylabel('latitude')
+plt.legend()
+
+plt.subplot(2,2,3)  
+plt.plot(mean_loc_upper_bound_plio-mean_loc_lower_bound_plio,label='plio')
+plt.plot(mean_loc_upper_bound_pi-mean_loc_lower_bound_pi,label='pi')
+plt.title('width of ITCZ')
+plt.xlabel('month number')
+plt.ylabel('degrees')
+plt.legend()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/avg_loc_by_month_south.eps'
+plt.savefig(fileout)
+plt.close()
+
+
+# we will now plot intensity by month.
+# 1. average amount of rain at the location of maximum intensity.
+
+plt.subplot(2,2,1)  
+plt.plot(mean_amt_max_intensity_plio,label='plio')
+plt.plot(mean_amt_max_intensity_pi,label='pi')
+plt.title('rain amt at max ITCZ intensity')
+plt.xlabel('month number')
+plt.ylabel('mm/day')
+plt.legend()
+
+# 2. mean amount of rain in mm/day
+
+plt.subplot(2,2,2)  
+plt.plot(mean_amt_itcz_plio,label='plio')
+plt.plot(mean_amt_itcz_pi,label='pi')
+plt.title('mean itcz precip')
+plt.xlabel('month number')
+plt.ylabel('mm/day')
+plt.legend()
+
+# 3. total amount of rain in kg
+
+plt.subplot(2,2,3)  
+plt.plot(total_amt_itcz_plio/1.0E12,label='plio')
+plt.plot(total_amt_itcz_pi/1.0E12,label='pi')
+plt.title('total itcz precip')
+plt.xlabel('month number')
+plt.ylabel('kg (x 10^12)')
+plt.legend()
+
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/ITCZ/rain_amt_by_month_south.eps'
+plt.savefig(fileout)
+plt.close()
+
+
+sys.exit()
+####
+

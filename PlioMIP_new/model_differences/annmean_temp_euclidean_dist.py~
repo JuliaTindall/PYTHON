@@ -1,0 +1,83 @@
+#!/usr/bin/env python3.7
+#NAME
+#    ANNMEAN_TEMP_EUCLIDEAN_DIST
+#PURPOSE
+#    This program will compare all the models to see how similar they
+#    are on the annual mean temperature
+#
+#    It will do this by obtaining a number of the euclidean distance between 
+#    them
+#
+# Julia 11/1/2018
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+import iris
+
+
+
+
+
+
+################################
+# main program
+
+# annual mean
+
+MODELSET = ['CCSM4-UoT','CCSM4-Utr','CCSM4','CESM1.2','CESM2','COSMOS','EC-Earth3.3','GISS2.1G','HadCM3','HadCM3_new','HadGEM3','IPSLCM5A','IPSLCM5A2','IPSLCM6A','MIROC4m','MRI2.3','NorESM1-F','NorESM-L']
+
+FIELD = 'TotalPrecipitation'
+EXPT = 'EOI400'
+CNTL = 'E280'
+ANOMALY = 'N'
+
+nmods = len(MODELSET)
+eucldistarr = np.zeros((nmods,nmods))
+
+for i,model1 in enumerate(MODELSET):
+    cube1 = iris.load_cube('/nfs/hera1/earjcti/regridded/' + model1 + '/' + 
+                           EXPT + '.' + FIELD + '.allmean.nc')
+    if ANOMALY == 'Y':
+        cubec = iris.load_cube('/nfs/hera1/earjcti/regridded/' + model1 + '/' + 
+                           CNTL + '.' + FIELD + '.allmean.nc')
+        cube1 = cube1 - cubec
+ 
+    for j,model2 in enumerate(MODELSET):
+        cube2 = iris.load_cube('/nfs/hera1/earjcti/regridded/'+ model2 + '/' + 
+                           EXPT + '.' + FIELD + '.allmean.nc')
+
+        if ANOMALY == 'Y':
+            cubec = iris.load_cube('/nfs/hera1/earjcti/regridded/' + 
+                                   model2 + '/' + 
+                                   CNTL + '.' + FIELD + '.allmean.nc')
+            cube2 = cube2 - cubec
+ 
+
+        cubediff = cube2.data - cube1.data
+
+        eucldistarr[i,j] = np.sqrt(np.mean(np.square(cubediff)))
+        print(model1,model2,eucldistarr[i,j])
+
+
+fig = plt.figure(figsize=[12.0,12.0])
+cs = plt.pcolormesh(MODELSET,MODELSET,eucldistarr,cmap='rainbow')
+cbar = plt.colorbar(cs,orientation='horizontal')
+cbar.set_label('euclidian distance')
+plt.xticks(rotation=90)
+
+if ANOMALY == 'Y':
+    titlename = EXPT + '-' + CNTL + '_' + FIELD + '_annmean'
+else:
+    titlename = EXPT + '_' + FIELD + '_annmean'
+
+plt.title(titlename)
+plt.savefig('/nfs/hera1/earjcti/regridded/allplots/Euclidean_distance/' + titlename + '.eps')
+plt.savefig('/nfs/hera1/earjcti/regridded/allplots/Euclidean_distance/' + titlename + '.png')

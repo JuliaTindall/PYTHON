@@ -1,0 +1,591 @@
+#!/usr/bin/env python2.7
+#NAME
+#    get_average_temp.py
+#PURPOSE
+#    This program will get the long term annual average temperature from
+#    both individual and database files.
+#
+#    It was originally written for Jochen who wanted to verify some values
+#    in a spreadsheet of Fergus
+#
+# search for 'main program' to find end of functions
+# Julia 3/8/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata  (not currently used)
+#  def annmean_ind
+#  def annmean_database
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(2,2,fileno+1)
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+
+    x, y = map(lons, lats)
+
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='max')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='i': #increasing
+                    cs = map.contourf(x,y,plotdata,V,norm=mp.colors.LogNorm(vmin=0,vmax=32),cmap='Reds')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    cs = map.contourf(x,y,plotdata,V,extend='both',cmap='rainbow')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-70,size=20)
+        cbar.ax.tick_params(labelsize=20)
+        plt.title(titlename,loc='left',fontsize=20)
+   
+
+
+#end def plotdata
+
+def annmean_ind(exptname,extra,startyear,nyears):
+
+    # if nyears is a negative number read in all the files in the directory
+    if nyears < 0:
+
+        # check if directory exists
+        dirname='/nfs/hera2/apps/metadata/experiments/'+exptname+'/netcdf/'
+        if os.path.isdir(dirname):
+            pass
+        else:
+            allraw=[-999.99,-999.99,0]
+            return(allraw)
+
+
+        f=MFDataset(dirname+exptname[0:5]+'a@pd*.nc')
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+
+        atemp=f.variables['temp'][:] # this is temp at 1.5m
+        atemp=np.squeeze(atemp)
+        ntimes,ny,nx=np.shape(atemp)
+    
+        
+        # check temp_1 is surface temperature after timestep
+        varSAT=' '
+        for name,variable in f.variables.items():
+            if name == 'temp_1':
+                lname=getattr(variable,'long_name')
+                #print('t1',lname)
+                if lname=='TEMP AT TROP LEVEL- NEED HT,PRESS':
+                    # try temp 2
+                    pass
+                if lname=='SURFACE TEMPERATURE AFTER TIMESTEP':
+                    varSAT='temp_1'
+                if lname=='Temperature T': # we need to assume this is correctT
+                                           # as we may not have a temp_2
+                    if varSAT==' ':
+                        varSAT='temp_1'
+
+            if name == 'temp_2':
+                lname=getattr(variable,'long_name')
+                #print('t2',lname)
+                if lname=='TEMP AT TROP LEVEL- NEED HT,PRESS':
+                    # try temp 2
+                    pass
+                if lname=='SURFACE TEMPERATURE AFTER TIMESTEP':
+                    varSAT='temp_2'
+
+                    
+                    
+
+        btemp=f.variables[varSAT][:] # surface temperature after timestep
+        btemp=np.squeeze(btemp)
+        f.close()
+
+        #sys.exit()
+
+    else:
+        print('you need to set up for a subset of the directory')
+        sys.exit()
+        
+    
+    #average across the time dimension
+    temp_1point5=np.mean(atemp,axis=0)
+    temp_surf=np.mean(btemp,axis=0)
+
+    # create weighting array
+    weightarr=np.zeros(np.shape(temp_surf))
+    for i in range(0,len(lon)):
+        weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+    # find weighted mean
+
+    avg_temp_surf=np.average(temp_surf,weights=weightarr)-273.15
+    avg_temp_1point5=np.average(temp_1point5,weights=weightarr)-273.15
+
+    #print( )
+    #print('number of files is',ntimes,'for expt',exptname)
+    #print('Raw files average surface temperature=',avg_temp_surf-273.15)
+    #print('Raw files average 1.5m temperature=',avg_temp_1point5-273.15)
+
+
+    allraw=[avg_temp_surf,avg_temp_1point5,ntimes]
+    return(allraw)
+
+#end def annmean
+
+#####################################################
+def annmean_database(exptname,extra,startyear,nyears,fieldname):
+
+     
+    filename='/nfs/hera2/apps/metadata/experiments/'+exptname+'/timeseries/'+exptname[0:5]+'a@pd_'+fieldname+'.nc'
+
+    if os.path.isfile(filename):
+        pass
+    else:
+        return(-999.99)
+
+
+    f=Dataset(filename)
+    lat = f.variables['latitude'][:]
+    lon = f.variables['longitude'][:]
+
+    atemp=f.variables['temp'][:] # this is temp at 1.5m
+    atemp=np.squeeze(atemp)
+    ntimes,ny,nx=np.shape(atemp)
+
+    starttime=ntimes-(nyears*12)
+    surface_temperature=atemp[starttime:ntimes,:,:]
+       
+    #average across the time dimension
+    temp_surf=np.mean(surface_temperature,axis=0)
+
+    # create weighting array
+    weightarr=np.zeros(np.shape(temp_surf))
+    for i in range(0,len(lon)):
+        weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+    # find weighted mean
+
+    avg_temp_surf=np.average(temp_surf,weights=weightarr)
+   
+    #print('Database files average surface temperature ',exptname,'=',avg_temp_surf-273.15)
+
+    return(avg_temp_surf-273.15)
+
+
+#end def annmean_database
+
+##################################
+def globmeans_database(exptname):
+
+    filename_SAT='/nfs/hera2/apps/metadata/experiments/'+exptname+'/globalmean/'+exptname+'_Annual_Average_a@pd_SurfaceTemperature.dat'
+    
+    if os.path.isfile(filename_SAT):
+        f=open(filename_SAT,'r')
+        SAT_file=f.readline()
+        # remove newline and convert to float
+        SAT_t=SAT_file.split()
+        SAT=float(SAT_t[0])-273.15
+        f.close()
+    else:
+        SAT=-999.99
+
+
+    filename_T='/nfs/hera2/apps/metadata/experiments/'+exptname+'/globalmean/'+exptname+'_Annual_Average_a@pd_Temperature.dat'
+
+    if os.path.isfile(filename_T):
+        f2=open(filename_T,'r')
+        T_file=f2.readline()
+        # remove newline and convert to float
+        T_t=T_file.split()
+        T=float(T_t[0])-273.15
+        #print(T)
+        f2.close()
+    else:
+        T=-999.99
+
+    glob_means=[SAT,T]
+
+    return(glob_means)
+
+
+
+
+#end def globmeans_database
+
+############################################
+def month_avg_ind(exptname):
+
+    monthnames=['January','February','March','April','May','June','July','August','September','October','November','December']
+
+    # SAT
+
+    ntime=0
+    temp_surf=0
+    for month in range(0,len(monthnames)):
+        f=Dataset('/nfs/hera2/apps/metadata/experiments/'+exptname+'/averages/'+exptname+'_Monthly_Average_'+monthnames[month]+'_a@pd_SurfaceTemperature.nc')
+        if month == 0:
+            dims=(f.dimensions.keys())
+            vars=(f.variables.keys())
+            if len(dims) == 2:  # lon and lat only
+                xname=dims[0]
+                yname=dims[1]
+            else:
+                xname='longitude'
+                yname='latitude'
+    
+            varname=vars[len(dims)]
+    
+
+        lat = f.variables[yname][:]
+        lon = f.variables[xname][:]
+
+
+        atemp=f.variables[varname][:] # this is temp at surface
+        temp_surf=temp_surf+np.squeeze(atemp)
+        ntime=ntime+1
+
+ 
+    temp_surf=temp_surf/12.
+
+
+    # check this is a 2 dimensional array
+    ndims=len(np.shape(temp_surf))
+    if ndims != 2:
+        avg_temp_surf=-999.99
+    else:
+        # create weighting array
+        weightarr=np.zeros(np.shape(temp_surf))
+        for i in range(0,len(lon)):
+            weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+        # find weighted mean
+
+        avg_temp_surf=np.average(temp_surf,weights=weightarr)-273.15
+
+    if ntime != 12:
+        avg_temp_surf=-999.99
+
+   
+
+    # temperature
+    ntime=0
+    temp_1=0
+    for month in range(0,len(monthnames)):
+        f=Dataset('/nfs/hera2/apps/metadata/experiments/'+exptname+'/averages/'+exptname+'_Monthly_Average_'+monthnames[month]+'_a@pd_Temperature.nc')
+
+        if month == 0:
+            dims=(f.dimensions.keys())
+            vars=(f.variables.keys())
+            if len(dims) == 2:  # lon and lat only
+                xname=dims[0]
+                yname=dims[1]
+            else:
+                xname='longitude'
+                yname='latitude'
+    
+            varname=vars[len(dims)]
+
+        lat = f.variables[yname][:]
+        lon = f.variables[xname][:]
+
+
+        atemp=f.variables[varname][:] # this is temp at surface
+        temp=np.squeeze(atemp)
+
+        temp_1=temp_1+temp
+        ntime=ntime+1
+
+   
+    # check this is a 2 dimensional array
+    temp_1=temp_1/ntime
+    ndims=len(np.shape(temp_1))
+    if ndims != 2:
+        avg_temp=-999.99
+    else:
+        # create weighting array
+        weightarr=np.zeros(np.shape(temp_1))
+        for i in range(0,len(lon)):
+            weightarr[:,i]=np.cos(np.deg2rad(lat))
+            
+        # find weighted mean
+
+        avg_temp=np.average(temp_1,weights=weightarr)-273.15
+   
+        #print('Average temp from average ',exptname,'=',avg_temp-273.15)
+
+
+    if ntime != 12:
+        avg_temp=-999.99
+
+
+    mean_from_avg=[avg_temp_surf,avg_temp]
+    return(mean_from_avg)
+
+
+#end def annmean
+
+
+
+
+############################################
+def annmean_averages(exptname):
+
+    notes=' '
+
+    # SAT
+    f=Dataset('/nfs/hera2/apps/metadata/experiments/'+exptname+'/averages/'+exptname+'_Annual_Average_a@pd_SurfaceTemperature.nc')
+    dims=(f.dimensions.keys())
+    vars=(f.variables.keys())
+    if len(dims) == 2:  # lon and lat only
+        xname=dims[0]
+        yname=dims[1]
+    else:
+        xname='longitude'
+        yname='latitude'
+    
+    varname=vars[len(dims)]
+    
+
+    lat = f.variables[yname][:]
+    lon = f.variables[xname][:]
+
+    if len(lat)!=73:
+        if len(lat)==37:
+            notes='FAMOUS'
+        else:
+            print('check dimensions')
+            sys.exit()
+
+
+
+
+    atemp=f.variables[varname][:] # this is temp at surface
+    temp_surf=np.squeeze(atemp)
+
+    # check this is a 2 dimensional array
+    ndims=len(np.shape(temp_surf))
+    if ndims != 2:
+        avg_temp_surf=-999.99
+    else:
+        # create weighting array
+        weightarr=np.zeros(np.shape(temp_surf))
+        for i in range(0,len(lon)):
+            weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+        # find weighted mean
+
+        avg_temp_surf=np.average(temp_surf,weights=weightarr)-273.15
+   
+
+    # temperature
+    f=Dataset('/nfs/hera2/apps/metadata/experiments/'+exptname+'/averages/'+exptname+'_Annual_Average_a@pd_Temperature.nc')
+    dims=(f.dimensions.keys())
+    vars=(f.variables.keys())
+    if len(dims) == 2:  # lon and lat only
+        xname=dims[0]
+        yname=dims[1]
+    else:
+        xname='longitude'
+        yname='latitude'
+    
+    varname=vars[len(dims)]
+
+    lat = f.variables[yname][:]
+    lon = f.variables[xname][:]
+
+    atemp=f.variables[varname][:] # this is temp at surface
+    temp=np.squeeze(atemp)
+   
+    # check this is a 2 dimensional array
+    ndims=len(np.shape(temp))
+    if ndims != 2:
+        avg_temp=-999.99
+    else:
+        # create weighting array
+        weightarr=np.zeros(np.shape(temp))
+        for i in range(0,len(lon)):
+            weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+        # find weighted mean
+
+        avg_temp=np.average(temp,weights=weightarr)-273.15
+   
+        #print('Average temp from average ',exptname,'=',avg_temp-273.15)
+
+    mean_from_avg=[avg_temp_surf,avg_temp,notes]
+    return(mean_from_avg)
+
+
+#end def annmean
+
+
+
+
+################################
+# main program
+
+# annual mean from individual files
+
+extra='z'
+startyear=70
+nyears_ind=-10  # if negative number use all of them
+nyears_db=30  # if negative number use all of them
+
+#allexpts=['xhckb','xiomv','xhckf']
+allexpts=['tdcza','tdhzt','tdlqa','tdlqb','tdlqc','tdlqd','tdlqe','tdlqf','tdlqg','tdlqh','tdlqi','tdlqj','tdlxf','tdlxi','xgraf','xgrag','xgrah','xgrai','xgygi','xgygj','xgygk','xgygl','xgygm','xgygn','xgygo','xgygp','xgygq','xgygz','xhckb','xhckd','xhckf','xhckh','xhcki','xhckj','xhckk','xhckl','xhckm','xhckn','xhcko','xhckp','xhckq','xhckz','xhgfk4','xhsop4','xhsor4','xilug','xiomv','xjpli','xhgfa','tdipf','tdkgg','tdkgi','tdkgf']
+
+allexpts=['xgrah']
+
+#print('expt ','R_SAT','R_T1.5','Tseries','GM_SAT','GM_T1.5','avg_SAT','avg_1,5')
+fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/CEMAC/Jochen/all_expts_mean.txt'
+fo=open(fileout,'w')
+fo.write('expt, nraw, R_SAT, R_T1.5, TS_S, TS_1.5, GM_SAT, GM_T1.5, Mo_SAT, Mo_1.5\n')
+
+
+for exptname in allexpts:
+
+
+    # get data from individual files
+    allraw=annmean_ind(exptname,extra,startyear,nyears_ind)
+    raw_temp_surf=allraw[0]
+    raw_temp_1point5=allraw[1]
+    ntimes=allraw[2]
+
+    # get data from timeseries
+#    database_tsurf=annmean_database(exptname,extra,startyear,nyears_db,'SurfaceTemperature')
+    database_tsurf=annmean_database(exptname,extra,startyear,nyears_db,'SurfaceTemperature_old')
+    database_t15=annmean_database(exptname,extra,startyear,nyears_db,'Temperature')
+
+    # get data from global means
+    globmeans_data=globmeans_database(exptname)
+    globmeans_SAT=globmeans_data[0]
+    globmeans_T=globmeans_data[1]
+
+    # get data from annual averages
+    mean_from_avg=annmean_averages(exptname)
+    avg_SAT=mean_from_avg[0]
+    avg_T=mean_from_avg[1]
+    notes=mean_from_avg[2]
+
+
+    # get data from monthly average individual months
+    mean_monthavg=month_avg_ind(exptname)
+    avg_SAT_month=mean_monthavg[0]
+    avg_T_month=mean_monthavg[1]
+
+
+
+    print(exptname,ntimes,round(raw_temp_surf,2),round(raw_temp_1point5,2),round(database_tsurf,2),round(globmeans_SAT,2),round(globmeans_T,2),round(avg_SAT,2),round(avg_T,2)),notes
+
+
+    # if global means missing replace with annual average
+    if globmeans_SAT == -999.99:
+        globmeans_SAT=avg_SAT
+    if globmeans_T == -999.99:
+        globmeans_T=avg_T
+
+    fo.write(exptname+', '+str(ntimes)+', '+str(round(raw_temp_surf,2))+', '+str(round(raw_temp_1point5,2))+', '+str(round(database_tsurf,2))+', '+str(round(database_t15,2))+', '+str(round(globmeans_SAT,2))+', '+str(round(globmeans_T,2))+', '+str(round(avg_SAT_month,2))+', '+str(round(avg_T_month,2))+', '+notes+'\n')
+    
+    
+
+fo.close()
+# experiments needed
+# 'tdcza',
+# 'tdhzt',
+# 'tdlqa',
+# 'tdlqb',
+# 'tdlqc',
+# 'tdlqd',
+# 'tdlqe',
+# 'tdlqf',
+# 'tdlqg',
+# 'tdlqh',
+# 'tdlqi',
+# 'tdlqj',
+# 'tdlxf',
+# 'tdlxi',
+
+# 'xgraf',
+# 'xgrag',
+# 'xgrah',
+# 'xgrai',
+# 'xgygi',
+# 'xgygj',
+# 'xgygk',
+# 'xgygl',
+# 'xgygm',
+# 'xgygn',
+# 'xgygo',
+# 'xgygp',
+# 'xgygq',
+# 'xgygz',
+# 'xhckb',
+# 'xhckd',
+# 'xhckf',
+# 'xhckh',
+# 'xhcki',
+# 'xhckj',
+# 'xhckk',
+# 'xhckl',
+# 'xhckm',
+# 'xhckn',
+# 'xhcko',
+# 'xhckp',
+# 'xhckq',
+# 'xhckz',
+# 'xhgfk4',
+# 'xhsop4',
+# 'xhsor4',
+# 'xilug',
+# 'xiomv',
+# 'xjpli',
+# 'xhgfa',
+# 'tdipf',
+# 'tdkgg',
+# 'tdkgi',
+# 'tdkgf',
+
+
+
+
+
+sys.exit(0)
+
+####
+

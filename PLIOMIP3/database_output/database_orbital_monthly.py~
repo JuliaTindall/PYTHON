@@ -1,0 +1,304 @@
+#NAME
+#    Database_orbital_monthly.py
+#PURPOSE 
+#
+#  This program will monthly database files from the orbital experiment
+#  (assuming that the daily data is availale)
+#
+#  Notes: a bit about orbital is in Onenote:2024-2025: PlioMIP3 intiial HadCM3: orbital experiments
+#
+#  xqbwn = LP_highNH_orb  ; xqbwo = LP_lowNH_orbit
+#  
+#  we also used the program : assess_spinup/check_orbital_expts for dividing 
+#  up months
+#    if expt == 'xpsip':
+#        # first day of year is 23rd December so shift 8 days to the right
+#        expt_shiftdata=np.roll(expt_insw_lat_time_cube.data, 8,axis=0)
+#        monthlengths=np.array([34.0,33.0,32.0,31.0,29.0,28.0,28.0,28.0,28.0,30.0,31.0,33.0])
+#    if expt == 'xpsiq':
+#        # first day of year is 7th January so shift 6 days to the left
+#        expt_shiftdata=np.roll(expt_insw_lat_time_cube.data,-6,axis=0)
+#        monthlengths=np.array([27.0,28.0,29.0,31.0,32.0,34.0,34.0,33.0,32.0,30.0,28.0,27.0])
+#    monthlengths=monthlengths * 360. / 365.
+
+#
+#  Julia 21.02.25  based on database_avg_fields_monthly
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import sys
+import cf_units
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import iris.coord_categorisation
+from iris.cube import CubeList
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+
+def get_calender(expt):
+    """
+    suppose we have a 360 day array starting at 1st January
+    this program will obtain the first day and last day of each month
+    accorin to the orbit
+    """
+    print(expt)
+    if (expt == 'xqbwn' or expt == 'xqbwp'):
+        monthlengths=np.array([34.0,33.0,32.0,31.0,29.0,28.0,28.0,28.0,28.0,30.0,31.0,33.0])
+   
+    if (expt == 'xqbwo' or expt == 'xqbwq'):
+        monthlengths=np.array([27.0,28.0,29.0,31.0,32.0,34.0,34.0,33.0,32.0,30.0,28.0,27.0])
+    
+    monthlengths = monthlengths * 360.0 / 365.
+    #print(monthlengths)
+
+    # calculate first and last day of month
+    firstmonthday = np.zeros(12)
+    lastmonthday = np.zeros(12)
+    for i in range(1,12):
+        firstmonthday[i] = firstmonthday[i-1] + monthlengths[i-1]
+        lastmonthday[i-1] = firstmonthday[i]
+
+    #print('orig')
+    #print(firstmonthday)
+    #print(lastmonthday)
+    
+    lastmonthday[11]=360.
+    firstmonthint=np.ceil(firstmonthday).astype(int)
+    lastmonthint=np.floor(lastmonthday).astype(int)
+
+    #print('rounded')
+    #print(firstmonthint)
+    #print(lastmonthint)
+    #sys.exit(0)
+
+
+    return (firstmonthint, lastmonthint)
+
+def get_shell_cube():
+    """
+    get a cube shell where we can store monthly data (size 12, 73, 96)
+    need to have a nice time dimension for concatination
+    """
+    filename = ('/nfs/hera1/earjcti/um/xqbwc/database_averages/' + 
+                'xqbwc_Monthly_Average_#pd_Temperature_3900_4000.nc')
+    shell_cube = iris.load_cube(filename)
+
+    # get a cube which has the time dimension we want
+    infile='/nfs/hera1/earjcti/um/xqbwc/pcpd/xqbwca#pd000003900ja+.nc'
+    timecube=iris.load_cube(infile,'TEMPERATURE AT 1.5M')
+    timecoord=timecube.coord('t')
+   
+    shell_cube.coord('time').units=cf_units.Unit(timecoord.units.origin,calendar='360_day')
+    shell_cube.coord('time').points=np.arange(timecoord.points[0],timecoord.points[0]+360., 30.0)
+              
+
+    return shell_cube
+
+
+
+def check_file_prg(pbcube,expt,year):
+    """
+    this program will check the calendar corrected data that we have derived
+    from the pb files.  It will compare it with the pd files and plot
+    """ 
+    # get pd data
+    months=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+
+    print(pbcube.coord('time'))
+    infile='/nfs/hera1/earjcti/um/'+expt+'/pcpd/'+expt+'a#pd'
+    vals=np.arange(-5.0,6.0,1.0)
+    plt.figure(figsize=[12.0,12.0])
+    for i,month in enumerate(months):
+        filename=infile+str(year).zfill(9)+month+'+.nc'
+        cube=iris.load_cube(filename,'TEMPERATURE AT 1.5M')
+        print(cube.coord('t'))
+        sys.exit(0)
+        tempdiff=cube.data - pbcube[i,:,:,:].data
+        tempdiff_cube = cube.copy(tempdiff)
+        plt.subplot(4,3,i+1)
+        qplt.contourf(iris.util.squeeze(tempdiff_cube),cmap='RdBu_r',
+                      levels=vals,extend='both')
+        plt.gca().coastlines()
+        plt.title(month)
+    plt.show()
+    sys.exit(0)
+       
+    
+  
+
+def get_monthly_cube(expt,year,first_day,last_day,shell_cube):
+    """
+    gets the daily temperature for the year and converts it to monthly 
+    temperature using the appropriate calendar correction
+
+    first day and last day is passed to this program.  It is a 12 element array
+    containing the first day and last day of each month (from 1-360).
+    Before using this the daily data will first need rolling so that 
+    1st January represents the same time in the orbital cycle between this and
+    PI
+    """
+    months=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    yearuse=year-startyear
+    dayuse = yearuse * 360.
+
+    infile='/nfs/hera1/earjcti/um/'+expt+'/pb/'+expt+'a#pb'
+    moncubes=CubeList()
+    for i,month in enumerate(months):
+        filename=infile+str(year).zfill(9)+month+'+.nc'
+        cubes=iris.load(filename)
+
+        for cube in cubes:
+            if cube.var_name == 'temp_2':
+                moncubes.append(cube)
+
+                break
+
+    iris.util.equalise_attributes(moncubes)
+    iris.util.unify_time_units(moncubes)
+    dailycube=moncubes.concatenate_cube()  # this is a 360 day cube
+
+    # now shift the data to account for start of the year and set up the 
+    # month lengths based on steves program
+    if (expt == 'xqbwn' or expt == 'xqbwp'):
+     # first day of year is 23rd Dec so shift 8 days to the right
+         daily_cc_data = np.roll(dailycube.data, 8, axis=0)
+   
+    if (expt == 'xqbwo' or expt == 'xqbwq'):
+        # first day of year is 7th January so shift 6 days to the left
+         daily_cc_data = np.roll(dailycube.data, -6, axis=0)
+   
+    mondata = np.zeros((12,1,73,96))
+    for mon in range(0,12):
+        mondata[mon,:,:,:] = np.mean(daily_cc_data[first_day[mon]:last_day[mon]+1,:],axis=0)
+
+    moncube=shell_cube.copy(data=mondata)
+    # adjust time for the year we are processing
+    moncube.coord('time').points=moncube.coord('time').points + dayuse
+    #print(year,moncube.coord('time'))
+    #print(year,shell_cube.coord('time'))
+    if CHECK_FILE == 'Y':
+        check_file_prg(moncube,expt,year)
+    #iris.save(moncube,'temporary.nc')
+    
+  
+    return moncube
+
+
+def get_glob_avg(cube,field):
+    """
+    gets the global average of the cube
+    returns single value mean
+    """
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    grid_areas=iris.analysis.cartography.area_weights(cube)
+
+    glob_mean_cube = cube.collapsed(['latitude','longitude'],
+                                    iris.analysis.MEAN,weights=grid_areas)
+    glob_mean_cube = iris.util.squeeze(glob_mean_cube)
+    
+    glob_mean_data = glob_mean_cube.data - 273.15
+    return glob_mean_data
+
+#=====================================================
+def get_monthly_data(expt,startyear,endyear,field):
+
+# this function will extract the data and write out to a file
+
+    outdir='/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Monthly_Average'
+    txtfile='/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_'+ field + str(startyear) + '_' + str(endyear)  +'_global_avg_monthly.txt'
+    ftxt=open(txtfile,'w')
+    ftxt.write('year,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec\n')
+
+    
+    # get stuff we need for calendar correction
+    first_day_month, last_day_month = get_calender(expt)
+    # get a cube shell where we can store monthly data (size 12, 73, 96)
+    shell_cube = get_shell_cube()
+
+    # loop over all years
+  
+ 
+    allcubes = CubeList()
+    for year in range(startyear,endyear):
+        print(year)
+        # get a year of temperatures (ie 360 days)
+        month_cube = get_monthly_cube(expt,year,first_day_month,
+                                         last_day_month,shell_cube)
+        allcubes.append(month_cube)
+        globavg = get_glob_avg(month_cube,field)
+        ftxt.write(np.str(year)+','+np.str(np.round(globavg,2)) + '\n')
+   
+    ftxt.close()
+  
+    alldata_cube=allcubes.concatenate_cube() # this gives a nt of 12 * nyears
+    iris.coord_categorisation.add_month_number(alldata_cube,'time', 
+                                               name='month')
+    print(alldata_cube)
+    print(alldata_cube.coord('month').points)
+    monavg_cube = alldata_cube.aggregated_by(['month'],iris.analysis.MEAN)
+    iris.util.promote_aux_coord_to_dim_coord(monavg_cube,'month')
+
+    # write average variable out to a netcdf file
+
+    # set up filename
+
+    fout=(outdir+'_#pd_'+field+'_' + str(startyear) + 
+          '_' + str(endyear) + '_orbital.nc')
+    if ((field == 'temp_1' and HadCM3 !='y')
+         or (field == 'temp' and HadCM3 =='y')):
+        fout=(outdir+'_#pd_Temperature_' + str(startyear) + 
+          '_' + str(endyear) + '_orbital.nc')
+    if field == 'precip_1':
+        fout=(outdir+'_#pd_TotalPrecipitationRate_' + str(startyear) + 
+          '_' + str(endyear) + '_orbital.nc')
+    if field == 'field30':
+        fout=(outdir+'_#pd_TotalCloud_' + str(startyear) + 
+          '_' + str(endyear) + '_orbital.nc')
+    if field == 'SST':
+        fout=(outdir+'_#pf_SST_' + str(startyear) + 
+          '_' + str(endyear) + 'orbital.nc')
+    print(fout)
+ 
+    iris.save(monavg_cube,fout)
+
+    return 
+
+
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+#expt='xkvje'
+#startyear=2301
+#nyears=100
+#HadCM3='n'
+
+#expt='xogzl'
+#startyear=2980
+#nyears=50
+#HadCM3='y'
+
+expts=['xqbwn','xqbwo','xqbwp','xqbwq']
+#expts=['xqbwo']
+#expts=['xqbwh','xqbwi','xqbwj','xqbwk','xqbwl',
+#       'xqbwm','xqbwr','xqbws','xqbwt']
+startyear=3900
+endyear=4000
+HadCM3='y'
+CHECK_FILE = 'N'  #  'Y' if we want to check the monthly file vs the pd file
+
+
+
+#temperature at 1.5m
+# note in the pb files there is 'temp', 'temp1' and 'temp2'.  It looks 
+# like 'temp_2' is the mean (temp/temp1 being max/min)
+field='temp'   # temperature at 1.5m in HadCM3
+for expt in expts:
+    get_monthly_data(expt,startyear,endyear,field)
+#    sys.exit(0)
+

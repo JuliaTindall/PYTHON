@@ -1,0 +1,324 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on October 2019
+
+
+#@author: earjcti
+"""
+This program will plot model diagnostics against model information
+the information it will use is
+1. year of first use
+2. IPCC report where it was first used
+3. resolution
+"""
+
+
+import numpy as np
+import scipy as sp
+import iris
+import matplotlib.pyplot as plt
+
+
+
+#####################################
+def plot_regress(field1, field2, cluster, xtitle, ytitle, fileout, xmin, xmax):
+    """
+    plots the regression of the field vs the ranking
+    """
+    # plot the climate sensitivity vs the global mean
+
+   
+    ax = plt.subplot(111)
+    for i, fielduse in enumerate(field2):
+        model = MODELNAMES[i]
+        print('j1',i,'j2', field1[i], 'j3',fielduse,'j4', MODELNAMES[i])
+        if i % 4 == 0: # i divides 4 with no remainder
+            ax.scatter(field1[i], fielduse, label = model) 
+        elif i % 4 == 1 :
+            ax.scatter(field1[i], fielduse, label = model, marker='^') 
+        elif i % 4 == 2 :
+            ax.scatter(field1[i], fielduse, label = model, marker='<') 
+        else:
+            ax.scatter(field1[i], fielduse, label = model, marker='v') 
+   
+    plt.xlabel(xtitle)
+    plt.ylabel(ytitle)
+    #plt.legend()
+
+    plt.xlim(xmin, xmax)
+
+
+    slope, intercept, r_value, p_value, std_err = (
+        sp.stats.linregress(field1, field2))
+
+    xarray = np.arange(xmin, xmax, 1)
+    yarray = intercept+(slope*xarray)
+    #ax.plot(xarray,yarray)
+    rsq_val_small = np.str(np.around(r_value **2, 2))
+    p_value_small = np.str(np.around(p_value, 2))
+
+    if FIELDNAME == 'NearSurfaceTemperature':
+       if xtitle == 'year':
+           subplotno = 'a'
+       else:
+           subplotno = 'b'
+    if FIELDNAME == 'TotalPrecipitation':
+       if xtitle == 'year':
+           subplotno = 'C'
+       else:
+           subplotno = 'd'
+    plt.title((subplotno + ") R-squared: "  + rsq_val_small + 
+              "  p-value: " + p_value_small))
+              
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0,
+                     box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+
+    #plt.show()
+    plt.savefig(fileout+'.eps')
+    plt.savefig(fileout+'.pdf')
+    plt.close()
+
+
+def get_model_years():
+    """
+    get the year when the model was first used from a dictionary
+    """
+
+    year = {'NorESM-L': 2011,
+            'NorESM1-F':2017,
+            'IPSLCM6A': 2018,
+            'IPSLCM5A2':2017,
+            'IPSLCM5A':2010,
+            'HadCM3': 1997,
+            'MIROC4m':2004,
+            'COSMOS':2009,
+            'CCSM4-UoT':2011,
+            'EC-Earth3.3':2019,
+            'MRI2.3': 2006, # from my investigation
+            'CCSM4-Utr': 2011,
+            'GISS2.1G': 2019,
+            'CESM1.2' :2013,
+            'CESM2': 2019,
+            'CCSM4' :2011
+            }
+
+    allyears = np.zeros(len(MODELNAMES))
+    for i, model in enumerate(MODELNAMES):
+        allyears[i] = year.get(model)
+
+    return allyears
+
+def get_resolution():
+    """
+    get the resolution of the model
+    """
+
+    xres_a = {'NorESM-L': 3.75,
+              'NorESM1-F':2.5,
+              'IPSLCM6A': 2.5,
+              'IPSLCM5A2':3.75,
+              'IPSLCM5A':3.75,
+              'HadCM3': 3.75,
+              'MIROC4m':2.8,
+              'COSMOS':3.75,
+              'CCSM4-UoT':1.25,
+              'EC-Earth3.3':1.125,
+              'MRI-CGCM2.3':2.8, # from my investigation
+              'CESM4-Utr': 2.5,
+              'CESM2' : 1.25,
+              'GISS': 2.5,
+              'CESM1.2' :1.25,
+              'CCSM4' :1.25
+              }
+
+    yres_a = {'NorESM-L': 3.75,
+              'NorESM1-F':1.9,
+              'IPSLCM6A': 1.26,
+              'IPSLCM5A2':1.9,
+              'IPSLCM5A':1.9,
+              'HadCM3': 2.5,
+              'MIROC4m':2.8,
+              'COSMOS':3.75,
+              'CCSM4-UoT':0.9,
+              'EC-Earth3.3':1.125,
+              'MRI-CGCM2.3':2.8, # from my investigation
+              'CESM-Utr': 1.9,
+              'CESM2' : 0.95,
+              'GISS': 2.0,
+              'CESM1.2' :0.9,
+              'CCSM4' :0.9
+              }
+
+    horiz_boxes = {'NorESM-L': 4608,
+                   'NorESM1-F':13824,
+                   'IPSLCM6A': 20592,
+                   'IPSLCM5A2':9216,
+                   'IPSLCM5A':9216,
+                   'HadCM3': 7008,
+                   'MIROC4m':8192,
+                   'COSMOS':4608,
+                   'CCSM4-UoT':55296,
+                   'EC-Earth3.3':51200,
+                   'MRI2.3':8192, # from my investigation
+                   'CCSM4-Utr': 13824,
+                   'GISS2.1G': 12960,
+                   'CESM1.2' :55296,
+                   'CESM2' : 55296,
+                   'CCSM4' :55296
+                   }
+
+    horiz_gb_atm = np.zeros(len(MODELNAMES))
+    for i, model in enumerate(MODELNAMES):
+        horiz_gb_atm[i] = horiz_boxes.get(model)
+
+    return horiz_gb_atm
+
+def get_cluster():
+    """
+    this will put models of the same family into a cluster
+    """
+
+    year ={'NorESM-L': 1,
+           'NorESM1-F': 1,
+           'IPSLCM6A': 2,
+           'IPSLCM5A2':2,
+           'IPSLCM5A':2,
+           'HadCM3': 0,
+           'MIROC4m': 0,
+           'COSMOS': 0,
+           'CCSM4-UoT':3,
+           'EC-Earth3.3': 0,
+           'MRI2.3': 0, # from my investigation
+           'CCSM4-Utr': 3,
+           'GISS2.1G': 0,
+           'CESM1.2' : 3,
+           'CESM2' : 3, 
+           'CCSM4' : 3
+           }
+
+    allyears = np.zeros(len(MODELNAMES))
+    for i, model in enumerate(MODELNAMES):
+        allyears[i] = year.get(model)
+
+    return allyears
+
+def get_model_info():
+    """
+    gets information about the model
+    returns modelyears
+            cluster this will group models of the same family
+    """
+    years = get_model_years()
+    resolution = get_resolution()
+    cluster = get_cluster()
+
+    return [years, resolution, cluster]
+
+def read_means_file(filename):
+    """
+    read all the data from the file containing the means
+    returns the mean
+    """
+
+    file1 = open(filename, "r")
+    lines = list(file1)
+
+    meanval, sdval = lines[2].split(",")
+
+    meanint = np.float(meanval)
+
+    return meanint
+
+def get_anomaly():
+    """
+    gets the anomaly in the field for each of the models
+    """
+
+    climdiff = np.zeros(len(MODELNAMES))
+
+    for i, model in enumerate(MODELNAMES):
+
+        print(FIELDNAME)
+        print(model)
+        meanexpt = read_means_file(FILESTART + model + '/EOI400.' +
+                                   FIELDNAME + '.data.txt')
+        meancntl = read_means_file(FILESTART + model + '/E280.' +
+                                   FIELDNAME + '.data.txt')
+
+        climdiff[i] = meanexpt - meancntl
+
+
+    return climdiff
+
+
+
+def main():
+    """
+    1. get model information.  For example the year of the model
+    2. second the anomaly in the field
+    3. plot
+    """
+    modelyears, model_res, modelcluster = get_model_info()
+
+    fieldanom = get_anomaly()
+
+    # regress anomaly against model year
+    plot_regress(modelyears, fieldanom, modelcluster, 'year',
+                 FIELDNAME + ' anom',
+                 FILESTART + '/allplots/' + FIELDNAME +
+                 '/' + FIELDNAME + '_anom_vs_modelyear' + SUBSCRIPT,
+                 1990., 2020.)
+
+    # regress anomaly against model resolution
+    plot_regress(model_res, fieldanom, modelcluster, 'horizontal gridboxes',
+                 FIELDNAME + ' anom',
+                 FILESTART + '/allplots/' + FIELDNAME +
+                 '/' + FIELDNAME + '_anom_vs_nbox_atm' + SUBSCRIPT,
+                 5000., 60000.)
+
+
+
+##########################################################
+# main program
+
+LINUX_WIN = 'w'
+
+if LINUX_WIN == 'l':
+    FILESTART = '/nfs/hera1/earjcti/regridded/'
+else:
+    FILESTART = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\regridded\\'
+
+MODELNAMES = ['CESM2', 'IPSLCM6A', 'COSMOS', 
+            'EC-Earth3.3', 'CESM1.2', 'IPSLCM5A',
+            'MIROC4m', 'IPSLCM5A2', 'HadCM3',
+            'GISS2.1G', 'CCSM4', 
+            'CCSM4-Utr', 'CCSM4-UoT', 
+            'NorESM-L', 'MRI2.3', 'NorESM1-F'
+              ]
+SUBSCRIPT = ''
+
+#MODELNAMES = ['CCSM4-UoT',
+#              'CCSM4',
+#              'CESM1.2',
+#              'IPSLCM6A',
+#              'IPSLCM5A2',
+#              'IPSLCM5A',
+#              'NorESM-L',
+#              'NorESM1-F',
+#              'COSMOS',
+#              'GISS',
+#              'HadCM3',
+#              'MIROC4m',
+#              'MRI-CGCM2.3'
+#            ]
+#SUBSCRIPT = '_redu'
+
+#FIELDNAME = 'NearSurfaceTemperature'
+FIELDNAME = 'TotalPrecipitation'
+
+
+main()

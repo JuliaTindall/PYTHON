@@ -1,0 +1,345 @@
+
+# coding: utf-8
+
+# In[1]:
+
+import numpy as np
+import numpy.ma as ma
+from netCDF4 import Dataset
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import matplotlib.ticker as mticker
+from matplotlib import colors
+import matplotlib.gridspec as gridspec
+
+import mtspec
+import glob
+
+import cartopy
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cartopy.crs as ccrs
+from scipy import signal
+from scipy.signal import periodogram
+import eofs
+import iris
+import iris.quickplot as qplt 
+import iris.plot as iplt
+iris.FUTURE.netcdf_promote=True
+import iris.coord_categorisation
+from eofs.iris import Eof
+from iris.analysis import stats
+from iris.analysis import maths
+
+
+# In[2]:
+
+# Upload Eoi400
+sst_constraint = iris.Constraint(cube_func=lambda cube: cube.var_name == 'temp')
+sst_constraint1 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'tos')
+sst_constraint2 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'THO')
+sst_constraint3 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'TS')
+sst_constraint4 = iris.Constraint(cube_func=lambda cube: cube.var_name == 'sst')
+HadCM3_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.2001-2501_timeseries_HadCM3_no_ann_cycle.nc', sst_constraint)
+CCSM4Utr_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.0-200_timeseries_CCSM4Utr_no_ann_cycle.nc', sst_constraint1)
+COSMOS_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.2300-2799_timeseries_COSMOS_no_ann_cycle.nc', sst_constraint2)
+IPSLCM6A_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.1850-2049_timeseries_IPSLCM6A_no_ann_cycle.nc', sst_constraint1)
+MIROC4m_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.0-500_timeseries_MIROC4m_no_ann_cycle.nc', sst_constraint1)
+NorESML_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.0-200_timeseries_NorESML_no_ann_cycle.nc', sst_constraint4)
+CESM12_Eoi400_SST = iris.load_cube('/nfs/hera1/ee22kvcs/EOI400.SST.501-1099_timeseries_CESM1.2_no_ann_cycle.nc', sst_constraint3)
+
+COSMOS_Eoi400_SST = COSMOS_Eoi400_SST[:, 0, :, :]
+print(CESM12_Eoi400_SST.shape)
+
+
+# In[3]:
+
+# Upload E280
+HadCM3_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.2411-2911_timeseries_HadCM3_no_ann_cycle.nc', sst_constraint)
+CCSM4Utr_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.0-200_timeseries_CCSM4Utr_no_ann_cycle.nc', sst_constraint1)
+COSMOS_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.2300-2799_timeseries_COSMOS_no_ann_cycle.nc', sst_constraint2)
+IPSLCM6A_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.2850-3049_timeseries_IPSLCM6A_no_ann_cycle.nc', sst_constraint1)
+MIROC4m_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.0-500_timeseries_MIROC4m_no_ann_cycle.nc', sst_constraint1)
+NorESML_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.0-200_timeseries_NorESML_no_ann_cycle.nc', sst_constraint4)
+CESM12_E280_SST = iris.load_cube('/nfs/hera1/ee22kvcs/E280.SST.501-806_timeseries_CESM1.2_no_ann_cycle.nc', sst_constraint3)
+
+COSMOS_E280_SST = COSMOS_E280_SST[:, 0, :, :]
+
+
+# In[4]:
+
+### EOFs without change 
+
+
+# In[5]:
+
+# Delimit the region for the cube
+min_lat = -60.0
+max_lat = 70.0
+min_lon = 120.0
+max_lon = 290.0
+
+# Functions to identify latitudes and longitudes we want to subset to
+def pacific_lat(input):
+    return min_lat  <= input <= max_lat 
+def pacific_lon(input):
+    return min_lon  <= input <= max_lon 
+
+pacific_con = iris.Constraint(latitude = pacific_lat, longitude = pacific_lon)
+# Subset the cube to the location of interest
+MODELNAMES_MP = [CCSM4Utr_Eoi400_SST, CESM12_Eoi400_SST, COSMOS_Eoi400_SST, HadCM3_Eoi400_SST, IPSLCM6A_Eoi400_SST, MIROC4m_Eoi400_SST,NorESML_Eoi400_SST]
+MODELNAMES_PI = [CCSM4Utr_E280_SST, CESM12_E280_SST, COSMOS_E280_SST, HadCM3_E280_SST, IPSLCM6A_E280_SST, MIROC4m_E280_SST, NorESML_E280_SST]
+
+pacific_mp_subset = []
+for i in MODELNAMES_MP:
+    pacific_mp_sub = pacific_con.extract(i)
+    pacific_mp_subset.append(pacific_mp_sub)
+    
+pacific_pi_subset = []
+for j in MODELNAMES_PI:
+    pacific_pi_sub = pacific_con.extract(j)
+    pacific_pi_subset.append(pacific_pi_sub)
+
+
+# In[26]:
+
+## Functions to calculate EOFs
+def eofs_calc_mp (model_number):
+    solver = Eof(pacific_mp_subset[model_number], weights=None, center=True)
+    eofs = solver.eofsAsCovariance(neofs=1)
+    pcs_mp  = solver.pcs(npcs=2, pcscaling=1)
+    #eigs = solver.eigenvalues(neigs=1)
+    varF_mp = solver.varianceFraction(neigs=1)
+    eof_std1_mp = eofs[0].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    #eof_std2_mp = eofs[1].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    eof_n1_mp = eofs[0]/eof_std1_mp
+    #eof_n2_mp = eofs[1]/eof_std2_mp
+    #return (eof_n1_mp, pcs_mp,varF_mp)
+    return (eof_n1_mp, pcs_mp,varF_mp)
+
+def eofs_calc_pi (model_number):
+    solver = Eof(pacific_pi_subset[model_number], weights=None, center=True)
+    eofs = solver.eofsAsCovariance(neofs=1)
+    pcs_pi  = solver.pcs(npcs=2, pcscaling=1)
+    #eigs = solver.eigenvalues(neigs=1)
+    varF_pi = solver.varianceFraction(neigs=1)
+    eof_std1_pi = eofs[0].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    #eof_std2_pi = eofs[1].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    eof_n1_pi = eofs[0]/eof_std1_pi
+    #eof_n2_pi = eofs[1]/eof_std2_pi
+    #return (eof_n1_pi, pcs_pi, varF_pi)
+    return (eof_n1_pi, pcs_pi, varF_pi)
+
+
+# In[27]:
+
+eofs_mp = [] #dimension 0: eof1, dimension 1: pcs, dimension 2: var
+eofs_pi = []
+
+for i in range(7):
+    a = eofs_calc_mp(i)
+    b = eofs_calc_pi(i)
+    
+    eofs_mp.append(a)
+    eofs_pi.append(b)
+
+
+# In[32]:
+
+MODELNAMES = ['CCSM4-Utr','CESM1.2','COSMOS','HadCM3','IPSLCM6A','MIROC4m','NorESM-L']
+# MP and PI
+# Define the axes
+fig = plt.figure(figsize=(16, 26))
+gs = gridspec.GridSpec(7, 3, width_ratios=[3, 3, 3.3])  # Define column widths
+
+map_axes1 = []
+for i in range(7):
+    ax = plt.subplot(gs[i, 0], projection=ccrs.PlateCarree(central_longitude=180.0))
+    map_axes1.append(ax)
+
+# Define the axes for the second column
+map_axes2 = []
+for i in range(7):
+    ax = plt.subplot(gs[i, 1], projection=ccrs.PlateCarree(central_longitude=180.0))
+    map_axes2.append(ax)
+
+for (ax,n, name) in zip(map_axes1, range(7), MODELNAMES):
+    ax.add_feature(cartopy.feature.BORDERS, linewidth = 0.5)
+    ax.add_feature(cartopy.feature.COASTLINE)
+    ax.set_yticks(np.arange(-60, 60, 20))
+    ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+    ax.set_xticks(np.arange(120,280+20,20), crs=ccrs.PlateCarree())
+    ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+     
+    if eofs_mp[n][0].collapsed(('latitude','longitude'), iris.analysis.MEAN).data >0:
+        im = iplt.contourf(eofs_mp[n][0], levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    else:
+        im = iplt.contourf(eofs_mp[n][0]*-1, levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    
+    ax.set_title(name + ' Eoi$^{400}$ EOF 1', fontsize=16)
+    
+for (ax,n, name) in zip(map_axes2, range(7), MODELNAMES):
+    ax.add_feature(cartopy.feature.BORDERS, linewidth = 0.5)
+    ax.add_feature(cartopy.feature.COASTLINE)
+    ax.set_yticks(np.arange(-60, 60, 20))
+    ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+    ax.set_xticks(np.arange(120,280+20,20), crs=ccrs.PlateCarree())
+    ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+     
+    if eofs_pi[n][0].collapsed(('latitude','longitude'), iris.analysis.MEAN).data >0:
+        im = iplt.contourf(eofs_pi[n][0], levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    else:
+        im = iplt.contourf(eofs_pi[n][0]*-1, levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    
+    ax.set_title(name + ' E$^{280}$ EOF 1', fontsize=16)
+    cbar_ax = fig.add_axes([0.6, 0.35, 0.025, 0.35])#[left, bottom, width, height]
+    fig.subplots_adjust(right=0.8)
+    fig.colorbar(im, cax=cbar_ax, label="SST anomalies (°C)")
+    #cbar.ax.set_ylabel('SST (°C)', size =20)
+    #cbar.ax.tick_params(labelsize=17)
+    #print(varF_mp[n].data)
+#plt.savefig('/nfs/see-fs-01_teaching/ee22kvcs/Task4/eof1_Pacific_check_NorESM-L_1.png', bbox_inches = 'tight', dpi=300, format='png')
+plt.show()
+
+
+# In[ ]:
+
+### EOFs calculated by subtracting the mean global average
+
+
+# In[12]:
+
+## Global mean anomaly
+MODELNAMES_MP = [CCSM4Utr_Eoi400_SST, CESM12_Eoi400_SST, COSMOS_Eoi400_SST, HadCM3_Eoi400_SST, IPSLCM6A_Eoi400_SST, MIROC4m_Eoi400_SST,NorESML_Eoi400_SST]
+MODELNAMES_PI = [CCSM4Utr_E280_SST, CESM12_E280_SST, COSMOS_E280_SST, HadCM3_E280_SST, IPSLCM6A_E280_SST, MIROC4m_E280_SST, NorESML_E280_SST]
+
+global_mean_mp =[]
+for m in MODELNAMES_MP:
+    gma_model = m.collapsed(('latitude','longitude'), iris.analysis.MEAN)
+    global_mean_mp.append(gma_model)
+    
+global_mean_pi =[]
+for m in MODELNAMES_PI:
+    gma_model = m.collapsed(('latitude','longitude'), iris.analysis.MEAN)
+    global_mean_pi.append(gma_model)
+
+
+# In[13]:
+
+# Take off the global mean for each year:
+anom_mp = []
+anom_pi = []
+
+for n in range(7):
+    a = pacific_mp_subset[n]-global_mean_mp[n]
+    b = pacific_pi_subset[n]-global_mean_pi[n]
+    anom_mp.append(a)
+    anom_pi.append(b)
+
+
+# In[14]:
+
+## Functions to calculate EOFs
+def eofs_calc_mp (model_number):
+    solver = Eof(anom_mp[model_number], weights=None, center=True)
+    eofs = solver.eofsAsCovariance(neofs=1)
+    pcs_mp  = solver.pcs(npcs=2, pcscaling=1)
+    #eigs = solver.eigenvalues(neigs=1)
+    varF_mp = solver.varianceFraction(neigs=1)
+    eof_std1_mp = eofs[0].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    #eof_std2_mp = eofs[1].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    eof_n1_mp = eofs[0]/eof_std1_mp
+    #eof_n2_mp = eofs[1]/eof_std2_mp
+    #return (eof_n1_mp, pcs_mp,varF_mp)
+    return (eof_n1_mp, pcs_mp,varF_mp)
+
+def eofs_calc_pi (model_number):
+    solver = Eof(anom_pi[model_number], weights=None, center=True)
+    eofs = solver.eofsAsCovariance(neofs=1)
+    pcs_pi  = solver.pcs(npcs=2, pcscaling=1)
+    #eigs = solver.eigenvalues(neigs=1)
+    varF_pi = solver.varianceFraction(neigs=1)
+    eof_std1_pi = eofs[0].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    #eof_std2_pi = eofs[1].collapsed(('latitude','longitude'), iris.analysis.STD_DEV)
+    eof_n1_pi = eofs[0]/eof_std1_pi
+    #eof_n2_pi = eofs[1]/eof_std2_pi
+    #return (eof_n1_pi, pcs_pi, varF_pi)
+    return (eof_n1_pi, pcs_pi, varF_pi)
+
+
+# In[15]:
+
+eofs_mp = [] #dimension 0: eof1, dimension 1: pcs, dimension 2: var
+eofs_pi = []
+
+for i in range(7):
+    a = eofs_calc_mp(i)
+    b = eofs_calc_pi(i)
+    
+    eofs_mp.append(a)
+    eofs_pi.append(b)
+
+
+# In[25]:
+
+MODELNAMES = ['CCSM4-Utr','CESM1.2','COSMOS','HadCM3','IPSLCM6A','MIROC4m','NorESM-L']
+# MP and PI
+# Define the axes
+fig = plt.figure(figsize=(16, 26))
+gs = gridspec.GridSpec(7, 3, width_ratios=[3, 3, 3.3])  # Define column widths
+
+map_axes1 = []
+for i in range(7):
+    ax = plt.subplot(gs[i, 0], projection=ccrs.PlateCarree(central_longitude=180.0))
+    map_axes1.append(ax)
+
+# Define the axes for the second column
+map_axes2 = []
+for i in range(7):
+    ax = plt.subplot(gs[i, 1], projection=ccrs.PlateCarree(central_longitude=180.0))
+    map_axes2.append(ax)
+    
+for (ax,n, name) in zip(map_axes1, range(7), MODELNAMES):
+    ax.add_feature(cartopy.feature.BORDERS, linewidth = 0.5)
+    ax.add_feature(cartopy.feature.COASTLINE)
+    ax.set_yticks(np.arange(-60, 60, 20))
+    ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+    ax.set_xticks(np.arange(120,280+20,20), crs=ccrs.PlateCarree())
+    ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+     
+    if eofs_mp[n][0].collapsed(('latitude','longitude'), iris.analysis.MEAN).data >0:
+        im = iplt.contourf(eofs_mp[n][0], levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    else:
+        im = iplt.contourf(eofs_mp[n][0]*-1, levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    
+    ax.set_title(name + ' Eoi$^{400}$ EOF 1', fontsize=15)
+    
+for (ax,n, name) in zip(map_axes2, range(7), MODELNAMES):
+    ax.add_feature(cartopy.feature.BORDERS, linewidth = 0.5)
+    ax.add_feature(cartopy.feature.COASTLINE)
+    ax.set_yticks(np.arange(-60, 60, 20))
+    ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+    ax.set_xticks(np.arange(120,280+20,20), crs=ccrs.PlateCarree())
+    ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+     
+    if eofs_pi[n][0].collapsed(('latitude','longitude'), iris.analysis.MEAN).data >0:
+        im = iplt.contourf(eofs_pi[n][0], levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    else:
+        im = iplt.contourf(eofs_pi[n][0]*-1, levels = np.arange(-4,4+1,1), axes = ax, cmap = 'RdBu_r', extend = 'both')
+    
+    ax.set_title(name + ' E$^{280}$ EOF 1', fontsize=15)
+    cbar_ax = fig.add_axes([0.6, 0.35, 0.025, 0.35])#[left, bottom, width, height]
+    fig.subplots_adjust(right=0.8)
+    fig.colorbar(im, cax=cbar_ax)
+    #cbar.ax.set_ylabel('SST (°C)', size =20)
+    #cbar.ax.tick_params(labelsize=17)
+    #print(varF_mp[n].data)
+#plt.savefig('/nfs/see-fs-01_teaching/ee22kvcs/Task4/eof1_Pacific_check_NorESM-L_2.png', bbox_inches = 'tight', dpi=300, format='png')
+plt.show()
+
+
+# In[ ]:
+
+
+

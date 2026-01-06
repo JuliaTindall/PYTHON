@@ -1,0 +1,264 @@
+#!/usr/bin/env python2.7
+#NAME
+#    orbit_forcing
+#PURPOSE
+#    This program will assess the orbital forcing between two different 
+# experiments.  We are actually trying to replicate the difference in incoming
+# shortwave radiation
+#
+#
+# search for 'main program' to find end of functions
+# Julia January 2019
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import xarray as xa
+import iris
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+
+
+def get_incom_sw(filestart1,filestart2,expt1,expt2,daily):
+
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    
+  
+
+    for i in range(0,len(monthnames)):
+        # read in data from expt1 files
+        filename=filestart1+monthnames[i]+'.nc'
+        f=MFDataset(filename)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        days=f.variables['t'][:]
+        atemp=f.variables['field200'][:] # get incoming sw radiation
+        atemp=np.squeeze(atemp)
+        f.close()
+
+        if i==0:
+            data1=np.zeros((len(lat),len(monthnames)*len(days)))
+            data2=np.zeros((len(lat),len(monthnames)*len(days)))
+            timesteps=len(monthnames)*len(days)
+
+        daystart=i*len(days)
+        dayend=(i+1)*len(days)
+
+    
+        # read in data from expt2 files
+        f=MFDataset(filestart2+monthnames[i]+'.nc')
+        atemp2=f.variables['field200'][:] # get incoming sw radiation
+        atemp2=np.squeeze(atemp2)
+        f.close()
+
+        if daily == 'y':
+            data1[:,daystart:dayend]=np.swapaxes(atemp[0:len(days),:,0],0,1)
+            data2[:,daystart:dayend]=np.swapaxes(atemp2[0:len(days),:,0],0,1)
+        else:
+            data1[:,i]=atemp[:,0]
+            data2[:,i]=atemp2[:,0]
+
+            
+    
+    # get maximum from first experiment
+    max_data1_np=np.argmax(data1[0,:]) # find max at northpole
+    max_data1_sp=np.argmax(data1[len(lat)-1,:]) # find max at southpole
+    print('max expt1')
+    print('np',max_data1_np,data1[0,max_data1_np])
+    print('sp',max_data1_sp,data1[0,max_data1_sp])
+
+
+    # get maximum from second experiment
+    max_data2_np=np.argmax(data2[0,:]) # find max at northpole
+    max_data2_sp=np.argmax(data2[len(lat)-1,:]) # find max at southpole
+    print('max expt2')
+    print('np',max_data2_np,data2[0,max_data2_np])
+    print('sp',max_data2_sp,data2[0,max_data2_sp])
+
+    nh_shift=max_data2_np-max_data1_np
+    sh_shift=max_data2_sp-max_data1_sp
+
+    # if the shift calculated from the NH and the SH are within two days 
+    # use the mean
+
+    if np.abs(nh_shift-sh_shift) > 300:
+        if sh_shift < 0:
+            sh_shift=sh_shift+360.
+        if nh_shift < 0:
+            nh_shift=nh_shift+360.
+
+    if np.abs(nh_shift-sh_shift) <= 2:
+        shiftreq=np.int(np.fix((nh_shift+sh_shift)/2.0))
+    else:
+        print('we are shifting differently in NH and SH')
+        print('nh shift',max_data2_np-max_data1_np)
+        print('sh shift',max_data2_sp-max_data1_sp)
+
+
+    print('nh shift',nh_shift)
+    print('sh shift',sh_shift)
+    print('shift',shiftreq)
+
+    data2_raw=data2
+    data2_shifted=np.zeros(np.shape(data2))
+
+    # shift data2 so that the maximum value in the northern hemisphere is in 
+    # the same place as it is in data1
+
+    shiftreq=shiftreq*(-1)
+    
+    for j in range(0,len(lat)):
+        # shift values using np.roll
+        data2_shifted[j,:]=np.roll(data2_raw[j,:],shiftreq,axis=0) 
+        
+    
+
+    anom=data2_shifted-data1
+
+    V=np.arange(0,600,50)
+    
+    plt.subplot(2,2,1)
+    print('j1',np.shape(len(monthnames)))
+    print('j2',np.shape(lat))
+    print('j3',np.shape(data1))
+
+    plt.contourf(np.arange(0,timesteps),lat,data1,V,extend='max')
+    plt.title('PI')
+   
+    plt.colorbar()
+
+    plt.subplot(2,2,2)
+    plt.contourf(np.arange(0,timesteps),lat,data2_raw,V,extend='max')
+    plt.title('new orbit '+expt2+' - raw')
+    plt.colorbar()
+
+    plt.subplot(2,2,3)
+    plt.contourf(np.arange(0,timesteps),lat,data2_shifted,V,extend='max')
+    plt.title('new orb (month+'+np.str(shiftreq)+')')
+
+    plt.colorbar()
+
+    plt.subplot(2,2,4)
+    V=np.arange(-100,105,5)
+    plt.contourf(np.arange(0,timesteps),lat,anom,V,cmap='RdBu_r',extend='both')
+    plt.title('new orbit - PI')
+    if daily == 'y':
+        plt.plot([151,151],[-90,90])
+        plt.plot([270,270],[-90,90])
+    else:
+        plt.plot([5,5],[-90,90])
+        plt.plot([9,9],[-90,90])
+
+    plt.colorbar()
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadCM3/orbit_forcing/'+expt2+'-'+expt1+daily+'.eps'
+    plt.savefig(fileout,bbox_inches='tight')
+    plt.close()
+
+    
+    return(shiftreq)
+ 
+
+#end def get_incom_sw
+
+#######################################
+def shiftexpt(shiftreq,expt2):
+
+
+# read in 30 years of data for each month
+    monthnames=['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    for mon in range(0,len(monthnames)):
+        #f=xa.open_mfdataset('/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pa*0'+monthnames[mon]+'.nc',concat_dim='none',coords='all')
+        f=iris.load('/nfs/hera1/earjcti/um/'+expt2+'/netcdf/'+expt2+'a@pa*0'+monthnames[mon]+'.nc')
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        days=f.variables['t'][:]
+        atemp=f.variables['precip'][:] # get precipitation
+        print(np.shape(atemp))
+        print(len(days))
+        sys.exit()
+        atemp=np.squeeze(atemp)
+       
+        f.close()
+
+        if mon==0:
+            allprecip=np.zeros((len(monthnames)*len(days),len(lat),len(lon)))
+            timesteps=len(monthnames)*len(days)
+            origdays=len(days)
+        else:
+            if len(days) != origdays:
+                print('different number of days in each month')
+                sys.exit()
+
+        daystart=mon*len(days)
+        dayend=(mon+1)*len(days)
+
+       # allprecip[daystart:dayend,:,:]=np.swapaxes(atemp[0:len(days),:,:],0,1)
+        allprecip[daystart:dayend,:,:]=np.swapaxes(atemp[0:len(days),:,:],0,1)
+      
+        sys.exit()
+            
+    
+
+    
+
+#enddef shiftexpt
+
+
+################################
+# main program
+
+
+# timeslices are xiboi=preindustrial, xibol=3205 - km5c', xoekc=3205-km5c, xoekd=3060 (K1), xoeke=2950 (G17), xoekf=3155 (KM3)
+#
+# others are xogzb, xogzc, xogzd, xogze, xogzf
+
+
+#############################
+# from monthly data
+#expt1='xiboi'
+#filestart1='/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy99'
+
+#expt2='xibof'
+# doesnt matter what year we use
+#filestart2='/nfs/hera1/earjcti/um/xogzd/netcdf/xogzda@pds48'
+#filestart2='/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy99'
+#filestart2='/nfs/hera1/earjcti/Xiaofang/xhgfk_netcdf/pdfiles/xhgfka@pdy99'
+
+#get_incom_sw(filestart1,filestart2,expt1,expt2,'n')
+
+
+
+######################################################
+# from daily data
+
+
+expt1='xibos' # preindustrial = xibos
+filestart1='/nfs/hera1/earjcti/um/xibos/netcdf/xibosa@paz78'
+
+expt2='xogze'
+filestart2='/nfs/hera1/earjcti/um/xogze/netcdf/xogzea@paw91'
+
+
+#shiftreq=get_incom_sw(filestart1,filestart2,expt1,expt2,'y')
+shiftreq=10
+shiftexpt(shiftreq,expt2)
+
+################################################################
+
+
+
+sys.exit(0)
+
+####
+

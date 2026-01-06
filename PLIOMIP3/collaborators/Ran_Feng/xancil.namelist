@@ -1,0 +1,119 @@
+ &nam_config
+  ICAL = 2,
+  ISIZE = 64,
+  L32BIT = .FALSE.,
+  VERSION = 4.5,
+  LBIGENDOUT = .TRUE.,
+  LWFIO = .FALSE.,
+  NNCFILES = 2
+  NCFILES = "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/collaborators/Ran_Feng/xqbwc_Monthly_Average_#pf_SST_3900_4000_E280_EPLSM.nc","/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/collaborators/Ran_Feng/xqbwc_Monthly_Average_#pd_SeaIceConc_3900_4000_E280_EPLSM.nc"
+ /
+
+ &nam_gridconfig
+  LVARGRID = .FALSE.,
+  IAVERT = 0,
+  IOVERT = 0,
+  LDEEPSOIL = .TRUE.,
+  NSOILLEV = 4,
+  SOILLEV(1) = 0.1,
+  SOILLEV(2) = 0.25,
+  SOILLEV(3) = 0.65,
+  SOILLEV(4) = 2.0
+ /
+
+ &nam_ozone
+ /
+
+ &nam_smow
+ /
+
+ &nam_slt
+ /
+
+ &nam_soil
+ /
+
+ &nam_veg
+ /
+
+ &nam_vegfrac
+ /
+
+ &nam_vegfunc
+ /
+
+ &nam_vegdist
+ /
+
+ &nam_sst
+ /
+
+ &nam_ice
+  LICE = .TRUE.,
+  ICE_FILEIN = "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/collaborators/Ran_Feng/xqbwc_Monthly_Average_#pd_SeaIceConc_3900_4000_E280_EPLSM.nc",
+  LICE_AMIP2 = .TRUE.,
+  LICE_SSTVAL = .FALSE.,
+  ICE_NCFRACNAME = "SeaIceConc",
+  LICE_PERCENT = .FALSE.,
+  LICE_MKMASK = .FALSE.,
+  ICE_FILEOUT = "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/collaborators/Ran_Feng/xqbwc_Monthly_Average_#pf_SeaIceConc_3900_4000_E280_EPLSM",
+  LICE_MIN = .FALSE.,
+  LICE_MAX = .FALSE.,
+  LICE_PERIODIC = .TRUE.,
+  IICE_MASK = 0,
+  IICE_TIMEUSAGE1 = 0,
+  IICE_TIMEUSAGE2 = 0,
+  IICE_STARTDATE(1) = 0000,
+  IICE_STARTDATE(2) = 1,
+  IICE_STARTDATE(3) = 16,
+  IICE_STARTDATE(4) = 0,
+  IICE_STARTDATE(5) = 0,
+  IICE_STARTDATE(6) = 0,
+  IICE_NTIMES = 12,
+  IICE_INTERVAL = 1,
+  IICE_INTUNIT = 1,
+  LICE_MM = .TRUE.
+ /
+
+ &nam_orog
+ /
+
+ &nam_mask
+ /
+
+ &nam_lfrac
+ /
+
+ &nam_ausrmulti
+ /
+
+ &nam_ausrancil
+ /
+
+ &nam_ts1
+ /
+
+ &nam_flux
+ /
+
+ &nam_ousrmulti
+ /
+
+ &nam_ousrancil
+ /
+
+ &nam_genanc_config
+  NANCFILES = 1
+ /
+
+ &nam_genanc
+  LGENANC_FILE(1) = .FALSE.,
+
+ /
+
+ &nam_astart
+ /
+
+ &nam_ostart
+ /
+

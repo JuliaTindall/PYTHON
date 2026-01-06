@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/assess_spinup/TOA_rad_inbal_timeseries.py", line 15, in <module>
+    import numpy as np
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/__init__.py", line 155, in <module>
+    from . import random
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/random/__init__.py", line 180, in <module>
+    from . import _pickle
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/numpy/random/_pickle.py", line 4, in <module>
+    from ._sfc64 import SFC64
+  File "<frozen importlib._bootstrap>", line 404, in parent
+KeyboardInterrupt

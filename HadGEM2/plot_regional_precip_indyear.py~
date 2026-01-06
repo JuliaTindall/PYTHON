@@ -1,0 +1,348 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_regional_precip_indyear
+#PURPOSE
+#    This program will plot the precipitation (annual and seasonal) and
+#    the precipitation anomaly (annual and seasonal) for each individual 
+#    year for a specified region of the globe
+#
+# search for 'main program' to find end of functions
+# Julia 9/2/2017
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def get_annmean_precip
+#  def get_seasmean_precip
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,lonmin,lonmax,latmin,latmax,plotbox):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno != 99:
+        plt.subplot(3,3,fileno+1)
+    else:
+        plt.subplot(2,1,1)
+
+   # this is good for the globe
+    map=Basemap(llcrnrlon=lonmin-20,urcrnrlon=lonmax+20,llcrnrlat=latmin-20,urcrnrlat=latmax+20,projection='cyl',resolution='c')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+#        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+#            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+            else:
+                print(np.shape(plotdata))
+                cs = map.contourf(x,y,plotdata,V)
+#                cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+
+    if plotbox =='y':  # overplot a box showing all the lats and lons
+        plt.plot([lonmin,lonmin],[latmin,latmax],'white')
+        plt.plot([lonmax,lonmax],[latmin,latmax],'white')
+        plt.plot([lonmin,lonmax],[latmin,latmin],'white')
+        plt.plot([lonmin,lonmax],[latmax,latmax],'white')
+        
+
+    if fileno == 99:  # single plot so add colorbar
+        cbar = plt.colorbar(cs,orientation="horizontal")
+        cbar.set_label(cbarname,labelpad=-40)
+#end def plotdata
+
+##############################################
+def get_annmean_precip(exptname,yearstart,yearend,lonmin,lonmax,latmin,latmax,regionname):
+
+
+    # setup initial values before loop
+    plotno=0
+    fileform='/nfs/hera1/earjcti/um/HadGEM_data/'+exptname+'/precip_data/'+exptname
+
+    # loop over each year and plot
+    for year in range(yearstart,yearend):
+
+        # get fileyear and extra value
+        century=np.floor(year/100.)
+
+        choices = {10: 'a', 11: 'b', 12: 'c', 13: 'd', 14: 'e', 
+                   15: 'f', 16: 'g', 17: 'h', 18: 'i', 19: 'j', 
+                   20: 'k', 21: 'l', 22: 'm', 23: 'n', 24: 'o', 
+                   25: 'p', 26: 'q', 27: 'r', 28: 's', 29: 't', 
+                   30: 'u', 31: 'v', 32: 'w', 33: 'x', 34: 'y', 
+                   35: 'z'}
+
+        extra=choices.get(century,99) # the second value is the default v
+                                         # value for if it is not found in
+                                         # the choices list
+      
+        yearuse=np.int(year-(century * 100))
+        yearuse=str("%02d"%yearuse)
+        
+        fname=fileform+'a@pd'+extra+np.str(yearuse)+'*.nc'
+
+        print(yearuse)
+        print(fname)
+        f=MFDataset(fname)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        aprecip=f.variables['precip_1'][:]
+        aprecip=np.squeeze(aprecip)
+        ntimes,ny,nx=np.shape(aprecip)
+        
+        if ntimes !=12:
+            print('you have not got 12 months in year ',year)
+            print('you have',ntimes)
+            sys.exit()
+        
+    
+       #average across the time dimension
+        pi_precip_ann=np.mean(aprecip,axis=0)
+    
+        pi_precip_ann=pi_precip_ann * 60. * 60. * 24. * 30.
+       
+      
+
+        # shift grid
+        lonprecip=lon
+        pi_precip_ann,lon = shiftgrid(180.,pi_precip_ann,lon,start=False)
+    
+
+        # set up array with all data for averaging
+        if year == yearstart:
+            pi_precip_ann_allyears=np.zeros((yearend-yearstart,ny,nx))
+            areamean_precip=np.zeros(yearend-yearstart)
+
+            
+        pi_precip_ann_allyears[year-yearstart,:,:]=pi_precip_ann
+
+
+        # mask out latitudes required and get average over region
+
+        ix1=(lon >=lonmin) & (lon <=lonmax)
+        ix2=(lat >=latmin) & (lat <=latmax)
+        lats_reg=lat[ix2]
+        lons_reg=lon[ix1]
+    
+        mask_precip=pi_precip_ann[ix2]
+        mask_precip=mask_precip[:,ix1]
+        
+        areamean_precip[year-yearstart]=np.mean(mask_precip)
+
+        # plot the data and highlight the region of the average
+       
+        titlename=np.str(year)
+        plotbox='y'
+        plotdata(pi_precip_ann,plotno,lon,lat,titlename,0,300,1.0,0.0,'y','mm/month',lonmin,lonmax,latmin,latmax,plotbox)
+        
+        plotno=(plotno+1)%9
+
+        if plotno ==0 or year==yearend:
+            plt.subplots_adjust(bottom=0.2)
+            cax=plt.axes([0.1,0.1,0.8,0.045])
+            plt.colorbar(cax=cax,orientation='horizontal')
+            axistitle='precip for '+exptname+ 'mm/month'
+            plt.title(axistitle)
+            
+            fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_regional_precip_indyear/'+exptname+'_'+np.str(year)+'_'+regionname+'.eps'
+            plt.savefig(fileout, bbox_inches='tight')  
+
+            plt.close()
+
+    # now plot average
+    titlename=exptname+'_allavg_'+regionname
+    plotdata(np.mean(pi_precip_ann_allyears,axis=0),99,lon,lat,titlename,0,300,1.0,0.0,'y','mm/month',lonmin,lonmax,latmin,latmax,plotbox)
+        
+    # plot average over region
+    plt.subplot(2,1,2)
+    plt.plot(areamean_precip)
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_regional_precip_indyear/'+exptname+'_annaverage_'+regionname+'.eps'
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+
+
+#end def annmean
+
+
+def seasmean(m1,m2,m3,figureno,seasname):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # preindustrial
+
+   
+    # read in data from multiple files
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvja/precip_data/xkvjaa@pdm[7-9]*'+m1+'_precip.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvja/precip_data/xkvjaa@pdm[7-9]*'+m2+'_precip.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvja/precip_data/xkvjaa@pdm[7-9]*'+m3+'_precip.nc')
+    lat = fa.variables['latitude'][:]
+    lon = fa.variables['longitude'][:]
+    aprecip=fa.variables['precip_1'][:]
+    bprecip=fb.variables['precip_1'][:]
+    cprecip=fc.variables['precip_1'][:]
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    pi_aprecip_avg=np.mean(aprecip,axis=0)
+    pi_bprecip_avg=np.mean(bprecip,axis=0)
+    pi_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    pi_seasprecip=np.mean((pi_aprecip_avg,pi_bprecip_avg,pi_cprecip_avg),axis=0)
+    pi_seasprecip=pi_seasprecip * 60. * 60. * 30. * 24.
+    
+    
+    lonprecip=lon
+    pi_seasprecip,lon = shiftgrid(180.,pi_seasprecip,lon,start=False)
+    
+    plotdata(pi_seasprecip,0,lon,lat,'PI HadGEM2: '+seasname,0,275,25,0.0,'n','mm/month')
+    
+     #==============
+     # Pliocene
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/precip_data/xkvjba@pdm[7-9]*'+m1+'_precip.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/precip_data/xkvjba@pdm[7-9]*'+m2+'_precip.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjb/precip_data/xkvjba@pdm[7-9]*'+m3+'_precip.nc')
+    aprecip=fa.variables['precip_1'][:]
+    bprecip=fb.variables['precip_1'][:]
+    cprecip=fc.variables['precip_1'][:]
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+
+    # average across the time dimension    
+    plio_aprecip_avg=np.mean(aprecip,axis=0)
+    plio_bprecip_avg=np.mean(bprecip,axis=0)
+    plio_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    plio_seasprecip=np.mean((plio_aprecip_avg,plio_bprecip_avg,plio_cprecip_avg),axis=0)
+    plio_seasprecip=plio_seasprecip * 60. * 60. * 30. * 24.
+
+    lon=lonprecip
+    plio_seasprecip,lon = shiftgrid(180.,plio_seasprecip,lon,start=False)
+    
+    
+    plotdata(plio_seasprecip,1,lon,lat,'PI HadGEM2: '+seasname,0,275,25,0.0,'n','mm/month')
+
+
+
+     #==============
+     # Pliocene+2
+
+
+    fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/precip_data/xkvjca@pdm[7-9]*'+m1+'_precip.nc')
+    fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/precip_data/xkvjca@pdm[7-9]*'+m2+'_precip.nc')
+    fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjc/precip_data/xkvjca@pdm[7-9]*'+m3+'_precip.nc')
+    aprecip=fa.variables['precip_1'][:]
+    bprecip=fb.variables['precip_1'][:]
+    cprecip=fc.variables['precip_1'][:]
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+    
+    pliop2_aprecip_avg=np.mean(aprecip,axis=0)
+    pliop2_bprecip_avg=np.mean(bprecip,axis=0)
+    pliop2_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    pliop2_seasprecip=np.mean((pliop2_aprecip_avg,pliop2_bprecip_avg,pliop2_cprecip_avg),axis=0)
+    pliop2_seasprecip=pliop2_seasprecip * 60. * 60. * 30. * 24.
+
+    lon=lonprecip
+    pliop2_seasprecip,lon = shiftgrid(180.,pliop2_seasprecip,lon,start=False)
+    
+ 
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_seasprecip-pi_seasprecip
+    V=[-64,-32,-16,-8,-4,-2,0,2,4,8,16,32,64]
+
+    plotdata(plio_anom,2,lon,lat,'Plio - PI Panom_HG2',0,275,25,V,'la','mm/month')
+    
+    # Pliocene+2 - preindustrial
+
+    pliop2_anom=pliop2_seasprecip-pi_seasprecip
+    V=[-64,-32,-16,-8,-4,-2,0,2,4,8,16,32,64]
+
+    plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Panom_HG2',0,275,25,V,'la','mm/month')
+
+
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_'+seasname+'anom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+    # Pliocene - preindustrial percentage change
+
+    plio_peranom=((plio_seasprecip-pi_seasprecip)/pi_seasprecip)*100.
+    titlename='Plio-PI precip %'+seasname
+    plotdata(plio_peranom,0,lon,lat,titlename,-50,50,5,0,'a','%')
+
+    plio_peranomp2=((pliop2_seasprecip-pi_seasprecip)/pi_seasprecip)*100.
+    titlename='Plio+2-PI precip %'+seasname
+    plotdata(plio_peranomp2,1,lon,lat,titlename,-50,50,5,0,'a','%')
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_'+seasname+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+
+
+#end def seasmean
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+plt.figure(figureno)
+get_annmean_precip('xkvjf',2301,2400,-10.0,30.0,15.0,30.0,'Sahara')
+figureno=figureno+1
+
+#djf mean
+#plt.figure(figureno)
+#seasmean('dc','ja','fb',figureno,'djf')
+#figureno=figureno+1
+
+#jja mean
+#plt.figure(figureno)
+#seasmean('jn','jl','ag',figureno,'jja')
+#figureno=figureno+1
+
+
+sys.exit(0)
+
+####
+

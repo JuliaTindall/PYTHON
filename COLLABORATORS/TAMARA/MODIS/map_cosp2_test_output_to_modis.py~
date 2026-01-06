@@ -1,0 +1,78 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 29.03.2022 by Julia
+
+this is an experimental program to see what is in the MOSIS-CR***nc4 file
+"""
+import numpy as np
+import iris
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+
+def reformat_hist(orighist):
+    """
+    note the MODIS data has 6 categories of cloud optical thickness
+    the cosp2 histograms have 7.  Combine the lower two catogeries so that
+    they match.  
+    """
+
+    print(orighist.coord('atmosphere_optical_thickness_due_to_cloud').points)
+    auxcoordpoints = np.copy(orighist.coord('atmosphere_optical_thickness_due_to_cloud').points)
+    auxcoordpoints[0] = 0.635
+    auxcoordpoints[1] = 0.635
+  
+    taucoord = iris.coords.AuxCoord(points = auxcoordpoints, long_name = 'tau')
+
+    print(taucoord)
+    
+    orighist.add_aux_coord(taucoord, data_dims = 1)
+    
+    newhist = orighist.aggregated_by(taucoord, iris.analysis.SUM)
+    newhist.coo
+
+    print('orighist',orighist)
+    print('newhist',newhist)
+    print(newhist.coord('atmosphere_optical_thickness_due_to_cloud'))
+    plt.subplot(211)
+    for i in range(0,2):
+        cube = orighist[:,i]
+        qplt.plot(cube)
+    plt.subplot(212)
+    for i in range(0,2):
+        cube =newhist[:,i]
+        qplt.plot(cube)
+   
+    plt.show()
+
+    sys.exit(0)
+def get_cloud_regieme(cosp2hist, MODIS_CR_cube):
+    """
+    we have a histogram (hist) from cosp2
+    we will calculate the euclidean distance from this histogram to 
+    each of the histograms in the MODIS_CR.
+    we will figure out which is the minimum euclidean distance and
+    pass this back as the cloud regieme.  
+    """
+    cosp2R_hist = reformat_hist(cosp2hist)
+    print('cosp',cosp2R_hist)
+    print('MODIS',MODIS_CF_cube)
+    print('julia')
+    sys.exit(0)
+
+    
+
+# modis cloud regieme has index ctp, cot, cr
+MODIS_CR_cube = iris.load_cube('MODIS_cloud_regiemes.nc')
+
+#isccp histogram has index ctp, cot, loc
+ISCCP_test_cube = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/COLLABORATORS/TAMARA/CFMIP/COSPv2.0_juliatest/driver/data/outputs/UKMO/cosp2_output_um.nc','cloud_area_fraction_in_atmosphere_layer')  
+
+
+for histno in range(0,10):
+    hist = ISCCP_test_cube[:, :, histno]
+    cloud_regieme = get_cloud_regieme(hist,MODIS_CR_cube)
+    print(hist)
+    sys.exit(0)

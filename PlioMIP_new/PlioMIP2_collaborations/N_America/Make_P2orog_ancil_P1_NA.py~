@@ -1,0 +1,66 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a program that will flatten the orography over Antarctica.  However because this actually causes the sea level to rise, we will reduce the orography everywhere else over the globe by 60m.  (However if the height of the orography is already less than 60m we will set it to zero).
+"""
+
+import numpy as np
+import iris
+from mpl_toolkits.basemap import Basemap, shiftgrid, maskoceans
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris.quickplot as qplt
+import iris.plot as iplt
+import cartopy.crs as ccrs
+import sys
+
+
+
+
+
+def main():
+    """
+    1. read in the files
+    2. set everything southwards of 60S to zero
+    3. reduce height everywhere else by 60m (or to zero)
+    3. write it out
+    """
+
+    cubelist  = iris.load(FILEIN)
+    newcubelist = iris.cube.CubeList([])
+
+    for cube in cubelist:
+        cubedata = cube.data
+        newcubedata = np.copy(cubedata)
+ 
+        for j, lat in enumerate(cube.coord('latitude').points):
+            if lat <= -60.:
+                newcubedata[:,:,j,:] = 0.0
+                
+        if cube.long_name == 'OROGRAPHY (/STRAT LOWER BC)':
+            for j, lat in enumerate(cube.coord('latitude').points):
+                if lat > -60.:
+                    for i, lon in enumerate(cube.coord('longitude').points):
+                        if cubedata[0,0,j,i] < 60.0:
+                            newcubedata[0,0,j,i] = 0.0
+                        else:
+                            newcubedata[0,0,j,i] = (cubedata[0,0,j,i] - 60.)
+                            
+            
+        newcube = cube.copy(data=newcubedata)
+        newcubelist.append(newcube)
+    
+    iris.save(newcubelist, FILEOUT)     
+       
+    
+  
+   
+
+
+FILEIN = '/nfs/hera1/earjcti/Xiaofang/P4_enh_qrparm.orog.nc'
+FILEOUT = '/nfs/hera1/earjcti/Xiaofang/P4_enh_qrparm.orog_after_antarctic_melt.nc'
+
+
+
+main()

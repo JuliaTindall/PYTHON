@@ -1,0 +1,349 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created May 2022 by Julia
+
+This program will produce the boundary conditions for the 
+PlioMIP3_basic_Eoi400 experiment.
+
+The topo will be as for P4 but will be modern over
+Canadian Archeapelego
+Bering Straight
+Those shelves near Australia
+
+"""
+
+import numpy as np
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+import matplotlib.pyplot as plt
+import netCDF4
+import sys
+
+
+def get_files(fileend, pi_fieldname, plio_fieldname):
+    """
+    gets the pliocene and the preindustrial files
+    """
+
+    filestart = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/'     
+    pi_filename = 'Modern_std/Modern_std/Modern_std_' + fileend + '.nc'
+    plio_filename = 'Plio_enh/Plio_enh/Plio_enh_' + fileend + '.nc'
+
+    pi_cube = iris.load_cube(filestart + pi_filename,pi_fieldname)
+    plio_cube = iris.load_cube(filestart + plio_filename,plio_fieldname)
+
+    return plio_cube, pi_cube
+
+def change_bering_strait(plio_cube, pi_cube):
+    """
+    inputs: pi and pliocene_core topography
+    output: pliocene topography with bering straight changed back to pi
+
+    """
+
+    lats = plio_cube.coord('latitude').points
+    lons = plio_cube.coord('longitude').points
+    newpliodata = np.zeros((len(lats),len(lons)))
+   
+    plio_data = plio_cube.data
+    pi_data = pi_cube.data
+
+    count=0
+    for j, lat in enumerate(lats):
+        for i, lon in enumerate(lons):
+            if (50 < lat < 80 and lon < -150
+                and (plio_data[j,i] > 0 and pi_data[j,i] < 0.0)):
+                count=count+1
+                newpliodata[j,i] = pi_data[j,i]
+            else:
+                newpliodata[j,i] = plio_data[j,i]    
+    
+
+    new_plio_cube = plio_cube.copy(data = newpliodata)
+
+    plt.subplot(3,3,1)
+    plio_reg_cube = plio_cube.extract(iris.Constraint(latitude = lambda cell: 50 < cell < 80, longitude=lambda cell: cell < -150))
+    V = np.arange(-5, 1, 6)
+    cs = iplt.pcolormesh(plio_reg_cube, vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('plio1')
+    
+
+    plt.subplot(3,3,2)
+    pi_reg_cube = pi_cube.extract(iris.Constraint(latitude = lambda cell: 50 < cell < 80, longitude=lambda cell: cell < -150))
+    V = np.arange(-5, 6, 1)  
+    cs = iplt.pcolormesh(pi_reg_cube, vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.title('pi1')
+ 
+
+    plt.subplot(3,3,3)
+    newplio_reg_cube = new_plio_cube.extract(iris.Constraint(latitude = lambda cell: 50 < cell < 80, longitude=lambda cell: cell < -150))
+    V = np.arange(-5, 6, 1)  
+    cs = iplt.pcolormesh(newplio_reg_cube, vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.title('newplio')
+ 
+
+    plt.subplot(3,3,4)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(plio_reg_cube, vmin=-500, vmax=500, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('plio2')
+    
+
+    plt.subplot(3,3,5)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(pi_reg_cube, vmin=-500, vmax=500, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('pi2')
+   
+    plt.subplot(3,3,6)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(newplio_reg_cube, vmin=-500, vmax=500,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio')
+   
+    plt.subplot(3,3,7)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(plio_reg_cube - pi_reg_cube, vmin=-500, vmax=500,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('orig diff')
+   
+   
+    plt.subplot(3,3,8)
+    V = np.arange(-50, 60, 10)
+    cs = iplt.pcolormesh(newplio_reg_cube - plio_reg_cube,  vmin=-500, vmax=500,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio - old plio')
+  
+
+    plt.subplot(3,3,9)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(newplio_reg_cube - pi_reg_cube,  vmin=-500, vmax=500,cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio - pi')
+    
+    return new_plio_cube
+
+
+def change_canadian_arctic(plio_cube, pi_cube):
+    """
+    inputs: pi and pliocene topography
+    output: pliocene topography with CAA changed back to pi
+
+    """
+
+    lats = plio_cube.coord('latitude').points
+    lons = plio_cube.coord('longitude').points
+    newpliodata = np.zeros((len(lats),len(lons)))
+   
+    plio_data = plio_cube.data
+    pi_data = pi_cube.data
+
+    count=0
+    for j, lat in enumerate(lats):
+        for i, lon in enumerate(lons):
+            if (lat > 75 and  -75 < lon < -60
+                and (plio_data[j,i] > 0.0 and pi_data[j,i] < 150.0)):
+                count=count+1
+                newpliodata[j,i] = min([pi_data[j,i], -10.0])
+            else:
+                newpliodata[j,i] = plio_data[j,i]  
+           # if lat == 80.5 or lon ==-65.5:
+           #     newpliodata[j,i] = 10000.
+            if lat == 80.5 and (lon ==-65.5 or lon ==-64.5):
+                newpliodata[j,i] = -10.0
+            
+     
+  
+    new_plio_cube = plio_cube.copy(data = newpliodata)
+
+    plt.subplot(3,3,1)
+    plio_reg_cube = plio_cube.extract(iris.Constraint(latitude = lambda cell: 60 < cell < 90, longitude=lambda cell: -130 < cell < -50))
+    V = np.arange(-5, 6, 1)
+    cs = iplt.pcolormesh(plio_reg_cube, vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('plio1')
+    
+
+    plt.subplot(3,3,2)
+    pi_reg_cube = pi_cube.extract(iris.Constraint(latitude = lambda cell: 60 < cell < 90, longitude=lambda cell: -130 < cell < -50))
+    V = np.arange(-5, 6, 1)  
+    cs = iplt.pcolormesh(pi_reg_cube,  vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('pi1')
+ 
+
+    plt.subplot(3,3,3)
+    newplio_reg_cube = new_plio_cube.extract(iris.Constraint(latitude = lambda cell: 60 < cell < 90, longitude=lambda cell: -130 < cell < -50))
+    V = np.arange(-5, 6, 1)  
+    cs = iplt.pcolormesh(newplio_reg_cube,  vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio')
+ 
+
+    plt.subplot(3,3,4)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(plio_reg_cube,  vmin=-500, vmax=500, cmap='RdBu_r') 
+    plt.gca().coastlines()
+    plt.title('plio2')
+    
+
+    plt.subplot(3,3,5)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(pi_reg_cube,  vmin=-500, vmax=500, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('pi2')
+   
+    plt.subplot(3,3,6)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(newplio_reg_cube,  vmin=-500, vmax=500, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio')
+   
+    plt.subplot(3,3,7)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(plio_reg_cube - pi_reg_cube,  vmin=-500, vmax=500, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('orig diff')
+   
+   
+    plt.subplot(3,3,8)
+    V = np.arange(-50, 60, 10)
+    cs = iplt.pcolormesh(newplio_reg_cube - plio_reg_cube,  vmin=-5, vmax=5, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio - old plio')
+  
+
+    plt.subplot(3,3,9)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(newplio_reg_cube - pi_reg_cube,  vmin=-500, vmax=500, cmap='RdBu_r')
+    plt.gca().coastlines()
+    plt.title('newplio - pi')
+    
+    plt.show()
+    sys.exit(0)
+    return new_plio_cube
+
+
+def change_australian_shelves(plio_cube, pi_cube):
+    """
+    inputs: pi and pliocene topography
+    output: pliocene topography with shelves near Australia changed back to pi
+
+    """
+
+    lats = plio_cube.coord('latitude').points
+    lons = plio_cube.coord('longitude').points
+    newpliodata = np.zeros((len(lats),len(lons)))
+   
+    plio_data = plio_cube.data
+    pi_data = pi_cube.data
+
+    count=0
+    for j, lat in enumerate(lats):
+        for i, lon in enumerate(lons):
+            if (-30 < lat < 30 and  90 < lon < 180
+                and (plio_data[j,i] > 0 and pi_data[j,i] < 0.0)):
+                count=count+1
+                newpliodata[j,i] = pi_data[j,i]
+            else:
+                newpliodata[j,i] = plio_data[j,i]    
+    
+
+    new_plio_cube = plio_cube.copy(data = newpliodata)
+
+    plt.subplot(3,3,1)
+    plio_reg_cube = plio_cube.extract(iris.Constraint(latitude = lambda cell: -30 < cell < 30, longitude=lambda cell: 90 < cell < 180))
+    V = np.arange(-5, 6, 1)
+    cs = iplt.pcolormesh(plio_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('plio1')
+    
+
+    plt.subplot(3,3,2)
+    pi_reg_cube = pi_cube.extract(iris.Constraint(latitude = lambda cell: -30 < cell < 30, longitude=lambda cell: 90 < cell < 180))
+    V = np.arange(-5, 6, 1)  
+    cs = iplt.pcolormesh(pi_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+   
+    plt.title('pi1')
+ 
+
+    plt.subplot(3,3,3)
+    newplio_reg_cube = new_plio_cube.extract(iris.Constraint(latitude = lambda cell: -30 < cell < 30, longitude=lambda cell: 90 < cell < 180))
+    V = np.arange(-5, 6, 1)  
+    cs = iplt.pcolormesh(newplio_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('newplio')
+ 
+
+    plt.subplot(3,3,4)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(plio_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('plio2')
+    
+
+    plt.subplot(3,3,5)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(pi_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('pi2')
+   
+    plt.subplot(3,3,6)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(newplio_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('newplio')
+   
+    plt.subplot(3,3,7)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(plio_reg_cube - pi_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('orig diff')
+   
+   
+    plt.subplot(3,3,8)
+    V = np.arange(-50, 60, 10)
+    cs = iplt.pcolormesh(newplio_reg_cube - plio_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('newplio - old plio')
+  
+
+    plt.subplot(3,3,9)
+    V = np.arange(-500, 600, 100)
+    cs = iplt.pcolormesh(newplio_reg_cube - pi_reg_cube, levels=V, cmap='RdBu_r', extend='both')
+    plt.gca().coastlines()
+    plt.title('newplio - pi')
+    
+
+    return new_plio_cube
+
+
+###############################################
+# main program
+
+
+# get Pliocene  lsm
+
+lsm_
+
+pliocore_topo_cube, pi_topo_cube = get_files('topo_v1.0',
+                                             'etopo1_topo','p4_topo')
+
+
+# change bering strait 
+new_plio_topo = change_bering_strait(pliocore_topo_cube, pi_topo_cube)
+
+# change Canadian arctic archipelego
+new_plio_topo2 = change_canadian_arctic(new_plio_topo, pi_topo_cube)
+
+# change Australasian shelves
+new_plio_topo = change_australian_shelves(new_plio_topo2, pi_topo_cube)
+
+# plot new land sea mask
+plt.subplot(1,1,1)
+iplt.contour(pliocore_topo_cube, levels=(0.0))
+plt.show()

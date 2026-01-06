@@ -1,0 +1,1442 @@
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_SURFPRECIP
+#PURPOSE
+#    This program will plot the precipitation (annual and seasonal) and
+#    the precipitation anomaly (annual and seasonal) for the final 30 years
+#    of the HadGEM2 simulations
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    if fileno !=99:
+        plt.subplot(2,2,fileno+1)
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='h')
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='l')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                print(np.shape(plotdata))
+                cs = map.contourf(x,y,plotdata,V,cmap='spectral',extend='max')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+
+    if fileno != 99:
+        plt.title(titlename)
+        cbar.set_label(cbarname,labelpad=-40)
+    else:
+        cbar.set_label(cbarname,labelpad=-60,size=15)
+        cbar.ax.tick_params(labelsize=15)
+        plt.title(titlename,loc='left',fontsize=18)
+  
+#end def plotdata
+
+###########################################################
+def plotmap_nh(plotdata,mPWP_data,PI_data,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,mask_ind,ygrid,xgrid,yuse,xuse,yspan,xspan):
+
+
+    if fileno > 3:
+        print('ERROR NOT ENOUGH SPACE ON PAGE ',fileno)
+        sys.exit()
+    #plt.subplot2grid((10,12),(fileno*2,0),colspan=9,rowspan=2)
+
+    print(ygrid,xgrid,yuse,xuse,yspan,xspan)
+    plt.subplot2grid((ygrid,xgrid),(yuse,xuse),colspan=yspan,rowspan=xspan)
+
+    lons, lats = np.meshgrid(lon,lat)
+   
+    if mask_ind =='n': # tropics mask
+        northlat=90.0
+        southlat=30.0
+    elif mask_ind == 'nalt': # alternative tropical region:
+        northlat=90.0
+        southlat=0.0
+    else:
+        northlat=90.0
+        southlat=-90.0
+
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=southlat,urcrnrlat=northlat,projection='cyl',resolution='c',fix_aspect=False)
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+
+    plotdata2=plotdata
+
+
+    # plot limits
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+
+    # plot map
+        
+    if uselog == 'n':
+        cs = map.contourf(x,y,plotdata,V,cmap='YlGnBu',extend='both')
+    else:
+        cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+   
+    #parallels=np.arange(-90.,90.,15.)
+    parallels=(30,45,60,75)
+    map.drawparallels(parallels,labels=[False,True,False,False]) # labels right
+    meridians=np.arange(-180.,180.,60.)
+    if fileno !=3:
+        map.drawmeridians(meridians,labels=[False,False,False,False]) # nolabels
+    else:
+        map.drawmeridians(meridians,labels=[False,False,False,True]) # labels bottom
+   
+    fontsize=10
+    plt.text(-180.0-6,northlat-fontsize-1,titlename,fontsize=fontsize,ha="right",bbox=dict(boxstyle="square,pad=0.1",color="white"))
+ 
+    # colorbar
+    if fileno==0:
+        plt.subplot2grid((10,12),(9,0),colspan=9,rowspan=1)
+        plt.gca().set_visible(False)
+        cbar = plt.colorbar(cs,orientation="horizontal",fraction=1.0)         
+        cbar.set_label(cbarname)
+        cbar.ax.tick_params(labelsize=10)
+        
+   
+
+    plotdata=plotdata2
+    
+    # plot map boundary
+    map.drawmapboundary
+
+
+    ###################################################
+    # do line graph showing absolute value by latitude
+
+
+    print('fileno is',fileno)
+    ax=plt.subplot2grid((10,12),(fileno*2,10),colspan=2,rowspan=2)
+    ax.plot(np.mean(mPWP_data,axis=1),lat,label='mPWP',linewidth=0.8)
+    ax.plot(np.mean(PI_data,axis=1),lat,label='PI',linewidth=0.8)
+    # plot dotted lines at locations
+    xmax=4
+    xmin=0
+    ax.plot([xmin,xmax],[45,45],color='black',linestyle='dotted',linewidth=0.8) 
+    ax.plot([xmin,xmax],[60,60],color='black',linestyle='dotted',linewidth=0.8) 
+    ax.plot([xmin,xmax],[75,75],color='black',linestyle='dotted',linewidth=0.8) 
+   
+    ax.tick_params(axis='y',which='both',labelleft='off')
+    ax.set_ylim(southlat,northlat)
+    ax.set_xlim(xmin,xmax)
+    if fileno !=3:
+        ax.set_xticks([]) # disable xticks
+    else:
+        ax.set_xticks(list(range(xmin,xmax,1)))
+        #ax.set_xlabel("mm/day",va='top')
+
+    # add legend away from plot
+    ax_leg=plt.subplot2grid((10,12),(9,10),colspan=2,rowspan=1)
+    ax_leg.legend(*ax.get_legend_handles_labels(),loc='center')
+    ax_leg.axis('off')
+    plt.legend()
+    
+   
+
+
+#end def plotmap_nh
+
+
+###########################################################
+def plotmap_nh_rainsnow(plotrain,plotsnow,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname,mask_ind,ygrid,xgrid,yuse,xuse,yspan,xspan):
+
+    # setup
+
+    if fileno > 3:
+        print('ERROR NOT ENOUGH SPACE ON PAGE ',fileno)
+        sys.exit()
+    lons, lats = np.meshgrid(lon,lat)
+   
+    if mask_ind =='n': # tropics mask
+        northlat=90.0
+        southlat=30.0
+    elif mask_ind == 'nalt': # alternative tropical region:
+        northlat=90.0
+        southlat=0.0
+    else:
+        northlat=90.0
+        southlat=-90.0
+
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+
+
+    # plot rain
+    plt.subplot2grid((ygrid,xgrid),(yuse,xuse),colspan=yspan,rowspan=xspan)
+
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=southlat,urcrnrlat=northlat,projection='cyl',resolution='c',fix_aspect=False)
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+        
+    if uselog == 'n':
+        cs = map.contourf(x,y,plotrain,V,cmap='YlGnBu',extend='both')
+    else:
+        cs = map.contourf(x,y,plotrain,V,cmap='RdBu',extend='both')
+   
+    parallels=(30,45,60,75)
+    map.drawparallels(parallels,labels=[False,False,False,False]) # labels right
+    meridians=np.arange(-180.,180.,90.)
+    if fileno !=3:
+        map.drawmeridians(meridians,labels=[False,False,False,False]) # nolabels
+    else:
+        map.drawmeridians(meridians,labels=[False,False,False,True]) # labels bottom
+   
+    fontsize=10
+    plt.text(-180.0-6,northlat-fontsize-1,titlename,fontsize=fontsize,ha="right",bbox=dict(boxstyle="square,pad=0.1",color="white"))
+ 
+    plt.text(-180.0-6,northlat-fontsize-1-15,'(rain)',fontsize=fontsize,ha="right",bbox=dict(boxstyle="square,pad=0.1",color="white"))
+
+    # plot map boundary
+    map.drawmapboundary
+
+
+    # plot snow
+    print(ygrid,xgrid,yuse,xuse,yspan,xspan)
+    plt.subplot2grid((ygrid,xgrid),(yuse,xuse+yspan+1),colspan=yspan,rowspan=xspan)
+
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=southlat,urcrnrlat=northlat,projection='cyl',resolution='c',fix_aspect=False)
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+        
+    if uselog == 'n':
+        cs = map.contourf(x,y,plotsnow,V,cmap='YlGnBu',extend='both')
+    else:
+        cs = map.contourf(x,y,plotsnow,V,cmap='RdBu',extend='both')
+   
+    parallels=(30,45,60,75)
+    map.drawparallels(parallels,labels=[False,False,False,False]) # no labels
+    meridians=np.arange(-180.,180.,90.)
+    if fileno !=3:
+        map.drawmeridians(meridians,labels=[False,False,False,False]) # nolabels
+    else:
+        map.drawmeridians(meridians,labels=[False,False,False,True]) # labels bottom
+   
+    fontsize=10
+    plt.text(-180.0-6,northlat-fontsize-1,titlename,fontsize=fontsize,ha="right",bbox=dict(boxstyle="square,pad=0.1",color="white"))
+
+    plt.text(-180.0-6,northlat-fontsize-1-15,'(snow)',fontsize=fontsize,ha="right",bbox=dict(boxstyle="square,pad=0.1",color="white"))
+
+  
+  # plot map boundary
+    map.drawmapboundary
+
+
+    # colorbar
+    if fileno==0:
+        plt.subplot2grid((10,11),(9,0),colspan=11,rowspan=1)
+        plt.gca().set_visible(False)
+        cbar = plt.colorbar(cs,orientation="horizontal",fraction=1.0)         
+        cbar.set_label(cbarname)
+        cbar.ax.tick_params(labelsize=10)
+   
+    
+  
+
+    
+    
+   
+
+
+#end def plotmap_nh_rainsnow
+
+
+def annmean(figureno,HadCM3,moses2):
+    #==============
+    # preindustrial
+
+
+    # read in data from multiple files
+    if HadCM3 == 'y':
+        if moses2 =='y':  #my simulations moses 2
+            f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*.nc')
+        else: # fergus simulation xgrad
+            f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*.nc')
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        aprecip=f.variables['precip'][:]
+        titlepi='PI-Ann_HadCM3'
+        titleplio='Plio-Ann_HadCM3'
+        titlediff='Plio - preind  Ann_HadCM3'
+            
+    else:
+        f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/precip_data/xkvjea@pdn[7-9]*.nc')
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        aprecip=f.variables['precip_1'][:]
+        titlepi='PI-Ann_HadGEM2'
+        titleplio='Plio-Ann_HadGEM2'
+        titlediff='Plio - preind Ann_HadGEM2'
+
+
+    aprecip=np.squeeze(aprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    pi_precip_ann=np.mean(aprecip,axis=0)
+    print('new shape',np.shape(pi_precip_ann))
+    
+    pi_precip_ann=pi_precip_ann * 60. * 60. * 24. # mm/day
+    
+    plt.figure(0)
+    lonprecip=lon
+    pi_precip_ann,lon = shiftgrid(180.,pi_precip_ann,lon,start=False)
+    
+    plotdata(pi_precip_ann,0,lon,lat,titlepi,0,275,25.0,0.0,'n','mm/month')
+    f.close()
+
+     #==============
+     # Pliocene
+
+    if HadCM3 == 'y':
+        if moses2 == 'y':
+            f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*.nc')
+        else: # fergus simulation xgrac
+            f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*.nc')
+        aprecip=f.variables['precip'][:]
+        aprecip=np.squeeze(aprecip)
+    else:
+        f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjf/precip_data/xkvjfa@pdn[7-9]*.nc')
+        aprecip=f.variables['precip_1'][:]
+        aprecip=np.squeeze(aprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+
+    plio_precip_ann=np.mean(aprecip,axis=0)
+    plio_precip_ann=plio_precip_ann * 60. * 60. * 24. # mm/day
+
+    lon=lonprecip
+    plio_precip_ann,lon = shiftgrid(180.,plio_precip_ann,lon,start=False)
+
+    plotdata(plio_precip_ann,1,lon,lat,titleplio,0,275,25,0.0,'n','mm/month')
+    f.close()
+
+     #==============
+     # Pliocene+2
+
+    if HadCM3 != 'y':
+        # read in data from multiple files
+        f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/precip_data/xkvjga@pdn[7-9]*.nc')
+        aprecip=f.variables['precip_1'][:]
+        aprecip=np.squeeze(aprecip)
+        ntimes,ny,nx=np.shape(aprecip)
+        print(ntimes,ny,nx)
+        
+    #average across the time dimension
+        plio_precipp2_ann=np.mean(aprecip,axis=0)
+        plio_precipp2_ann=plio_precipp2_ann * 60. * 60. * 24. # mm/day
+        lon=lonprecip
+        plio_precipp2_ann,lon = shiftgrid(180.,plio_precipp2_ann,lon,start=False)
+
+        f.close()
+
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_precip_ann-pi_precip_ann
+
+    V=[-64,-32,-16,-8,-4,-2,0,2,4,8,16,32,64]
+    plotdata(plio_anom,2,lon,lat,titlediff,0,275,25,V,'n','mm/month')
+    
+    # Pliocene+2 - preindustrial
+
+    if HadCM3 != 'y':
+        pliop2_anom=plio_precipp2_ann-pi_precip_ann
+        V=[-64,-32,-16,-8,-4,-2,0,2,4,8,16,32,64]
+
+        plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Panom_HG2',0,275,25,V,'n','mm/month')
+
+
+    if HadCM3 == 'y':
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_HadCM3'+moses2+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_HadCM3'+moses2+'.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+    else:
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+    ###############################################
+    # plot anomaly in mm/day for paper.
+   
+    if HadCM3 == 'y':  # hadgem equivelent is plotted in plot_precip.py
+        V=0
+        plotdata(plio_anom,99,lon,lat,'HadCM3 mPWP precipitation anomaly',-1.0,1.1,0.1,V,'a','mm/day')
+        if moses2 == 'y':
+            fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_xibol.eps' 
+        else:
+            fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_xgrad.eps' 
+        plt.savefig(fileout, bbox_inches='tight') 
+        if moses2 =='y':
+            fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_xibol.tiff' 
+        else:
+            fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_xgrad.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+        plt.close()
+    else:
+        V=0
+        plotdata(pliop2_anom,99,lon,lat,'HadGEM2 mPWP precip anomaly',-1.0,1.1,0.1,V,'a','mm/day')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_xkvjg.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_xkvjg.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+        plt.close()
+
+
+
+    # Pliocene - preindustrial percentage change
+
+    print(pi_precip_ann)
+    if HadCM3 == 'y':
+        plio_peranom=((plio_precip_ann-pi_precip_ann)/pi_precip_ann)*100.
+        plotdata(plio_peranom,99,lon,lat,'b) HadCM3: mPWP-PI Precip anomaly',-70,75,5,0,'a','%')
+
+    if HadCM3 != 'y':
+        plio_peranomp2=((plio_precipp2_ann-pi_precip_ann)/pi_precip_ann)*100.
+        plotdata(plio_peranomp2,99,lon,lat,'a) HadGEM2: mPWP-PI Precip anomaly',-70,75,5,0,'a','percentage change from PI')
+
+    if HadCM3 == 'y':
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_HadCM3'+moses2+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_HadCM3'+moses2+'.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+    else:
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_xkvjg.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_xkvjg.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+
+
+    plt.close()
+
+    # print out all the diagnostics we need for the paper
+
+  # get land mask and put on correct grid
+
+    if HadCM3 != 'y':
+        fm=Dataset('/nfs/hera1/earjcti/um/HadGEM_ancils/qrparm.mask.nc')
+    else:
+        fm=Dataset('/nfs/hera2/apps/metadata/ancil/preind2/qrparm.mask.nc')
+    lsmlon=fm.variables['longitude'][:]
+    lsmlat=fm.variables['latitude'][:]
+    lsm=fm.variables['lsm'][:]
+    lsm=np.squeeze(lsm)
+    lsm,lsmlon = shiftgrid(180.,lsm,lsmlon,start=False)
+    fm.close()
+
+   
+    if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+        pi_land=pi_precip_ann/lsm
+        pi_sea=pi_precip_ann / (np.abs(lsm-1.0))
+        plio_land=plio_precip_ann/lsm
+        plio_sea=plio_precip_ann / (np.abs(lsm-1.0))
+        if HadCM3 !='y':
+           pliop2_land=plio_precipp2_ann/lsm
+           pliop2_sea=plio_precipp2_ann / (np.abs(lsm-1.0))
+                                  
+    else:
+        print('error lon/lat of land sea mask dont match')
+        anom_land=plio_anom * lsm
+        plotdata(anom_land,99,lon,lat,'a) mPWP temperature anomaly',0,10,1.0,V,'i',degC)
+        plt.show()
+        sys.exit()
+
+
+
+    # print temperature changes
+    # create weighting array
+    weightarr=np.zeros(np.shape(pi_land))
+    for i in range(0,len(lon)):
+        weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+    print('mean pi precip',np.average(pi_precip_ann,weights=weightarr)) 
+    print('mean plio precip',np.average(plio_precip_ann,weights=weightarr))
+
+    print('mean pi precip land',np.average(pi_precip_ann,weights=weightarr*lsm)) 
+    print('mean plio precip land',np.average(plio_precip_ann,weights=weightarr*lsm))
+    print('mean pi precip sea',np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0))) 
+    print('mean plio precip sea',np.average(plio_precip_ann,weights=weightarr*np.abs(lsm-1.0)))
+    print('land panom',np.average(plio_precip_ann,weights=weightarr*lsm)-np.average(pi_precip_ann,weights=weightarr*lsm)) 
+    print('sea panom',np.average(plio_precip_ann,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0))) 
+    print('total panom',np.average(plio_precip_ann,weights=weightarr) - np.average(pi_precip_ann,weights=weightarr)) 
+    print('land p %',(np.average(plio_precip_ann,weights=weightarr*lsm)-np.average(pi_precip_ann,weights=weightarr*lsm)) * 100. /  np.average(pi_precip_ann,weights=weightarr*lsm))
+    print('sea p %',(np.average(plio_precip_ann,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0))) * 100. / np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0)))
+    print('total p %',(np.average(plio_precip_ann,weights=weightarr) - np.average(pi_precip_ann,weights=weightarr)) * 100. / np.average(pi_precip_ann,weights=weightarr))
+  
+
+    if HadCM3 != 'y':
+        print(' ')
+        print ('mean plio p2 precip',np.average(plio_precipp2_ann,weights=weightarr))
+        print('mean plio p2 precip land',np.average(plio_precipp2_ann,weights=weightarr*lsm))
+        print('mean plio p2 precip sea',np.average(plio_precipp2_ann,weights=weightarr*np.abs(lsm-1.0))) 
+        print('land panom',np.average(plio_precipp2_ann,weights=weightarr*lsm)-np.average(pi_precip_ann,weights=weightarr*lsm)) 
+        print('sea panom',np.average(plio_precipp2_ann,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0))) 
+        print('total panom',np.average(plio_precipp2_ann,weights=weightarr) - np.average(pi_precip_ann,weights=weightarr)) 
+  
+        print('land p %',(np.average(plio_precipp2_ann,weights=weightarr*lsm)-np.average(pi_precip_ann,weights=weightarr*lsm)) * 100. /  np.average(pi_precip_ann,weights=weightarr*lsm))
+        print('sea p %',(np.average(plio_precipp2_ann,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0))) * 100. / np.average(pi_precip_ann,weights=weightarr*np.abs(lsm-1.0)))
+        print('total p %',(np.average(plio_precipp2_ann,weights=weightarr) - np.average(pi_precip_ann,weights=weightarr)) * 100. / np.average(pi_precip_ann,weights=weightarr))
+    
+        
+    
+#end def annmean
+
+
+def seasmean(m1,m2,m3,figureno,seasname,HadCM3,moses2):
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # preindustrial
+
+   
+    # read in data from multiple files
+    if HadCM3 == 'y':
+        if moses2 == 'y':
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*'+m3+'.nc')
+       
+        else: # fergus simulation xgrad
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*'+m3+'.nc')
+      
+        lat = fa.variables['latitude'][:]
+        lon = fa.variables['longitude'][:]
+        aprecip=fa.variables['precip'][:]
+        bprecip=fb.variables['precip'][:]
+        cprecip=fc.variables['precip'][:]
+        pititle='PI HadCM3: '+seasname
+        pliotitle='Plio HadCM3: '+seasname
+        difftitle='Plio-PI HadCM3: '+seasname
+        
+    else:
+        fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/precip_data/xkvjea@pdn[7-9]*'+m1+'_precip.nc')
+        fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/precip_data/xkvjea@pdn[7-9]*'+m2+'_precip.nc')
+        fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/precip_data/xkvjea@pdn[7-9]*'+m3+'_precip.nc')
+        lat = fa.variables['latitude'][:]
+        lon = fa.variables['longitude'][:]
+        aprecip=fa.variables['precip_1'][:]
+        bprecip=fb.variables['precip_1'][:]
+        cprecip=fc.variables['precip_1'][:]
+        pititle='PI HadGEM2: '+seasname
+        pliotitle='Plio HadGEM2: '+seasname
+        difftitle='Plio-PI HadGEM2: '+seasname
+
+
+
+
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    pi_aprecip_avg=np.mean(aprecip,axis=0)
+    pi_bprecip_avg=np.mean(bprecip,axis=0)
+    pi_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    pi_seasprecip=np.mean((pi_aprecip_avg,pi_bprecip_avg,pi_cprecip_avg),axis=0)
+    pi_seasprecip=pi_seasprecip * 60. * 60. * 24. # mm/day
+    
+    
+    lonprecip=lon
+    pi_seasprecip,lon = shiftgrid(180.,pi_seasprecip,lon,start=False)
+    
+    plotdata(pi_seasprecip,0,lon,lat,pititle,0,1,0.25,0.0,'n','mm/day')
+    
+     #==============
+     # Pliocene
+
+    if HadCM3 == 'y':
+        if moses2 =='y':
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*'+m3+'.nc')
+        else:
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*'+m3+'.nc')
+        aprecip=fa.variables['precip'][:]
+        bprecip=fb.variables['precip'][:]
+        cprecip=fc.variables['precip'][:]
+    else:
+        fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjf/precip_data/xkvjfa@pdn[7-9]*'+m1+'_precip.nc')
+        fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjf/precip_data/xkvjfa@pdn[7-9]*'+m2+'_precip.nc')
+        fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjf/precip_data/xkvjfa@pdn[7-9]*'+m3+'_precip.nc')
+        aprecip=fa.variables['precip_1'][:]
+        bprecip=fb.variables['precip_1'][:]
+        cprecip=fc.variables['precip_1'][:]
+
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+
+    # average across the time dimension    
+    plio_aprecip_avg=np.mean(aprecip,axis=0)
+    plio_bprecip_avg=np.mean(bprecip,axis=0)
+    plio_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    plio_seasprecip=np.mean((plio_aprecip_avg,plio_bprecip_avg,plio_cprecip_avg),axis=0)
+    plio_seasprecip=plio_seasprecip * 60. * 60.  * 24.
+
+    lon=lonprecip
+    plio_seasprecip,lon = shiftgrid(180.,plio_seasprecip,lon,start=False)
+    
+    
+    plotdata(plio_seasprecip,1,lon,lat,pliotitle,0,1,0.25,0.0,'n','mm/day')
+
+
+
+     #==============
+     # Pliocene+2
+
+    if HadCM3 != 'y':
+        fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/precip_data/xkvjga@pdn[7-9]*'+m1+'_precip.nc')
+        fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/precip_data/xkvjga@pdn[7-9]*'+m2+'_precip.nc')
+        fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/precip_data/xkvjga@pdn[7-9]*'+m3+'_precip.nc')
+        aprecip=fa.variables['precip_1'][:]
+        bprecip=fb.variables['precip_1'][:]
+        cprecip=fc.variables['precip_1'][:]
+        aprecip=np.squeeze(aprecip)
+        bprecip=np.squeeze(bprecip)
+        cprecip=np.squeeze(cprecip)
+        
+        pliop2_aprecip_avg=np.mean(aprecip,axis=0)
+        pliop2_bprecip_avg=np.mean(bprecip,axis=0)
+        pliop2_cprecip_avg=np.mean(cprecip,axis=0)
+        
+        pliop2_seasprecip=np.mean((pliop2_aprecip_avg,pliop2_bprecip_avg,pliop2_cprecip_avg),axis=0)
+        pliop2_seasprecip=pliop2_seasprecip * 60. * 60.  * 24.
+        
+        lon=lonprecip
+        pliop2_seasprecip,lon = shiftgrid(180.,pliop2_seasprecip,lon,start=False)
+    
+ 
+
+    # Pliocene - preindustrial
+
+    plio_anom=plio_seasprecip-pi_seasprecip
+    V=[-64,-32,-16,-8,-4,-2,0,2,4,8,16,32,64]
+    plotdata(plio_anom,2,lon,lat,difftitle,0,1,0.25,V,'la','mm/day')
+    
+    # Pliocene+2 - preindustrial
+
+    if HadCM3 != 'y':
+        pliop2_anom=pliop2_seasprecip-pi_seasprecip
+        V=[-64,-32,-16,-8,-4,-2,0,2,4,8,16,32,64]
+
+        plotdata(pliop2_anom,3,lon,lat,'PlioP2 - PI Panom_HG2',-5,5,0.25,V,'a','mm/month')
+
+
+    if HadCM3 == 'y':
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_'+seasname+'anom_HadCM3'+moses2+'.eps' 
+    else:
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_'+seasname+'anom.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+    # Pliocene - preindustrial percentage change
+
+    plio_peranom=((plio_seasprecip-pi_seasprecip)/pi_seasprecip)*100.
+    plotdata(plio_peranom,0,lon,lat,difftitle,-70,78,5,0,'a','%')
+
+
+    if HadCM3 !='y':
+        plio_peranomp2=((pliop2_seasprecip-pi_seasprecip)/pi_seasprecip)*100.
+        titlename='Plio+2-PI precip %'+seasname
+        plotdata(plio_peranomp2,1,lon,lat,titlename,-70,78,5,0,'a','%')
+
+    if HadCM3 =='y':
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_'+seasname+'HadCM3'+moses2+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_'+seasname+'HadCM3'+moses2+'.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+    else:
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_percent_'+seasname+'.tiff' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+
+    plt.close()
+
+
+    # Pliocene - preindustrial mm/day change
+
+    if HadCM3 !='y':
+        plio_anom=(pliop2_seasprecip-pi_seasprecip)
+    else:
+        plio_anom=(plio_seasprecip-pi_seasprecip)
+
+    titlename='Plio-PI precip'+seasname
+    plotdata(plio_anom,0,lon,lat,difftitle,-1,1,0.1,0,'a','mm/day')
+
+    if HadCM3 =='y':
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_'+seasname+'HadCM3'+moses2+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+    else:
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_anom_only_'+seasname+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+
+    plt.close()
+
+
+
+    # print out all the diagnostics we need for the paper
+
+  # get land mask and put on correct grid
+
+    if HadCM3 != 'y':
+        fm=Dataset('/nfs/hera1/earjcti/um/HadGEM_ancils/qrparm.mask.nc')
+    else:
+        fm=Dataset('/nfs/hera2/apps/metadata/ancil/preind2/qrparm.mask.nc')
+    lsmlon=fm.variables['longitude'][:]
+    lsmlat=fm.variables['latitude'][:]
+    lsm=fm.variables['lsm'][:]
+    lsm=np.squeeze(lsm)
+    lsm,lsmlon = shiftgrid(180.,lsm,lsmlon,start=False)
+    fm.close()
+
+   
+    if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+        pi_land=pi_seasprecip/lsm
+        pi_sea=pi_seasprecip / (np.abs(lsm-1.0))
+        plio_land=plio_seasprecip/lsm
+        plio_sea=plio_seasprecip / (np.abs(lsm-1.0))
+        if HadCM3 !='y':
+           pliop2_land=pliop2_seasprecip/lsm
+           pliop2_sea=pliop2_seasprecip / (np.abs(lsm-1.0))
+                                  
+    else:
+        print('error lon/lat of land sea mask dont match')
+        anom_land=plio_anom * lsm
+        plotdata(anom_land,99,lon,lat,'a) mPWP temperature anomaly',0,10,1.0,V,'i',degC)
+        plt.show()
+        sys.exit()
+
+    # plot land precipitation for the mPWP and the PI
+    if HadCM3 !='y':
+
+        titlename='PI land precip'+seasname
+        plotdata(pi_land*30.,99,lon,lat,titlename,0,80,1,0,'n','mm/month')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/PI_land_precip_'+seasname+'HadGEM.eps' 
+        plt.savefig(fileout,bbox_inches='tight')
+        plt.close()
+
+        titlename='mPWP land precip'+seasname
+        plotdata(pliop2_land*30.,99,lon,lat,titlename,0,80,1,0,'n','mm/month')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/mPWP_land_precip_'+seasname+'HadGEM.eps' 
+        plt.savefig(fileout,bbox_inches='tight')
+        plt.close()
+    else:
+        titlename='HadCM3 PI land precip'+seasname
+        plotdata(pi_land*30.,99,lon,lat,titlename,0,80,1,0,'n','mm/month')
+       
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/PI_land_precip_'+seasname+'HadCM3'+moses2+'.eps' 
+        plt.savefig(fileout,bbox_inches='tight')
+        plt.close()
+
+        titlename='HadCM3 mPWP land precip'+seasname
+        plotdata(plio_land*30.,99,lon,lat,titlename,0,80,1,0,'n','mm/month')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/mPWP_land_precip_'+seasname+'HadCM3'+moses2+'.eps' 
+        plt.savefig(fileout,bbox_inches='tight')
+        plt.close()
+   
+
+    # print temperature changes
+    # create weighting array
+    weightarr=np.zeros(np.shape(pi_land))
+    for i in range(0,len(lon)):
+        weightarr[:,i]=np.cos(np.deg2rad(lat))
+
+    print('SEASON iS',seasname)
+    print('----------------')
+    print('mean pi precip',np.average(pi_seasprecip,weights=weightarr)) 
+    print('mean plio precip',np.average(plio_seasprecip,weights=weightarr))
+
+    print('mean pi precip land',np.average(pi_seasprecip,weights=weightarr*lsm)) 
+    print('mean plio precip land',np.average(plio_seasprecip,weights=weightarr*lsm))
+    print('mean pi precip sea',np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0))) 
+    print('mean plio precip sea',np.average(plio_seasprecip,weights=weightarr*np.abs(lsm-1.0)))
+    print('land panom',np.average(plio_seasprecip,weights=weightarr*lsm)-np.average(pi_seasprecip,weights=weightarr*lsm)) 
+    print('sea panom',np.average(plio_seasprecip,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0))) 
+    print('total panom',np.average(plio_seasprecip,weights=weightarr) - np.average(pi_seasprecip,weights=weightarr)) 
+    print('land p %',(np.average(plio_seasprecip,weights=weightarr*lsm)-np.average(pi_seasprecip,weights=weightarr*lsm)) * 100. /  np.average(pi_seasprecip,weights=weightarr*lsm))
+    print('sea p %',(np.average(plio_seasprecip,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0))) * 100. / np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0)))
+    print('total p %',(np.average(plio_seasprecip,weights=weightarr) - np.average(pi_seasprecip,weights=weightarr)) * 100. / np.average(pi_seasprecip,weights=weightarr))
+  
+
+    if HadCM3 != 'y':
+        print(' ')
+        print ('mean plio p2 precip',np.average(pliop2_seasprecip,weights=weightarr))
+        print('mean plio p2 precip land',np.average(pliop2_seasprecip,weights=weightarr*lsm))
+        print('mean plio p2 precip sea',np.average(pliop2_seasprecip,weights=weightarr*np.abs(lsm-1.0))) 
+        print('land panom',np.average(pliop2_seasprecip,weights=weightarr*lsm)-np.average(pi_seasprecip,weights=weightarr*lsm)) 
+        print('sea panom',np.average(pliop2_seasprecip,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0))) 
+        print('total panom',np.average(pliop2_seasprecip,weights=weightarr) - np.average(pi_seasprecip,weights=weightarr)) 
+  
+        print('land p %',(np.average(pliop2_seasprecip,weights=weightarr*lsm)-np.average(pi_seasprecip,weights=weightarr*lsm)) * 100. /  np.average(pi_seasprecip,weights=weightarr*lsm))
+        print('sea p %',(np.average(pliop2_seasprecip,weights=weightarr*np.abs(lsm-1.0))-np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0))) * 100. / np.average(pi_seasprecip,weights=weightarr*np.abs(lsm-1.0)))
+        print('total p %',(np.average(pliop2_seasprecip,weights=weightarr) - np.average(pi_seasprecip,weights=weightarr)) * 100. / np.average(pi_seasprecip,weights=weightarr))
+    
+
+
+
+#end def seasmean
+
+
+def seasmean_get(m1,m2,m3,figureno,seasname,HadCM3,moses2,field):
+    # this program is a bit like seasmean but it will just get the data
+    # it won't analyse it or print anything out or plot anything
+
+    # m1 m2 m3 are the month neames needed to reproduce the seasonal mean
+    #==============
+    # preindustrial
+
+   
+    # read in data from multiple files
+    if HadCM3 == 'y':
+        if moses2 == 'y':
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[7-9]*'+m3+'.nc')
+       
+        else: # fergus simulation xgrad
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*'+m3+'.nc')
+      
+        lat = fa.variables['latitude'][:]
+        lon = fa.variables['longitude'][:]
+        
+    else:
+        fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/netcdf/pdfiles/xkvjea@pdn[7-9]*'+m1+'.nc')
+        fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/netcdf/pdfiles/xkvjea@pdn[7-9]*'+m2+'.nc')
+        fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/netcdf/pdfiles/xkvjea@pdn[7-9]*'+m3+'.nc')
+        lat = fa.variables['latitude'][:]
+        lon = fa.variables['longitude'][:]
+        if field=='precip':
+            field='precip_1'
+    aprecip=fa.variables[field][:]
+    bprecip=fb.variables[field][:]
+    cprecip=fc.variables[field][:]
+
+
+
+
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    
+#average across the time dimension
+    pi_aprecip_avg=np.mean(aprecip,axis=0)
+    pi_bprecip_avg=np.mean(bprecip,axis=0)
+    pi_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    pi_seasprecip=np.mean((pi_aprecip_avg,pi_bprecip_avg,pi_cprecip_avg),axis=0)
+    pi_seasprecip=pi_seasprecip * 60. * 60. * 24. # mm/day
+    pi_seasprecip,lon = shiftgrid(180.,pi_seasprecip,lon,start=False)
+   
+    
+     #==============
+     # Pliocene
+
+    if HadCM3 == 'y':
+        if moses2 =='y':
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[7-9]*'+m3+'.nc')
+        else:
+            fa=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*'+m1+'.nc')
+            fb=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*'+m2+'.nc')
+            fc=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*'+m3+'.nc')
+       
+    else:
+        fa=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/netcdf/pdfiles/xkvjga@pdn[7-9]*'+m1+'.nc')
+        fb=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/netcdf/pdfiles/xkvjga@pdn[7-9]*'+m2+'.nc')
+        fc=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/netcdf/pdfiles/xkvjga@pdn[7-9]*'+m3+'.nc')
+    aprecip=fa.variables[field][:]
+    bprecip=fb.variables[field][:]
+    cprecip=fc.variables[field][:]
+    lon = fa.variables['longitude'][:]
+       
+
+    aprecip=np.squeeze(aprecip)
+    bprecip=np.squeeze(bprecip)
+    cprecip=np.squeeze(cprecip)
+
+    # average across the time dimension    
+    plio_aprecip_avg=np.mean(aprecip,axis=0)
+    plio_bprecip_avg=np.mean(bprecip,axis=0)
+    plio_cprecip_avg=np.mean(cprecip,axis=0)
+    
+    plio_seasprecip=np.mean((plio_aprecip_avg,plio_bprecip_avg,plio_cprecip_avg),axis=0)
+    plio_seasprecip=plio_seasprecip * 60. * 60.  * 24.
+   
+    plio_seasprecip,lon = shiftgrid(180.,plio_seasprecip,lon,start=False)
+   
+    retdata=[lon,lat,pi_seasprecip,plio_seasprecip]
+    return retdata
+    
+#end def seasmean_get
+
+
+def precip_chg_by_latitude(HadCM3,land_ocn_ind,abs_pcent,season,moses2):
+
+    plt.close()
+    if land_ocn_ind == 'l' or land_ocn_ind == 'o':  # land or ocean
+        # get land mask
+        if HadCM3 == 'y' :
+            fm=Dataset('/nfs/hera2/apps/metadata/ancil/preind2/qrparm.mask.nc')
+        else:
+            fm=Dataset('/nfs/hera1/earjcti/um/HadGEM_ancils/qrparm.mask.nc')
+        lsmlon=fm.variables['longitude'][:]
+        lsmlat=fm.variables['latitude'][:]
+        lsm=fm.variables['lsm'][:]
+        lsm=np.squeeze(lsm)
+        fm.close()
+
+        
+    if season != 'ann':
+        m1='unknown'
+        m2='unknown'
+        m3='unknown'
+
+        if season == 'djf':
+            m1='dc'
+            m2='ja'
+            m3='fb'
+
+        if season == 'mam':
+            m1='mr'
+            m2='ar'
+            m3='my'
+
+        if season == 'jja':
+            m1='jn'
+            m2='jl'
+            m3='ag'
+
+        if season == 'son':
+            m1='sp'
+            m2='ot'
+            m3='nv'
+
+
+
+    #==============
+    # preindustrial
+
+    if HadCM3 == 'y':
+        if season == 'ann':
+            if moses2 == 'y':
+                f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[5-9]*.nc')
+            else:
+                f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[7-9]*.nc')
+        else:
+            if moses2 == 'y':
+                filebase='/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[5-9]*%s.nc'
+            else:
+                filebase='/nfs/hera1/earjcti/um/netcdf/xgrad_netcdf/pdfiles/xgrada@pdq[5-9]*%s.nc'
+
+            filenames=(filebase % [m1,m2,m3])
+            print('filenames are',filenames)
+            f=MFDataset(filenames)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        aprecip=f.variables['precip'][:]
+    else:
+    # read in data from multiple files
+        if season == 'ann':
+            f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvje/precip_data/xkvjea@pdn[5-9]*.nc')
+        else:
+            filebase='/nfs/hera1/earjcti/um/HadGEM_data/xkvje/precip_data/xkvjea@pdn[5-9]*%s_precip.nc'
+            filenames=(filebase % [m1,m2,m3])
+            print('filenames are',filenames)
+            f=MFDataset(filenames)
+
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        aprecip=f.variables['precip_1'][:]
+    
+    f.close()
+    aprecip=np.squeeze(aprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+    print(ntimes,ny,nx)
+
+#average across the time dimension and the latitude dimension
+    pi_precip_ann=np.mean(aprecip,axis=0)
+
+    if land_ocn_ind == 'l': # mask out all non land points.
+        if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+            pi_precip_ann=pi_precip_ann / (lsm)
+            pi_precip_ann[pi_precip_ann == float('Inf')] = float('NaN')
+        else:
+            print('error lon/lat of land sea mask dont match')
+
+    if land_ocn_ind == 'o': # mask out all non ocean points.
+        if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+            pi_precip_ann=pi_precip_ann / (np.abs(lsm-1.0))
+            pi_precip_ann[pi_precip_ann == float('Inf')] = float('NaN')
+        else:
+            print('error lon/lat of land sea mask dont match')
+
+  
+    
+    pi_precip_lat_ann=np.nanmean(pi_precip_ann,axis=1)
+    print('new shape pi',np.shape(pi_precip_lat_ann))
+
+    mp.rcParams.update({'font.size':15})
+    if HadCM3 == 'y':
+        labelwrite='HadCM3_PI'
+    else:
+        labelwrite='HadGEM2_PI'
+    if land_ocn_ind =='l':
+        labelwrite=labelwrite+'_land_'
+    if land_ocn_ind =='o':
+        labelwrite=labelwrite+'_ocean_'
+    if land_ocn_ind =='b':
+        labelwrite=labelwrite+'_land_ocean_'
+
+    valmin=0.
+    valmax=10.
+    if land_ocn_ind == 'l':
+        valmax=9.
+    print('pi precip lat',pi_precip_lat_ann*60.*60.*24.)    
+    plt.plot(pi_precip_lat_ann*60.*60.*24.,lat,'g')
+    plt.plot([valmin,valmax],[-14,-14])
+    plt.plot([valmin,valmax],[-12,-12])
+    plt.plot([valmin,valmax],[-10,-10])
+    plt.plot([valmin,valmax],[-8,-8])
+    plt.plot([valmin,valmax],[-6,-6])
+    plt.plot([valmin,valmax],[-4,-4])
+    plt.plot([valmin,valmax],[-2,-2])
+    plt.plot([valmin,valmax],[0,0])
+    plt.plot([valmin,valmax],[14,14])
+    plt.plot([valmin,valmax],[12,12])
+    plt.plot([valmin,valmax],[10,10])
+    plt.plot([valmin,valmax],[8,8])
+    plt.plot([valmin,valmax],[6,6])
+    plt.plot([valmin,valmax],[4,4])
+    plt.plot([valmin,valmax],[2,2])
+
+    plt.xlabel('mm/day',fontsize=20)
+    plt.ylabel('latitude',fontsize=20)
+    axes=plt.gca()
+    axes.set_ylim([-30,15])
+    axes.set_xlim([valmin,valmax])
+    plt.title(labelwrite+season,loc='left',fontsize=25)
+
+
+
+    
+     #==============
+     # Pliocene
+
+    if HadCM3 == 'y':
+        if season == 'ann':
+            if moses2=='y':
+                f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[5-9]*.nc')
+            else:
+                f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*.nc')    
+        else:
+            if moses2=='y':
+                filebase='/nfs/hera1/earjcti/um/netcdf/xibol_netcdf/xibola@pdy[5-9]*%s.nc'
+            else:
+                filebase='/nfs/hera1/earjcti/um/netcdf/xgrac_netcdf/pdfiles/xgraca@pdt[7-9]*%s.nc'
+            filenames=(filebase % [m1,m2,m3])
+            print('filenames are',filenames)
+            f=MFDataset(filenames)
+
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        aprecip=f.variables['precip'][:]
+
+    else:
+        if season == 'ann':
+            f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjf/precip_data/xkvjfa@pdn[5-9]*_precip.nc')
+        else:
+            filebase='/nfs/hera1/earjcti/um/HadGEM_data/xkvjf/precip_data/xkvjfa@pdn[5-9]*%s_precip.nc'
+            filenames=(filebase % [m1,m2,m3])
+            print('filenames are',filenames)
+            f=MFDataset(filenames)
+
+        aprecip=f.variables['precip_1'][:]
+
+    f.close()
+    aprecip=np.squeeze(aprecip)
+    ntimes,ny,nx=np.shape(aprecip)
+
+    plio_precip_ann=np.mean(aprecip,axis=0)
+
+
+    if land_ocn_ind == 'l': # mask out all non land points.
+        if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+            plio_precip_ann=plio_precip_ann / (lsm)
+            plio_precip_ann[plio_precip_ann == float('Inf')] = float('NaN')
+        else:
+            print('error lon/lat of land sea mask dont match')
+
+    if land_ocn_ind == 'o': # mask out all non ocean points.
+        if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+            plio_precip_ann=plio_precip_ann / (np.abs(lsm-1.0))
+            plio_precip_ann[plio_precip_ann == float('Inf')] = float('NaN')
+        else:
+            print('error lon/lat of land sea mask dont match')
+
+
+    plio_precip_lat_ann=np.nanmean(plio_precip_ann,axis=1)
+
+
+    if HadCM3 == 'y':
+        plt.plot(plio_precip_lat_ann*60.*60.*24.,lat,'r')
+        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_'+labelwrite+season+'.eps' 
+        plt.savefig(fileout, bbox_inches='tight')  
+        plt.close()
+        
+
+     #==============
+     # Pliocene+2
+
+    if HadCM3 != 'y':
+        # read in data from multiple files
+        if season == 'ann':
+            f=MFDataset('/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/precip_data/xkvjga@pdn[5-9]*.nc')
+        else:
+            filebase='/nfs/hera1/earjcti/um/HadGEM_data/xkvjg/precip_data/xkvjga@pdn[5-9]*%s_precip.nc'
+            filenames=(filebase % [m1,m2,m3])
+            print('filenames are',filenames)
+            f=MFDataset(filenames)
+
+        aprecip=f.variables['precip_1'][:]
+        aprecip=np.squeeze(aprecip)
+        ntimes,ny,nx=np.shape(aprecip)
+        print(ntimes,ny,nx)
+        
+    #average across the time dimension
+        plio_precipp2_ann=np.mean(aprecip,axis=0)
+        if land_ocn_ind == 'l': # mask out all non land points.
+            if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+                plio_precipp2_ann=plio_precipp2_ann / (lsm)
+                plio_precipp2_ann[plio_precipp2_ann == float('Inf')] = float('NaN')
+            
+            else:
+                print('error lon/lat of land sea mask dont match')
+
+        if land_ocn_ind == 'o': # mask out all non ocean points.
+            if (np.array_equal(lsmlon,lon)) and (np.array_equal(lsmlat,lat)):
+                plio_precipp2_ann=plio_precipp2_ann / (np.abs(lsm-1.0))
+                plio_precipp2_ann[plio_precipp2_ann == float('Inf')] = float('NaN')
+
+            else:
+                print('error lon/lat of land sea mask dont match')
+
+
+        plio_precipp2_lat_ann=np.nanmean(plio_precipp2_ann,axis=1)
+        f.close()
+
+        if HadCM3 == 'n':
+            plt.plot(plio_precipp2_lat_ann*60.*60.*24.,lat,'r')
+            fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/MAP_'+labelwrite+season+'.eps' 
+            plt.savefig(fileout, bbox_inches='tight')  
+            plt.close()
+
+
+
+    # Pliocene - preindustrial
+
+    if abs_pcent == 'a':
+        plio_anom=(plio_precip_lat_ann-pi_precip_lat_ann)* 60. *  60. *24.
+    if abs_pcent == 'p':
+        plio_anom=(plio_precip_lat_ann-pi_precip_lat_ann)/ pi_precip_lat_ann
+        plio_anom=plio_anom * 100.
+
+    # Pliocene+2 - preindustrial
+
+    if HadCM3 != 'y':
+        if abs_pcent == 'a':
+          pliop2_anom=(plio_precipp2_lat_ann-pi_precip_lat_ann)* 60.*  60. *24.
+        if abs_pcent == 'p':
+          pliop2_anom=(plio_precipp2_lat_ann-pi_precip_lat_ann)/ pi_precip_lat_ann
+          pliop2_anom=pliop2_anom * 100.
+
+
+
+    if HadCM3 == 'y':
+        allanom=[lat,plio_anom]
+        return allanom
+    else:
+        allanom=[lat,plio_anom,pliop2_anom]
+        return allanom
+    
+    
+
+
+
+#end def precip_chg_by_latitude
+
+#############################################
+def nh_allseasons(HadMC3,moses2):
+    if HadCM3=='n':
+        plio_expt='xkvjg'
+    else:
+        plio_expt='HadCM3'+moses2
+
+    # getdata for all seasons in nh we are going to put it on a nice figure
+    retdata=seasmean_get('dc','ja','fb',figureno,'djf',HadCM3,moses2,'precip')
+    lon=retdata[0]
+    lat=retdata[1]
+    pi_djf=retdata[2]
+    plio_djf=retdata[3]
+
+    mask_ind='n' # northernhemisphere
+    plotmap_nh(plio_djf-pi_djf,plio_djf,pi_djf,0,lon,lat,'DJF',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,12,0,0,9,2)
+   
+    retdata=seasmean_get('mr','ar','my',figureno,'mam',HadCM3,moses2,'precip')
+    pi_mam=retdata[2]
+    plio_mam=retdata[3]
+    plotmap_nh(plio_mam-pi_mam,plio_mam,pi_mam,1,lon,lat,'MAM',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,12,2,0,9,2)
+      
+ 
+    retdata=seasmean_get('jn','jl','ag',figureno,'jja',HadCM3,moses2,'precip')
+    pi_jja=retdata[2]
+    plio_jja=retdata[3]
+    plotmap_nh(plio_jja-pi_jja,plio_jja,pi_jja,2,lon,lat,'JJA',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,12,4,0,9,2)
+       
+
+    retdata=seasmean_get('sp','ot','nv',figureno,'son',HadCM3,moses2,'precip')
+    pi_son=retdata[2]
+    plio_son=retdata[3]
+    plotmap_nh(plio_son-pi_son,plio_son,pi_son,3,lon,lat,'SON',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,12,6,0,9,2)
+   
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/NH_'+plio_expt+'_allseasons.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/NH_'+plio_expt+'_allseasons.tiff' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+
+
+#enddef nh_allseasons
+
+def nh_allseasons_rainsnow(HadMC3,moses2):
+# plot rain and snow amount for all seasons
+    if HadCM3=='n':
+        plio_expt='xkvjg'
+    else:
+        plio_expt='HadCM3'+moses2
+
+    # getdata for all seasons in nh we are going to put it on a nice figure
+    retdata=seasmean_get('dc','ja','fb',figureno,'djf',HadCM3,moses2,'rain')
+    lon=retdata[0]
+    lat=retdata[1]
+    pi_djf_rain=retdata[2]
+    plio_djf_rain=retdata[3]
+    retdata=seasmean_get('dc','ja','fb',figureno,'djf',HadCM3,moses2,'snow')
+    pi_djf_snow=retdata[2]
+    plio_djf_snow=retdata[3]
+    
+
+    mask_ind='n' # northernhemisphere
+    plotmap_nh_rainsnow(plio_djf_rain-pi_djf_rain,plio_djf_snow-pi_djf_snow,0,lon,lat,'DJF',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,11,0,0,5,2)
+   
+    retdata=seasmean_get('mr','ar','my',figureno,'mam',HadCM3,moses2,'rain')
+    pi_mam_rain=retdata[2]
+    plio_mam_rain=retdata[3]
+    retdata=seasmean_get('mr','ar','my',figureno,'mam',HadCM3,moses2,'snow')
+    pi_mam_snow=retdata[2]
+    plio_mam_snow=retdata[3]
+    plotmap_nh_rainsnow(plio_mam_rain-pi_mam_rain,plio_mam_snow-pi_mam_snow,1,lon,lat,'MAM',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,11,2,0,5,2)
+      
+ 
+    retdata=seasmean_get('jn','jl','ag',figureno,'jja',HadCM3,moses2,'rain')
+    pi_jja_rain=retdata[2]
+    plio_jja_rain=retdata[3] 
+    retdata=seasmean_get('jn','jl','ag',figureno,'jja',HadCM3,moses2,'snow')
+    pi_jja_snow=retdata[2]
+    plio_jja_snow=retdata[3]
+    plotmap_nh_rainsnow(plio_jja_rain-pi_jja_rain,plio_jja_snow-pi_jja_snow,2,lon,lat,'JJA',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,11,4,0,5,2)
+       
+
+    retdata=seasmean_get('sp','ot','nv',figureno,'son',HadCM3,moses2,'rain')
+    pi_son_rain=retdata[2]
+    plio_son_rain=retdata[3]
+    retdata=seasmean_get('sp','ot','nv',figureno,'son',HadCM3,moses2,'snow')
+    pi_son_snow=retdata[2]
+    plio_son_snow=retdata[3]
+    plotmap_nh_rainsnow(plio_son_rain-pi_son_rain,plio_son_snow-pi_son_snow,3,lon,lat,'SON',-1.0,1.1,0.1,0,'a','mm/day',mask_ind,10,11,6,0,5,2)
+   
+  
+   
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/NH_rainsnow_'+plio_expt+'_allseasons.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfprecip/NH_rainsnow'+plio_expt+'_allseasons.tiff' 
+    plt.savefig(fileout, bbox_inches='tight')  
+
+
+
+#enddef nh_allseasons_rainsnow
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+HadCM3='y'
+moses2='y'
+#plt.figure(figureno)
+annmean(figureno,HadCM3,moses2)
+#figureno=figureno+1
+
+#djf mean
+#plt.figure(figureno)
+#seasmean('dc','ja','fb',figureno,'djf',HadCM3,moses2)
+#figureno=figureno+1
+
+#mam mean
+#plt.figure(figureno)
+#seasmean('mr','ar','my',figureno,'mam',HadCM3,moses2)
+#figureno=figureno+1
+
+#jja mean
+#plt.figure(figureno)
+#seasmean('jn','jl','ag',figureno,'jja',HadCM3,moses2)
+#figureno=figureno+1
+
+#son mean
+#plt.figure(figureno)
+#seasmean('sp','ot','nv',figureno,'son',HadCM3,moses2)
+#figureno=figureno+1
+
+
+# just plot poleward of 30N for all seassons
+# ie all seasons on one page
+#nh_allseasons(HadCM3,moses2) # get precipitation
+#nh_allseasons_rainsnow(HadCM3,moses2) # get rainsnow
+
+
+
+# to see what the polar amplification is
+#HadCM3='y'
+#moses2='y'
+#season='ann'
+#land_ocn_ind='l'    # valid values are l - land , o- ocean b=both
+#abs_pcent='a'       # valid values are p - percentage chg, a=absolute change
+#precip_ret=precip_chg_by_latitude(HadCM3,land_ocn_ind,abs_pcent,season,moses2)
+#lats_HadCM3=precip_ret[0]
+#precip_anom_HadCM3=precip_ret[1]
+#plt.plot(precip_anom_HadCM3,lats_HadCM3)
+
+#moses2='n'
+#precip_ret=precip_chg_by_latitude(HadCM3,land_ocn_ind,abs_pcent,season,moses2)
+#lats_HadCM3=precip_ret[0]
+#precip_anom_HadCM3m1=precip_ret[1]
+
+
+#HadCM3='n'
+#precip_ret=precip_chg_by_latitude(HadCM3,land_ocn_ind,abs_pcent,season,moses2)
+#lats_HadGEM=precip_ret[0]
+#precip_anom_HadGEM=precip_ret[1]
+#precip_anom_HadGEMp2=precip_ret[2]
+
+#mp.rcParams.update({'font.size':15})
+#plt.plot(precip_anom_HadGEMp2,lats_HadGEM,'g',label='HadGEM2')
+#plt.plot(precip_anom_HadCM3,lats_HadCM3,'r',label='HadCM3')
+#plt.plot(precip_anom_HadCM3m1,lats_HadCM3,'b',label='HadCM3m1')
+#plt.plot(precip_anom_HadGEM,lats_HadGEM,'b')
+
+#if abs_pcent == 'a':
+#    plt.xlabel('mm/day',fontsize=20)
+#if abs_pcent == 'p':
+#    plt.xlabel('%',fontsize=20)
+#plt.ylabel('latitude',fontsize=20)
+
+#if land_ocn_ind =='l':
+#    plt.title('f) mPWP - preind land precip anom '+season,loc='left',fontsize=2#5)
+#if land_ocn_ind =='o':
+#    plt.title('g) mPWP - preind ocean precip anom '+season,loc='left',fontsize=#25)
+#if land_ocn_ind =='b':
+#    plt.title('e) mPWP - preind precip anom '+season,loc='left',fontsize=25)
+#axes=plt.gca()
+#if abs_pcent == 'p':
+#    axes.set_xlim(xmin=-20.0,xmax=100.0)
+#axes.set_ylim([-80,80])
+#legend=plt.legend()
+#if land_ocn_ind =='l':
+#    if abs_pcent =='a':
+#        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfpre#cip/MAP_polar_amp_land_'+season+'.eps' 
+#    if abs_pcent =='p':
+#        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfpre#cip/MAP_polar_amp_land_pcent_'+season+'.eps' 
+#if land_ocn_ind =='o':
+#    if abs_pcent =='a':
+#        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfpre#cip/MAP_polar_amp_ocean_'+season+'.eps' 
+#    if abs_pcent =='p':
+#        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfpre#cip/MAP_polar_amp_ocean_pcent_'+season+'.eps' 
+
+#print(land_ocn_ind,abs_pcent)
+#if land_ocn_ind =='b':
+#    if abs_pcent == 'a':
+#        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfpre#cip/MAP_polar_amp_'+season+'.eps' 
+#    if abs_pcent == 'p':
+#        fileout='/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/HadGEM2/plot_surfpre#cip/MAP_polar_amp_'+season+'.eps' 
+#plt.savefig(fileout, bbox_inches='tight')  
+
+
+
+sys.exit(0)
+
+####
+

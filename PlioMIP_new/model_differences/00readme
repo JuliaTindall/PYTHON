@@ -1,0 +1,6 @@
+This directory will compare the models with each other.  
+
+In particular it will be comparing HadCM3_new_(parameters) with HadCM3 (parameters that were in use at the time of PlioMIP2).  
+
+
+Some of the programs are based on those in other directories but plot HadCM3_new and HadCM3_original

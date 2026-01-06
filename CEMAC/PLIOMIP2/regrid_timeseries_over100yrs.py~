@@ -1,0 +1,1252 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on July 21 2020
+
+#
+# This program will produce a regridded 1X1degree timeseries of a given field.  
+# We will remove the annual cycle in order to look for interannual variability 
+# etc.  
+
+
+import numpy as np
+from netCDF4 import Dataset
+import iris
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import iris.analysis.cartography
+import iris.coord_categorisation
+from iris.cube import CubeList
+import cf_units as unit
+import sys
+#import os
+
+###################################################
+# get all data from files as a single cube
+##################################################
+def get_ecearth_cube(exptname, lsmstart):
+    """
+    get's the datacube from ecearth
+    (it is in multiple files)
+    """
+    allcubes = iris.load(filename)
+    iris.util.equalise_attributes(allcubes)
+    iris.util.unify_time_units(allcubes)
+    cubes = allcubes.concatenate_cube()
+    print(filename)
+    print(allcubes)
+    print(cubes)
+    sys.exit(0)
+    ncubes = len(allcube)
+    for i in range(0, ncubes):
+        if allcube[i].var_name == fielduse:
+            cube = allcube[i]
+    if fielduse == "sst":
+        if exptname == 'Eoi400':
+            #lsmfile = lsmstart+modelname+'/lsm_plio_new.nc'
+            lsmfile = lsmstart+modelname+'/EC-Earth3.3_mPlio_LSM.nc'
+        if exptname == 'E280':
+            #lsmfile = lsmstart+modelname+'/lsm.nc'
+            lsmfile = lsmstart+modelname+'/EC-Earth3.3_PI_LSM.nc'
+
+        lsmcube = iris.load(lsmfile)
+        #  qiong has said to take >0.5 as land and >0.5 as sea
+
+        nt, nx, ny = np.shape(cube.data)
+        mymask_2d = lsmcube[0].data
+        mymask_2d = np.where(mymask_2d > 0.5, 1.0, 0.0)
+        mymask = np.vstack([mymask_2d] * nt)
+
+
+        cube.data = np.ma.array(cube.data, mask=mymask)
+    return cube
+
+def get_hadcm3_cube(model):
+    """
+    get's the datacube from hadcm3 or mri-cgcm2.3
+    """
+    allcubes = iris.cube.CubeList([])
+    if model == 'MRI2.3':
+        startyear = STARTYEAR+1
+        endyear = ENDYEAR+1
+
+    for i in range(STARTYEAR, ENDYEAR):
+        yearuse = str(i).zfill(3)
+        filenameuse = (filename+yearuse+'.nc')
+        cubetemp = iris.load_cube(filenameuse)
+     
+        u = unit.Unit('days since 0800-01-01 00:00:00',
+                      calendar=unit.CALENDAR_360_DAY)
+        if model == 'HadCM3':
+            cubetemp.coord('t').rename('time')
+        cubetemp.coord('time').points = (np.arange(0, 12)+((i-STARTYEAR)*12))*30.
+
+        cubetemp.coord('time').units = u
+
+        allcubes.append(cubetemp)
+
+
+    iris.util.equalise_attributes(allcubes)
+    cube_temp = allcubes.concatenate_cube()
+
+    if model == 'MRI2.3':
+        cube_temp.coord('pressure level').rename('surface')
+
+    if model == 'HadCM3' and fielduse == 'SST':
+        cube_temp.coord('unspecified').rename('surface')
+
+    if model == 'HadCM3' and fielduse == 'NearSurfaceTemperature':
+        cube_temp.coord('ht').rename('surface')
+
+    if model == 'HadCM3' and fielduse == 'MSLP':
+        cube_temp.coord('msl').rename('surface')
+
+
+    cube_temp.coord('surface').points = 0.
+    cube = cube_temp.extract(iris.Constraint(surface=0.))
+   
+    return cube
+
+def get_noresm_ocn(exptnamein, fieldnamein):
+    """
+    get noresm ocean things one file per month
+
+    """
+    months = ['01','02','03','04','05','06','07','08','09','10','11','12']
+    fileend = '.nc'
+   
+    
+    if exptnamein == 'Eoi400' and modelname == 'NorESM1-F': 
+        startyear = 2400
+        endyear = 2500
+    if exptnamein == 'E280' and modelname == 'NorESM1-F': 
+        startyear = 1900
+        endyear = 2000
+    if exptnamein == 'E280' and modelname == 'NorESM-L': 
+        startyear = 2100
+        endyear = 2200
+    if exptnamein == 'Eoi400' and modelname == 'NorESM-L': 
+        startyear = 1002
+        endyear = 1200
+  
+    allcubes = iris.cube.CubeList([])
+   
+    for year in range(startyear, endyear):
+        for i, mon in enumerate(months):
+            file = filename + np.str(year) + '-' + mon + fileend
+            cubetemp = iris.load_cube(file, 'Ocean surface temperature')
+            allcubes.append(cubetemp)
+       
+    iris.util.equalise_attributes(allcubes)
+
+    cube = allcubes.concatenate_cube()
+    print(cube)
+  
+  
+    return cube
+
+def get_ipslcm5_atm(exptname, fieldnamein):
+    """
+      get data from the atmospheric files in ipslcm5
+
+      there is a bit of an error in the file calendar so we will
+    """
+    # copy the data to a new file but without the error
+    with Dataset(filename) as src, Dataset("temporary.nc", "w", format='NETCDF3_CLASSIC') as dst:
+        # copy attributes
+        for name in src.ncattrs():
+            dst.setncattr(name, src.getncattr(name))
+        # copy dimensions
+        print(src.dimensions)
+        #for name,  dimension in src.dimensions.iteritems():
+        for name, dimension in src.dimensions.items():
+
+            if name != 'tbnds':   # don't copy across time counter bounds
+                dst.createDimension(name, (len(dimension)))
+
+        # copy all file data
+        for name, variable in src.variables.items():
+            print('name is', name, variable)
+            if name not in ('time_counter_bnds', 'time_centered'):
+                x = dst.createVariable(name, variable.datatype,
+                                       variable.dimensions)
+                if name == 'time_counter':
+                    # convert from seconds to days and start at middle of month
+                    dst.variables[name][:] = ((src.variables[name][:] / (60.*60.*24))
+                                              -(src.variables[name][0] / (60.*60.*24)) + 15.)
+                else:
+                    dst.variables[name][:] = src.variables[name][:]
+                # copy attributes for this variable
+                for ncattr in src.variables[name].ncattrs():
+                    attribute = src.variables[name].getncattr(ncattr)
+                    print(ncattr, exptname)
+                    if ncattr == 'calendar' and exptname == 'Eoi400':
+                        dst.variables[name].setncattr(ncattr, '360_day')
+                    else:
+                        if (ncattr == 'units' and name == 'time_counter'):
+                    # change units from seconds to days
+                            dst.variables[name].setncattr(ncattr, attribute.replace('seconds', 'days'))
+                        else:
+                            dst.variables[name].setncattr(ncattr, attribute)
+
+        fieldreq = fieldnamein
+        if fieldnamein == 'pr':
+            fieldreq = 'Precip Totale liq+sol'
+        if fieldnamein == 'tas':
+            fieldreq = 'Temperature 2m'
+
+
+        cube = iris.load_cube('temporary.nc', fieldreq)
+
+        if fieldnamein in ('ts', 'tas'):
+            cube.convert_units('Celsius')
+
+        if exptname == 'Eoi400':
+            u = unit.Unit('days since 0800-01-01 00:00:00',
+                          calendar=unit.CALENDAR_360_DAY)
+        else:
+            u = unit.Unit('days since 0800-01-01 00:00:00',
+                          calendar=unit.CALENDAR_365_DAY)
+        cube.coord('time').units = u
+
+        return cube
+
+def get_ipslcm6():
+    """
+    get ipslcm6 data
+    """
+    cubeall = iris.load_cube(filename)
+    print(cubeall)
+    sys.exit(0)
+
+    cubelist = iris.cube.CubeList([])
+    for i, t_slice in enumerate(cubeall.slices(['latitude', 'longitude'])):
+        if i >= 1200:
+            t_slice.coord('time').bounds = None
+            t_slice2 = iris.util.new_axis(t_slice, 'time')
+            cubelist.append(t_slice2)
+
+    cube = cubelist.concatenate_cube()
+    return cube
+
+def get_miroc_tos():
+    """
+    get miroc data
+    """
+    cube = iris.load_cube(filename)
+
+    # MIROC didn't have the units set up correctly for 'tos'
+    cube.coord('latitude').units = 'degrees'
+    cube.coord('longitude').units = 'degrees'
+    return cube
+
+def get_HadGEM3():
+    """
+    here there is one file per month containing the data
+    """
+    months = ['01','02','03','04','05','06','07','08','09','10','11','12']
+    filemid = 'o_1m_'
+    fileend = '_grid-T.nc'
+   
+    # eoi400
+    #startyear = 2334
+    #endyear = 2434
+
+    #e280
+    startyear=1950
+    endyear = 2050
+    #endyear=2050
+
+    allcubes = iris.cube.CubeList([])
+   
+    for year in range(startyear, endyear):
+        # eoi400
+        #if year < 2394: 
+        #   extra = 'v963'
+        #else:
+        #    extra = 'x150'
+        #e280
+        extra='q637'
+        for i, mon in enumerate(months):
+            datestart = np.str(year) + mon + '01-'
+            if i == 11:
+                daterange = datestart + np.str(year+1) + months[0] + '01'
+            else:
+                daterange = datestart + np.str(year) + months[i+1] + '01'
+            file = filename + extra + filemid + daterange + fileend
+            print(file, fieldname)
+            
+            cubetemp = iris.load(file)
+            cubetemp = iris.load_cube(file, fielduse)
+            u = unit.Unit('days since 0800-01-01 00:00:00',
+                  calendar=unit.CALENDAR_360_DAY) # put as 360 day calendar
+            cubetemp.coord('time').attributes = None
+            cubetemp.coord('time').points = ((i+((year-startyear)*12))*30.)+15.
+            cubetemp.coord('time').units = u
+            allcubes.append(cubetemp)
+       
+    iris.util.equalise_attributes(allcubes)
+    cube = allcubes.concatenate_cube()
+    print(cube.coord('time').points)
+
+    return cube
+
+
+
+def get_ccsm4_2deg():
+    """
+    get ccsm4_2deg utrecht data
+    """
+
+    allcube = iris.load(filename)
+    ncubes = len(allcube)
+    for i in range(0, ncubes):
+        if allcube[i].var_name == fielduse:
+            cube = allcube[i]
+        if allcube[i].var_name == 'lat':
+            latcube2d = allcube[i]
+            latcube = latcube2d[:,0]
+        if allcube[i].var_name == 'lon':
+            loncube2d = allcube[i]
+            loncube = loncube2d[0,:]
+  
+    # put units as celcius if required
+    if fielduse == 'tas':
+        cube.units = 'Celsius'
+
+    # needed for 200 years
+  
+    cube.add_dim_coord(iris.coords.DimCoord(latcube.data,
+                       standard_name='latitude', long_name='latitude',
+                       var_name='latitude',units='degrees', bounds=None,
+                       coord_system='GeogCS', circular=False), 1)
+    londata = loncube.data
+    londatause = np.where(londata > 320.0, londata-360.0, londata)
+    print(londatause)
+    cube.add_dim_coord(iris.coords.DimCoord(londatause,
+                       standard_name='longitude', long_name='longitude',
+                       var_name='longitude',units='degrees', bounds=None,
+                       coord_system='GeogCS', circular=True), 2)
+
+
+    return cube
+
+def get_ccsm4_uot(fieldnamein):
+    """
+    get Uof T cube (need to add a dimension)
+    if precip convert to mm/day
+    """
+
+    cube = iris.load_cube(filename)
+    points = (np.arange(0, 1200)*30)+15. # go for middle of month
+    u = unit.Unit('days since 0800-01-01 00:00:00',
+                  calendar=unit.CALENDAR_360_DAY) # put as 360 day calendar because of the way
+                                               # the data was sent.
+
+    cube.add_dim_coord(iris.coords.DimCoord(points,
+                                            standard_name='time', long_name='time',
+                                            var_name='time',
+                                            units=u,
+                                            bounds=None,
+                                            coord_system=None, circular=False), 0)
+
+    if fieldnamein == 'pr':
+        cube.data = cube.data * 60. *60. *24. *1000.
+        cube.name = 'Total precipitation'
+        cube.long_name = 'Total precipitation'
+        cube.units = 'mm/day'
+
+
+    return cube
+
+def get_cesm12_singlecube(filename_, fielduse_):
+    """
+    get a single cube from a single file
+    this is needed because total precipitation is the sum of two cubes
+    """
+    allcube = iris.load(filename_)
+    ncubes = len(allcube)
+    for i in range(0, ncubes):
+        if allcube[i].var_name == fielduse_:
+            singlecube = allcube[i]
+
+    return singlecube
+
+def get_cesm12(exptnamein):
+    """
+    get cesm1.2 data
+    """
+    fileends = ['050101-055012.nc','055101-060012.nc', 
+                '060101-065012.nc','065101-065812.nc', 
+                '065901-070812.nc','070901-075812.nc', 
+                '075901-077812.nc','077901-079812.nc', 
+                '079901-080612.nc']#preind
+    #fileends = ['050101-055012.nc','055101-059912.nc',  # pliocene
+    #            '060001-064912.nc','065001-069912.nc', 
+    #            '070001-074912.nc','075001-079912.nc', 
+    #            '080001-084912.nc','085001-089912.nc', 
+    #            '090001-094912.nc','095001-099912.nc', 
+    #            '100001-104912.nc','105001-109912.nc']
+
+
+    if type(fielduse) is list: # perhaps a list containing large scale and convective precip
+                               # that need to be added together for total precipitaiton
+        cube1list = CubeList([])
+        cube2list = CubeList([])
+        for end in fileends:
+
+            filename1 = filename[0] + end
+            cube = get_cesm12_singlecube(filename1, fielduse[0])
+            cube1list.append(cube)
+
+            filename2 = filename[1] + end
+            cube = get_cesm12_singlecube(filename2,fielduse[1])
+            cube2list.append(cube)
+        iris.util.equalise_attributes(cube1list)
+        iris.util.equalise_attributes(cube2list)
+        iris.util.unify_time_units(cube1list)
+        iris.util.unify_time_units(cube2list)
+        cube1 = cube1list.concatenate_cube()
+        cube2 = cube2list.concatenate_cube()
+        if fieldnameout == 'TotalPrecipitation':
+            cube = cube1 + cube2
+        if fieldnameout == 'SST':
+           # mask temperature (cube1) by ice fraction (cube2)
+            cube1.convert_units('Celsius')
+            cubedata = np.where((cube2.data > 0.01),
+                                -1.8, cube1.data)
+            cube = cube1.copy(data=cubedata)
+    else:
+        cube = get_cesm12_singlecube(filename, fielduse)
+
+    # put units as celcius if required
+    if fielduse == 'TREFHT':
+        cube.convert_units('Celsius')
+
+    if fieldnameout == 'SST':
+        # we need to mask out the land
+        if exptnamein == 'Eoi400':
+            filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' +
+                           'b40.B1850.f09_g16.PMIP4-pliomip2.' +
+                           'LANDFRAC.1001.1100.nc')
+        if exptnamein == 'E280':
+            filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' +
+                       'b.e12.B1850.f09_g16.preind.' +
+                       'cam.h0.LANDFRAC.0701.0800.nc')
+        lsmcube = get_cesm12_singlecube(filelsm, 'LANDFRAC')
+
+        nt, nx, ny = np.shape(cube.data)
+        mymask_2d = lsmcube[0].data
+        mymask_2d = np.where(mymask_2d > 0.01, 1.0, 0.0)
+        mymask = np.vstack([mymask_2d] * nt)
+
+        cube.data = np.ma.array(cube.data, mask=mymask)
+
+
+    return cube
+
+
+def get_cesm2(exptnamein):
+    """
+    get cesm2 data
+    """
+
+    fileends = ['050101-055012.nc','055101-060012.nc', 
+                '060101-065012.nc','065101-070012.nc', 
+                '070101-075012.nc','075101-080012.nc', 
+                '080101-085012.nc','085101-090012.nc', 
+                '090101-095012.nc','095101-100012.nc', 
+                '100101-105012.nc','105101-110012.nc', 
+                '110101-115012.nc','115101-120012.nc']
+
+
+    if type(fielduse) is list: # perhaps a list containing large scale and convective precip
+                               # that need to be added together for total precipitaiton
+        cube1list = CubeList([])
+        cube2list = CubeList([])
+        for end in fileends:
+
+            filename1 = filename[0] + end
+            cube = get_cesm12_singlecube(filename1, fielduse[0])
+            cube1list.append(cube)
+
+            filename2 = filename[1] + end
+            cube = get_cesm12_singlecube(filename2,fielduse[1])
+            cube2list.append(cube)
+        iris.util.equalise_attributes(cube1list)
+        iris.util.equalise_attributes(cube2list)
+        cube1 = cube1list.concatenate_cube()
+        cube2 = cube2list.concatenate_cube()
+        if fieldnameout == 'TotalPrecipitation':
+            cube = cube1 + cube2
+        if fieldnameout == 'SST':
+           # mask temperature (cube1) by ice fraction (cube2)
+            cube1.convert_units('Celsius')
+            cubedata = np.where((cube2.data > 0.01),
+                                -1.8, cube1.data)
+            cube = cube1.copy(data=cubedata)
+    else:
+        cube = get_cesm12_singlecube(filename, fielduse)
+
+    # put units as celcius if required
+    if fielduse == 'TREFHT':
+        cube.convert_units('Celsius')
+
+    if fieldnameout == 'SST':
+        # we need to mask out the land
+        if exptnamein == 'Eoi400':
+            filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' +
+                           'b.e21.B1850.f09_g17.' +
+                           'PMIP4-midPliocene-eoi400.001.'+
+                           'cam.h0.LANDFRAC.1101.1200.nc')
+            
+        if exptnamein == 'E280':
+            #if modelname == 'CESM2':
+            #    filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' +
+           #                'b.e21.B1850.f09_g17.' +
+           #                'CMIP6-piControl.001.cam.h0.'+
+           #                'LANDFRAC.1300.1399.nc')
+           # else:
+            filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' +
+                       'b.e12.B1850.f09_g16.preind.' +
+                       'cam.h0.LANDFRAC.0701.0800.nc')
+        lsmcube = get_cesm12_singlecube(filelsm, 'LANDFRAC')
+
+        nt, nx, ny = np.shape(cube.data)
+        mymask_2d = lsmcube[0].data
+        mymask_2d = np.where(mymask_2d > 0.01, 1.0, 0.0)
+        mymask = np.vstack([mymask_2d] * nt)
+
+        cube.data = np.ma.array(cube.data, mask=mymask)
+
+    return cube
+
+
+
+######################################################
+def correct_start_month(cube):
+    """
+    parameters: cube
+    returns: the same cube
+
+    if month doesn't start on january we will have to change some of the
+    years from the end to match those at the start to give 100 full years
+
+
+    """
+    print(modelname, fielduse)
+    if (modelname in ('CCSM4', 'CESM1.2',  # have added noresm in here 
+                     'CESM2') or           # for PSL because midnight
+        (modelname == 'NorESM-L' and fielduse=='PSL')): 
+                                           # on 1st feb is end of the
+                                           # month so the month must
+                                           # be January
+        print('CCSM',cube.coord('month').points)
+        months = cube.coord('month').points
+        months = months -1
+        for i, month in enumerate(months):
+            if month == 0: months[i] = 12
+        print(months)
+        cube.coord('month').points = months
+ 
+    else:
+        startyear = (cube.coord('year').points[0])
+        endyear = (cube.coord('year').points[-1])
+        # count the number of months that have the same year as the first index
+        nstart = 0
+        nend = 0
+        for i in range(0, 12):
+            if cube.coord('year').points[i] == startyear:
+                nstart = nstart+1
+        for i in range(-13, 0):
+            if cube.coord('year').points[i] == endyear:
+                nend = nend+1
+        if nend != 12 or nstart != 12:
+        # oops we don't have a full year at the start and the end
+        # check to see whether we can aggregate into one year
+            print(nend,nstart)
+            if nend + nstart == 12:
+                for i in range(-1 * nend, 0):
+                # move the last few to the start of the cube
+                    cube.coord('year').points[i] = startyear
+
+
+                else:
+
+                    print('you have a partial year somewhere')
+                    print('correct input data to provide full years')
+                    print(nend, nstart)
+                    sys.exit(0)
+
+
+    return cube
+
+######################################################
+def cube_avg(cube):
+    """
+    Extract monthly averaged data from a cube
+
+    Parameters:
+    cube (iris cube): A cube with montly data that we average
+
+    Returns:
+    meanmonthcube (iris cube): the input cube averaged over each of the 12 calendar months
+
+    """
+
+    meanmonthcube = cube.aggregated_by('month', iris.analysis.MEAN)
+
+    meanmonthcube.long_name = fieldnameout
+
+    print(meanmonthcube)
+    iris.util.promote_aux_coord_to_dim_coord(meanmonthcube, 'month')
+
+    return meanmonthcube
+
+
+def remove_ann_cycle(cube, mon_avg_cube):
+    """
+    removes the annual cycle stored in mon_avg_cube from cube
+    """
+
+    cubedata = cube.data
+
+    mon_data =np.zeros(np.shape(mon_avg_cube.data))
+    for monthno in range(1,13):
+        print('month is',monthno,mon_avg_cube.coord('month').points)
+        moncube = mon_avg_cube.extract(iris.Constraint(month=monthno))
+        mon_data[monthno-1,:,:]=moncube.data
+
+ 
+    for i, monthno in enumerate(cube.coord('month').points):
+        print('i',i)
+        cubedata[i, :, :] = cubedata[i, :, :] - mon_data[monthno-1,:,:]
+
+
+    timeseries_cube = cube.copy(data=cubedata)
+
+    return timeseries_cube
+
+
+##############################################
+def regrid_data(fieldnamein, exptnamein):
+    """
+    regrid the data
+    """
+
+    # outfile
+    if linux_win == 'l':
+        print(modelname,exptnameout,fieldnameout,np.str(STARTYEAR),np.str(ENDYEAR))
+        outstart = ('/nfs/hera1/earjcti/regridded/' + modelname +
+                    '/timeseries/' + exptnameout + '.' + fieldnameout + '.')
+        lsmstart = '/nfs/hera1/earjcti/regridded/'
+    else:
+        outstart = ('C:\\Users\\julia\\OneDrive\\WORK\\DATA\\regridded\\'
+                    + modelname + '\\timeseries\\' + exptnameout 
+                    + '.' + fieldnameout + '.')
+        lsmstart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+
+    #####################################
+    # get all data in a single cube
+    if modelname in ('EC-Earth3.1', 'EC-Earth3.3'): # all fields in one file
+        cube = get_ecearth_cube(exptnamein, lsmstart)
+    elif modelname in ('HadCM3', 'MRI2.3'):
+        cube = get_hadcm3_cube(modelname)
+    elif modelname in ('IPSLCM5A', 'IPSLCM5A2') and fieldnamein != 'tos':
+        cube = get_ipslcm5_atm(exptnamein, fieldnamein)
+    elif modelname in ('NorESM1-F', 'NorESM-L') and fieldnamein == 'tos':
+        cube = get_noresm_ocn(exptnamein, fieldnamein)
+    elif modelname in ('MIROC4m', 'tos'):
+        cube = get_miroc_tos()
+    elif modelname == 'GISS2.1G':
+        cube = get_giss()
+    #elif modelname == 'CCSM4-Utr':
+    #    cube = get_ccsm4_2deg()
+    elif modelname in ('CESM1.2', 'CCSM4'):
+        cube = get_cesm12(exptnamein)
+    elif modelname in ('CESM2'):
+        cube = get_cesm2(exptnamein)
+    elif (modelname == 'CCSM4-UoT'):
+        cube = get_ccsm4_uot(fieldnamein)
+    elif (modelname == 'HadGEM3'):
+        cube = get_HadGEM3()  
+    else:
+        cube = iris.load_cube(filename)
+
+   
+    # now regrid the cube onto a 1X1 grid (we will first try regridding the raw data)
+    # we have stored the grid we want in a file 'one_lev_one_deg.nc'
+
+    # do not need to regrid CCSM4_UoTdata or a field that was originally on a tripolar grid
+    print('about to regrid')
+    if ((modelname == 'CCSM4-UoT')
+            or (modelname == 'IPSLCM5A' and fieldnamein == 'tos')
+            or (modelname == 'IPSLCM5A2' and fieldnamein == 'tos')
+            or (modelname == 'IPSLCM6A' and fieldnamein == 'tos')
+            or (modelname == 'COSMOS')):
+        regridded_cube = cube
+    else:
+        cubegrid = iris.load_cube('one_lev_one_deg.nc')
+        regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
+    print('regridded',regridded_cube)
+  
+    refdate = 'days since 0800-01-01 00:00:00'
+
+    # for cosmos
+#    if modelname == 'COSMOS':
+#        # cosmos data is in a strange time coordinate line yyyymmdd
+#        # we need to convert it to days since reference time
+#        origpoints = regridded_cube.coord('time').points
+#        npoints = len(origpoints)
+#        yeararr = np.zeros(npoints)
+#        montharr = np.zeros(npoints)
+#        dayarr = np.zeros(npoints)
+#        daydecimal = np.zeros(npoints)
+#        dayssinceref = np.zeros(npoints)
+#       for i in range(0, npoints):
+#            origstr = str(origpoints[i])
+#            print(origpoints,origstr)
+#            yeararr[i] = origstr[:][0:4]
+#            montharr[i] = origstr[:][4:6]
+#            dayarr[i] = origstr[:][6:8]
+#            daydecimal[i] = origstr[:][8:]
+#            dayssinceref[i] = dayssinceref[i-1]+dayarr[i]+daydecimal[i]-daydecimal[i-1]
+        # subtract 1 from days since reference date (as reference date will be 1st Jan)#
+#        dayssinceref = dayssinceref-1
+
+
+#        regridded_cube.coord('time').points = dayssinceref
+
+            
+          
+
+        #  end of COSMOS loop
+
+    # for EC-Earth3.1
+    if modelname == 'EC-Earth3.1':
+    # convert from hours to days
+        origpoints = regridded_cube.coord('time').points
+        newpoints = origpoints/24.
+        regridded_cube.coord('time').points = newpoints
+        refdate = 'days since 2390-01-01 00:00:00'
+
+
+    # regrid to mm/day from kg/m2/s if required
+    if modelname in ('EC-Earth3.1', 'EC-Earth3.3', 'IPSLCM5A',
+                     'IPSLCM5A2', 'IPSLCM6A', 'CCSM4-Utr', 'GISS2.1G'):
+        if fieldnamein == 'pr':
+            regridded_cube.data = regridded_cube.data * 60. *60. *24.
+            cube.data = cube.data* 60. *60. *24.
+            regridded_cube.name = 'Total precipitation'
+            regridded_cube.long_name = 'Total precipitation'
+            regridded_cube.units = 'mm/day'
+
+
+
+    if modelname in ('NorESM1-F', 'NorESM-L', 'CESM1.2', 'CESM2', 'CCSM4'):
+
+       # if precipitation is in m/s convert to mm/day
+        if fieldnamein == 'pr':
+            regridded_cube.data = regridded_cube.data * 60. * 60. * 24. * 1000.
+            cube.data = cube.data * 60. * 60. * 24. * 1000.
+            regridded_cube.name = 'Total precipitation'
+            regridded_cube.long_name = 'Total precipitation'
+            regridded_cube.units = 'mm/day'
+
+    if modelname in ('CCSM4-UoT', 'NorESM1-F', 'NorESM-L', 'IPSLCM6A',
+                     'EC-Earth3.1', 'EC-Earth3.3', 'IPSLCM5A', 'IPSLCM5A2',
+                     'HadCM3', 'GISS2.1G'):
+         # convert to celcius
+        if fieldnamein in ('tas', 'tos'):
+            regridded_cube.convert_units('Celsius')
+            cube.convert_units('Celsius')
+
+
+    if modelname in ('MIROC4m', 'IPSLCM6A', 'EC-Earth3.1'):
+        regridded_cube.coord('time').units = refdate
+
+
+    # add auxillary coordinates month and year
+    iris.coord_categorisation.add_month_number(regridded_cube, 'time', name='month')
+
+    iris.coord_categorisation.add_year(regridded_cube, 'time', name='year')
+
+
+     # correct the start month if required
+    regridded_cube = correct_start_month(regridded_cube)
+    
+    # calculate averages
+    print('calculating averages')
+    mean_mon_cube = cube_avg(regridded_cube)
+
+
+
+    # remove annual cyble
+    print('about to remove annual cycle')
+    anom_cube = remove_ann_cycle(regridded_cube, mean_mon_cube)
+    print('removed annual cycle')
+
+    # to check we have removed the average properly get the monthly
+    # average of the anomaly cube it should be zero
+
+    #new_mean_mon_cube = cube_avg(anom_cube)
+    #qplt.contourf(new_mean_mon_cube[2, :, :], levels=np.arange(-0.01, 0.011, 0.001), extend='both')
+    #plt.show()
+
+
+
+    # write the cubes out to a file
+
+    outfile = outstart+ np.str(STARTYEAR) + '-' + np.str(ENDYEAR)+ '_'+'timeseries_Katya_no_ann_cycle.nc'
+    print(outfile)
+    iris.save(anom_cube, outfile, fill_value=2.0E20)
+    #iris.save(anom_cube, outfile, netcdf_format='NETCDF3_CLASSIC', fill_value=2.0E20)
+
+
+
+
+#############################################################################
+def getnames(modelname, filestart, fieldnamein, exptnamein):
+
+# this program will get the names of the files and the field for each
+# of the model
+
+    # set up model specific dictionaries
+    MIROC_FIELDS = {"pr" : "pr",
+                    "tas" : "tas",
+                    "sic" : "SeaIceAreaFraction",
+                    "tos" : "tos"
+                    }
+
+    COSMOS_FIELDS = {"pr" : "TotalPrecip",
+                     "tas" : "NearSurfaceAirTemp",
+                     "sic" : "SeaIceAreaFraction",
+                     "tos" : "SST",
+                     "PSL" : "slp"
+                     }
+
+    ECearth_FIELDS = {"pr" : "totp",
+                      "tas" : "tas",
+                      "tos" : "sst",
+                      "sic" : "SeaIceAreaFraction"
+                      }
+
+    IPSLCM5A_FIELDS = {"pr" : "TotalPrecip_pr",
+                       "tas" : "NearSurfaceTemp_tas",
+                       "sic" : "SeaIceAreaFraction",
+                       "tos": "SeasurfaceTemp_sst"
+                       }
+
+    NorESM_FIELDS = {"pr" : "PRECT",
+                     "tas" : "TREFHT",
+                     "sic" : "SeaIceAreaFraction",
+                     "tos" : "sst"
+                    }
+
+    CCSM42_FIELDS = {"pr" : "TotalPrecip",
+                     "tas" : "NearSurfaceAirTemp",
+                     "sic" : "SeaIceAreaFraction",
+                     "tos" : "SeaSurfaceTemp"
+                      }
+
+    CESM12_FIELDS = {"pr" : "TotalPrecip",
+                     "tas" : "TREFHT",
+                     "sic" : "SeaIceAreaFraction",
+                     "tos" : "TS"
+                     }
+
+    CESM12_EXTRA = {"Eoi400": "b.e12.B1850.f09_g16.PIMP4-pliomip2.ccsm4.cam.h0.",
+                    "E280": "b.e12.B1850C5CN.f09_g16.preind.cam.h0.",
+                    }
+
+    CESM2_EXTRA = {"Eoi400": "b.e21.B1850.f09_g17.PMIP4-midPliocene-eoi400.001.cam.h0.",
+                   "E280": "b.e21.B1850.f09_g17.CMIP6-piControl.001.cam.h0.",
+                   }
+
+    CCSM4_EXTRA = {"Eoi400": "b40.B1850.f09_g16.PMIP4-pliomip2.",
+                   "E280": "b40.B1850.f09_g16.preind.cam.h0.",
+                   }
+
+    ECearth_EXPT = {"Eoi400": "mPlio",
+                    "E280":"PI"
+                   }
+
+    CESM12_EXPT = {"Eoi400": "PlioMIP2",
+                   "E280":"PI"
+                   }
+
+    IPSLCM5A_EXPT = {"Eoi400": "Eoi400",
+                     "E280":"PI"
+                    }
+
+    CESM12_TIME = {"E280" : ".0701.0800",
+                   "Eoi400" : ".1101.1200"
+                   }
+
+    CESM2_TIME = {"E280" : ".110001-120012",
+                  "Eoi400" : ".1101.1200"
+                 }
+
+    CCSM4_TIME = {"Eoi400" : ".1001.1100",
+                  "E280" : ".0081.0180"
+                  }
+
+    IPSLCM5A_TIME = {"Eoi400": "3581_3680",
+                     "E280":"3600_3699"
+                    }
+
+    IPSLCM5A21_TIME = {"Eoi400": "3381_3480",
+                       "E280":"6110_6209",
+                      }
+    IPSLCM6A_TIME = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gr_185001-204912",
+                     "E280":"piControl_r1i1p1f1_gr_285001-304912",
+                     }
+    IPSLCM6A_TIME_ALT = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gn_185001-204912",
+                         "E280":"piControl_r1i1p1f1_gn_285001-304912",
+                        }
+    IPSLCM6A_STARTYEAR = {"Eoi400" : "1850", "E280" : "2850"}
+    IPSLCM6A_ENDYEAR = {"Eoi400" : "2049", "E280" : "3049"}
+
+    GISS_TIME1 = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gn_305101-310012",
+                  "E280":"piControl_r1i1p1f1_gn_490101-495012",
+                  "E560": "abrupt-2xCO2_r1i1p1f1_gn_190101-195012"
+                 }
+    CCSM4_UofT_TIME = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gr1_160101-170012",
+                       "E280":"piControl_r1i1p1f1_gr1_150101-160012",
+                       "E560": "abrupt-2xCO2_r1i1p1f1_gn_195101-200012"
+                      }
+    GISS_TIME2 = {"Eoi400": "midPliocene-eoi400_r1i1p1f1_gn_310101-315012",
+                  "E280":"piControl_r1i1p1f1_gn_495101-500012",
+                  "E560": "abrupt-2xCO2_r1i1p1f1_gn_195101-200012"
+                  }
+    atm_ocn_ind = {"tas": "Amon",
+                   "pr": "Amon",
+                   "tos":"Omon"}
+    cosmos_version = {"tas": "",
+                      "pr": "",
+                      "tos":"_1x1_data_remapbil"}
+
+    # get names for each model
+    if modelname == 'MIROC4m':
+        startyear="0"
+        endyear="500"
+        filename = filestart + modelname + '/'
+        fielduse = MIROC_FIELDS.get(fieldnamein)
+        filename = (filename + fielduse + '_500yr/MIROC4m_'+exptnamein
+                    + '_' + atm_ocn_ind.get(fieldnamein) + '_' + fielduse + '.nc')
+    if modelname == 'COSMOS':
+        startyear="2300"
+        endyear = "2799"
+        if linux_win == 'l':
+            filename = '/nfs/hera1/earjcti/PLIOMIP2/COSMOS/'
+            filename = filename+exptnamein+'/'
+        else:
+            filename = filestart+'/COSMOS/'
+        fielduse = COSMOS_FIELDS.get(fieldnamein)
+        print(filename,exptnamein,fielduse,cosmos_version.get(fieldnamein,""))
+        filename = (filename + exptnamein + '_' + fielduse + "_2300-2799" +
+                    cosmos_version.get(fieldnamein,"") + '.nc')
+        print(filename)
+    if modelname == 'CCSM4-UoT':
+        if linux_win == 'l':
+            filename = filestart + 'UofT/'
+            filename = (filename + 'UofT-CCSM4/for_julia/' +
+                        exptnamein + '/' + atm_ocn_ind.get(fieldnamein) + '/')
+        else:
+            filename = filestart + 'UofT-CCSM4\\' + exptnamein + '\\'
+        fielduse = MIROC_FIELDS.get(fieldnamein)
+
+        filename = (filename + fielduse +
+                    '_' + atm_ocn_ind.get(fieldnamein) +
+                    '_' + exptnamein + '_UofT-CCSM4_gr.nc')
+    if modelname == 'HadCM3':
+        fielduse = fieldname.get(fieldnamein,fieldnamein)
+        print(exptnamein[0],fieldnamein)
+        if exptnamein[0] == 'x' or exptnamein[1] == 't': # ie an exptname like xozzz
+            exptuse=exptnamein
+            filename = ('/nfs/hera1/earjcti/um/' + exptuse + '/' + fielduse + '/'
+                    + exptuse + '.' + fielduse + '.')
+        else:
+            exptuse = exptname_l.get(exptnamein)
+            filename = (filestart + 'LEEDS/HadCM3/' + exptuse + '/' + fielduse + '/'
+                    + exptuse + '.' + fielduse + '.')
+
+    if modelname == 'MRI2.3':
+        exptuse = exptname_l.get(exptnamein)
+        fielduse = MIROC_FIELDS.get(fieldnamein)
+        filename = (filestart+'MRI-CGCM2.3/'+fielduse+'/'
+                    +exptuse+'.'+fielduse+'.')
+    if modelname == 'EC-Earth3.1' or modelname == 'EC-Earth3.3':
+        fileend = '_surface.nc'
+        if fieldnamein == 'tos':
+            fileend = '_ci-sst.nc'
+        exptuse = exptname_l.get(exptnamein)
+        fielduse = ECearth_FIELDS.get(fieldnamein)
+        if exptuse == 'e280':
+            filename = ('/nfs/hera1/earjcti/PLIOMIP2/EC-Earth3.3/EC-Earth3-LR/' 
+                        + 'tos_EC-Earth3-LR_PI/tos_Omon_EC-Earth3-LR'
+                        + '_piControl_r1i1p1f1_gn_*')
+            startyear = 221901
+            endyear = 241901
+    if modelname == 'IPSLCM5A' or modelname == 'IPSLCM5A2':
+        exptuse = exptname_l.get(exptnamein)
+        if modelname == 'IPSLCM5A':
+            timeuse = IPSLCM5A_TIME.get(exptnamein)
+        if modelname == 'IPSLCM5A2':
+            timeuse = IPSLCM5A21_TIME.get(exptnamein)
+        fielduse = IPSLCM5A_FIELDS.get(fieldnamein)
+        if fieldnamein == 'tos':
+            filename = (filestart + modelname + '/'
+                        + IPSLCM5A_EXPT.get(exptnamein) + '.'
+                        + fielduse + '_' + timeuse 
+                        + '_monthly_TS_rectilinear.nc')
+        else:
+            filename = (filestart+modelname + '/'
+                        + IPSLCM5A_EXPT.get(exptnamein) + '.'
+                        + fielduse + '_' + timeuse + '_monthly_TS.nc')
+
+    if modelname == 'NorESM1-F' or modelname == 'NorESM-L':
+        if exptnamein == 'Eoi400':
+            startyear="1001"
+            endyear="1200"
+            fielduse = NorESM_FIELDS.get(fieldnamein,fieldnamein)
+            filename = ('/nfs/b0164/Data/NorESM-L/sst_200yr/NorESM-L.Eoi400.sst.')
+
+
+    if modelname == 'IPSLCM6A':
+        fielduse = MIROC_FIELDS.get(fieldnamein)
+        if fieldnamein == 'tos':
+            filename = (filestart + modelname + '/' + fielduse +
+                        '_Omon_IPSL-CM6A-LR_' + IPSLCM6A_TIME_ALT.get(exptnamein) 
+                        + '_rectilinear.nc')
+            startyear = IPSLCM6A_STARTYEAR.get(exptnamein)
+            endyear = IPSLCM6A_ENDYEAR.get(exptnamein)
+        else:
+            filename = (filestart + modelname + '/' + fielduse +
+                        '_' + atm_ocn_ind.get(fieldnamein) + '_IPSL-CM6A-LR_' 
+                        + IPSLCM6A_TIME.get(exptnamein) + '.nc')
+    if modelname == 'GISS2.1G':
+        fielduse = fieldnamein
+        exptuse = exptname_l.get(exptnamein)
+        filename = []
+        filename.append(filestart + modelname + '/' + exptuse + '/' + fielduse +
+                        '_' + atm_ocn_ind.get(fieldnamein) +
+                        '_GISS-E2-1-G_' + GISS_TIME1.get(exptnamein)
+                        + '.nc')
+        filename.append(filestart + modelname + '/' + exptuse + '/' 
+                        + fielduse +
+                        '_' + atm_ocn_ind.get(fieldnamein) +
+                        '_GISS-E2-1-G_' + GISS_TIME2.get(exptnamein) + '.nc')
+
+    if modelname == 'CCSM4-Utr':
+        startyear="0"
+        endyear="200"
+        print(exptnamein, CCSM42_FIELDS.get(fieldnamein),fieldnamein)
+        filename=('/nfs/hera1/earjcti/PLIOMIP2/Utrecht/' + exptnamein + '/' +
+                  exptnamein + '_' + CCSM42_FIELDS.get(fieldnamein) +
+                  '_rectilinear_200yrs.nc')
+        fielduse = fieldnamein
+       
+    if modelname == 'CESM1.2':
+        startyear = "501"
+        endyear = "806"
+        if fieldnamein == 'pr':
+            # this has been passed in two files.
+            # for convective and large scale precipitaiton put filename in a list
+            filename1 = (filestart + 'NCAR/' +
+                  CESM12_EXTRA.get(exptnamein) +
+                  'PRECC' +
+                  CESM12_TIME.get(exptnamein) + '.nc')
+            filename2 = (filestart + 'NCAR/' +
+                  CESM12_EXTRA.get(exptnamein) +
+                  'PRECL' +
+                  CESM12_TIME.get(exptnamein) + '.nc')
+            filename = [filename1, filename2]
+            fielduse = ['PRECC', 'PRECL']
+        if fieldnamein == 'tos':
+            # if we are passing SST we also need to pass ice fraciton
+            filename1 = ('/nfs/hera1/earjcti/PLIOMIP2/CESM1.2/' +
+                  CESM12_EXTRA.get(exptnamein) +
+                  'TS.')
+            filename2 = ('/nfs/hera1/earjcti/PLIOMIP2/CESM1.2/' +
+                  CESM12_EXTRA.get(exptnamein) +
+                  'ICEFRAC.')
+            filename = [filename1, filename2]
+            print(filename1, filename2)
+            fielduse = ['TS', 'ICEFRAC']
+        if fieldnamein =='tas':
+            filename=(filestart + 'NCAR/' +
+                  CESM12_EXTRA.get(exptnamein) +
+                  CESM12_FIELDS.get(fieldnamein) +
+                  CESM12_TIME.get(exptnamein) + '.nc')
+            fielduse = CESM12_FIELDS.get(fieldnamein)
+
+    if modelname == 'CESM2':
+        startyear = "501"
+        endyear = "1200"
+        if fieldnamein == 'pr':
+            # this has been passed in two files.
+            # for convective and large scale precipitaiton put filename in a list
+            filename1 = (filestart + 'NCAR/' +
+                  CESM2_EXTRA.get(exptnamein) +
+                  'PRECC' +
+                  CESM2_TIME.get(exptnamein) + '.nc')
+            filename2 = (filestart + 'NCAR/' +
+                  CESM2_EXTRA.get(exptnamein) +
+                  'PRECL' +
+                  CESM2_TIME.get(exptnamein) + '.nc')
+            filename = [filename1, filename2]
+            fielduse = ['PRECC', 'PRECL']
+        if fieldnamein == 'tos':
+            # if we are passing SST we also need to pass ice fraciton
+            filename1 = ('/nfs/hera1/earjcti/PLIOMIP2/CESM2/' +
+                  CESM2_EXTRA.get(exptnamein) +
+                  'TS.')
+            filename2 = ('/nfs/hera1/earjcti/PLIOMIP2/CESM2/' +
+                  CESM2_EXTRA.get(exptnamein) +
+                  'ICEFRAC.')
+            filename = [filename1, filename2]
+            print(filename1, filename2)
+            fielduse = ['TS', 'ICEFRAC']
+        if fieldnamein =='tas':
+            filename=(filestart + 'NCAR/' +
+                      CESM2_EXTRA.get(exptnamein) +
+                      CESM12_FIELDS.get(fieldnamein) +
+                      CESM2_TIME.get(exptnamein) + '.nc')
+            fielduse = CESM12_FIELDS.get(fieldnamein)
+
+    if modelname == 'CCSM4':
+        if fieldnamein == 'pr':
+            # this has been passed in two files.
+            # for convective and large scale precipitaiton put filename in a list
+            filename1 = (filestart + 'NCAR/' +
+                         CCSM4_EXTRA.get(exptnamein) +
+                         'PRECC' +
+                         CCSM4_TIME.get(exptnamein) + '.nc')
+            filename2 = (filestart + 'NCAR/' +
+                         CCSM4_EXTRA.get(exptnamein) +
+                         'PRECL' +
+                         CCSM4_TIME.get(exptnamein) + '.nc')
+            filename = [filename1, filename2]
+            fielduse = ['PRECC', 'PRECL']
+
+        if fieldnamein == 'tos':
+            # if we are using SST we also need to pass ice fraction
+            filename1 = (filestart + 'NCAR/' +
+                         CCSM4_EXTRA.get(exptnamein) +
+                         'TS' +
+                         CCSM4_TIME.get(exptnamein) + '.nc')
+            filename2 = (filestart + 'NCAR/' +
+                         CCSM4_EXTRA.get(exptnamein) +
+                         'ICEFRAC' +
+                         CCSM4_TIME.get(exptnamein) + '.nc')
+            filename = [filename1, filename2]
+            fielduse = ['TS', 'ICEFRAC']
+
+        if fieldnamein == 'tas':
+            filename=(filestart + 'NCAR/' +
+                      CCSM4_EXTRA.get(exptnamein) +
+                      CESM12_FIELDS.get(fieldnamein) +
+                      CCSM4_TIME.get(exptnamein) + '.nc')
+            fielduse = CESM12_FIELDS.get(fieldnamein)
+
+
+    if modelname == 'HadGEM3':
+        filename = []
+        filestart = '/nfs/hera1/pliomip2/data/HadGEM3_new/timeseries/' 
+        if exptnamein == 'Eoi400':
+            filename = filestart + 'Eoi400/ocean/sst_sal_temp/new_nemo_b'
+        if exptnamein == 'E280':
+            filename = filestart + 'E280/ocean/sst_sal_temp/new_nemo_b'
+       
+        fielduse = 'sea_surface_temperature'
+
+    print(fielduse, filename)
+    retdata = [fielduse, filename, startyear, endyear]
+    return retdata
+
+
+##########################################################
+# main program
+
+filename =  ' '
+linux_win =  'l'
+modelname = "NorESM-L" # MIROC4m  COSMOS CCSM4-UoT EC-Earth3.1
+                   # HadCM3 MRI2.3
+                   # IPSLCM5A,  IPSLCM5A2
+                   # NorESM1-F NorESM-L
+                   # IPSLCM6A GISS2.1G
+                   # CCSM4-Utr, CESM1.2
+                   # CCSM4
+                   # new to this version
+                   # EC-Earth3.3 CESM2 (b.e21)
+
+
+exptname = {
+        "E280" : "E280",
+        "Eoi400" : "EOI400",
+        "E400":"E400",
+        "E560": "E560"
+            }
+
+exptname_l = {
+        "E280" : "e280",
+        "Eoi400" : "eoi400",
+        "E400":"e400",
+        "E560": "e560"
+            }
+
+fieldname = {
+        "pr" : "TotalPrecipitation",
+        "tas" : "NearSurfaceTemperature",
+        "sic" : "SeaIceConcentration",
+        "tos": "SST"
+        }
+ 
+
+# this is regridding where all results are in a single file
+#fieldnamein = ['pr','tas','tos']
+#exptnamein = ['E280']  # type E280 Eoi400 or an HadCM3 name
+
+#fieldnamein = ['PSL']
+fieldnamein = ['tos'] # ocean tempeature or sst
+exptnamein = ['Eoi400']
+
+#fieldnamein = ['tos','pr','tas']
+#exptnamein = ['Eoi400', 'E280']
+#exptnamein = ['E560']
+if linux_win == 'l':
+    #filestart = '/nfs/hera1/pliomip2/data/'
+    filestart = '/nfs/b0164/Data/'
+else:
+    filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+
+for expt in range(0, len(exptnamein)):
+    for field in range(0, len(fieldnamein)):
+
+        if (modelname in ('IPSLCM5A', 'IPSLCM5A2', 'CCSM4-Utr')
+            and fieldnamein[field] == 'tos'):
+            #filestart = '/nfs/hera1/earjcti/PLIOMIP2/'
+            filestart = '/nfs/b0164/Data/'
+        if modelname in ('IPSLCM6A', 'GISS2.1G'):
+            filestart = '/nfs/hera1/earjcti/PLIOMIP2/'
+
+
+        # call program to get model dependent names
+        # fielduse,  and  filename
+        retdata = getnames(modelname, filestart, fieldnamein[field], exptnamein[expt])
+
+        fielduse = retdata[0]
+        filename = retdata[1]
+        STARTYEAR = retdata[2]
+        ENDYEAR = retdata[3]
+
+        print('juliafield',fielduse,'juliafile',filename)
+        fieldnameout = fieldname.get(fieldnamein[field],fieldnamein[field])
+        exptnameout = exptname.get(exptnamein[expt],exptnamein[expt])
+        #sys.exit(0)
+        regrid_data(fieldnamein[field], exptnamein[expt])
+
+#sys.exit(0)

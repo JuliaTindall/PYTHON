@@ -1,0 +1,69 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#"""
+#Created on Fri Jul  5 15:11:26 2019
+#
+#@author: earjcti
+#"""
+#
+#   This program will obtain the SST data from the pliovar site locations and process
+#
+#
+import csv
+import sys
+from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+###################################
+# get the sitenames from a file
+
+filename='/nfs/hera1/earjcti/PLIOMIP2/proxydata/pliovar_metadata_global_alan.csv'
+
+count=0
+latlist=[]
+lonlist=[]
+
+with open(filename) as csvfile:
+    readCSV = csv.reader(csvfile, delimiter=',')
+    for row in readCSV:
+        if count!=0: # not titleline
+            latlist.append(np.float(row[2]))
+            lonlist.append(np.float(row[3]))
+        count=count+1
+
+print(latlist)
+print(len(latlist))
+
+
+######################################
+# setup a map and plot the points
+
+alllons=np.arange(-180,180,1)
+alllats=np.arange(-90,90,1)
+lons,lats=np.meshgrid(alllons,alllats)
+map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,
+                urcrnrlat=90.0,projection='cyl',resolution='c')
+map.drawmapboundary
+x,y=map(lons,lats)
+map.drawcoastlines()
+
+
+for i in range(0,len(latlist)):
+    lon=lonlist[i]
+    lat=latlist[i] 
+    #lon=-12.
+    #lat=70.
+    print('ju',lon,lat)
+    # convert to map projection coords.
+    # Note that lon,lat can be scalars, lists or numpy arrays.
+    xpt,ypt = map(lon,lat)
+    print(lon,xpt,lat,ypt)
+    # convert back to lat/lon
+    lonpt, latpt = map(xpt,ypt,inverse=True)
+    map.plot(xpt,ypt,'bo')  # plot a blue dot there
+   
+
+
+plt.show()

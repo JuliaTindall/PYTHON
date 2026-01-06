@@ -1,0 +1,295 @@
+#NAME
+#    average_fields.py
+#PURPOSE 
+#
+#  This program will create netcdf files containing the average fields
+#
+#
+# Julia 8.2.2017
+# Julia 20.10.2018 ; included the ability to create database HadCM3 files
+
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import sys
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+class main():
+    """
+    this class will basically run the profram
+    """
+    def __init__(self, field):
+        """
+        input: field # a short field name
+        modeltype: F=famous C=HadCM3, G=HadGEM
+        
+        gets data such as the list of the filenames we need
+        and the longfieldname and also which type of file it is
+        """
+        
+        longfield = {'temp1.5' : 'TEMPERATURE AT 1.5M',
+                     'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
+                     'cloud_cover' : 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
+                     'mslp' : 'PRESSURE AT MEAN SEA LEVEL',
+                     'evapsea' : 'EVAPORATION FROM SEA (GBM)   KG/M2/S',
+                     'seaiceconc' : 'AICE : ICE CONCENTRATION',
+                     'oceansurftemp' : 'OCN TOP-LEVEL TEMPERATURE          K',
+                     'surfsalinity': 'SALINITY (OCEAN)       (PSU-35)/1000',
+                     'MLD' : 'MIXED LAYER DEPTH (OCEAN)          M',
+                     'AMOC' : 'Meridional Overturning Stream Function (Atlantic)'
+                     }
+        
+        atm_ocn_ind = {'temp1.5' : 'a',
+                       'precip' : 'a',
+                       'cloud_cover' : 'a',
+                       'mslp' : 'a',
+                       'evapsea' : 'a',
+                       'seaiceconc' : 'o',
+                       'oceansurftemp' :  'o',
+                       'surfsalinity': 'o',
+                       'MLD' : 'o',
+                       'AMOC' : 'o'
+                       }
+        modelsep = {'F' : '#', 'C':'@','Ca':'#'}
+        fileletter = {'temp1.5' : 'pd',
+                      'precip' : 'pd',  
+                      'cloud_cover' : 'pd',
+                      'mslp' : 'pd',
+                      'evapsea' : 'pd',
+                      'seaiceconc' : 'pf',
+                      'oceansurftemp' : 'pf',
+                      'surfsalinity': 'pf',
+                      'MLD' : 'pf',
+                      'AMOC' : 'pk2'}
+
+        # centuary indicator for HadCM3
+        centuaryind = {'0' : '0', '1':'1','2':'2','3' : '3',
+                       '4' : '4', '5':'5','6':'6','7' : '7',
+                       '8' : '8', '9':'9','10':'a','11' : 'b',
+                       '12' : 'c', '13':'d','14':'e','15' : 'f',
+                       '16' : 'g', '17':'h','18':'i','19' : 'j',
+                       '20' : 'k', '21':'l','22':'m','23' : 'n',
+                       '24' : 'o', '25':'p','26':'q','27' : 'r',
+                       '28' : 's', '29':'t','30':'u','31' : 'v',
+                       '32' : 'w', '33':'x','34':'y','35' : 'z'}
+        
+        if field == 'AMOC':
+            fileloc = '/pk2/'
+        elif MODELTYPE == 'Ca':
+            #fileloc = '/' + fileletter.get(field) + '/'
+            fileloc = '/netcdf/'
+        else:
+            #fileloc = '/'+ fileletter.get(field) +'/'
+            fileloc = '/netcdf/'
+        
+        filestart = ('/nfs/hera1/earjcti/um/' + EXPT + fileloc 
+                     + EXPT[0:5] + atm_ocn_ind.get(field)
+                     + modelsep.get(MODELTYPE))
+        
+        if field == 'AMOC':
+            filestart = filestart + 'pg'
+        else:
+            filestart = filestart + fileletter.get(field)
+    
+        self.fieldname = longfield.get(field)
+        
+        self.filenames = ([])
+        print(STARTYEAR)
+        for year in range(STARTYEAR, STARTYEAR + NYEARS):
+            if MODELTYPE == 'F' or MODELTYPE == 'Ca': # famous
+                filenumber = str(year).zfill(9)
+            if MODELTYPE == 'C': # hadcm3
+                if year >=  1000:
+                    cent = np.str(year)[0:2]
+                    year2 = np.str(year)[2:4]
+                else:
+                    cent = np.str(year)[0:1]
+                    year2 = np.str(year)[1:3]
+                print(cent)
+                filenumber = centuaryind.get(cent) + year2
+                print(filenumber)
+            self.filenames.append(filestart + filenumber)   
+      
+        self.filetype = fileletter.get(field)
+        self.field = field
+        
+        
+           
+    def main_get_field(self):
+        """
+        this will get the longterm mean and interannual standard deviation 
+        based on
+        yearly averages from the files in self.filenames
+        """
+        
+        print('start of main get field')
+        cubelist_year = CubeList([])
+        
+        for i, filename in enumerate(self.filenames):
+            print(filename)
+            cubeoneyear = self.main_get_oneyear(filename, i)
+            cubelist_year.append(cubeoneyear)
+        
+        
+        print('about to equalise')
+        
+        iris.util.equalise_attributes(cubelist_year)
+        iris.util.unify_time_units(cubelist_year)
+        
+        print('after unify time')
+        if self.field == 'AMOC':
+             cube_allyears = cubelist_year.concatenate_cube()
+             tvar = 'time'
+        else:
+            cube_allyears = cubelist_year.merge_cube()
+            tvar = 't'
+        
+        print('cube all years',cube_allyears)
+        cube_mean = cube_allyears.collapsed(tvar, iris.analysis.MEAN)
+        cube_stdev = cube_allyears.collapsed(tvar, iris.analysis.STD_DEV)
+            
+        return cube_mean, cube_stdev
+            
+       
+    def main_get_oneyear(self, filename, year):
+        """
+        read in one years supply of cubes
+        average and return for adding to the cubelist
+        """
+        
+        # fileending for famous and hadcm3 models
+        fileend = {'F' : '+'}
+        if self.filetype == 'pd' or self.filetype == 'pf':
+            if AVG_SEAS == 'ann':
+                cubes = iris.load(filename + '*', self.fieldname)
+
+            if AVG_SEAS == 'djf':
+                cubes = CubeList([])
+
+                cube = iris.load_cube(filename + 'dc' + 
+                                      fileend.get(MODELTYPE, '') + '.nc', 
+                                      self.fieldname)
+                cubes.append(cube)  
+
+                cube = iris.load_cube(filename + 'ja' +
+                                      fileend.get(MODELTYPE, '') + '.nc', 
+                                      self.fieldname)
+                cubes.append(cube)  
+
+                cube = iris.load_cube(filename + 'fb' +
+                                      fileend.get(MODELTYPE, '') + '.nc', 
+                                      self.fieldname)  
+                cubes.append(cube)
+
+            if AVG_SEAS == 'jja':
+                cubes = CubeList([])
+                print(filename, fileend.get(MODELTYPE,''))
+                cube = iris.load_cube(filename + 'jn' +
+                                      fileend.get(MODELTYPE, '') + '.nc', 
+                                      self.fieldname) 
+                cubes.append(cube)  
+
+                cube = iris.load_cube(filename + 'jl' +
+                                      fileend.get(MODELTYPE, '') + '.nc', 
+                                      self.fieldname)
+                cubes.append(cube)  
+
+                cube = iris.load_cube(filename + 'ag' +
+                                      fileend.get(MODELTYPE, '') + '.nc', 
+                                      self.fieldname)
+                cubes.append(cube)
+
+
+        
+            if len(cubes) != NMONTHS:
+                    print('wrong number of cubes')
+                    sys.exit(0)
+            else:
+                iris.util.equalise_attributes(cubes)
+                cube1year = cubes.concatenate_cube()
+                cube1year.coord('t').points = (
+                    np.arange(year*NMONTHS + 0,year *NMONTHS +NMONTHS,1))
+                cubeyear = cube1year.collapsed('t', iris.analysis.MEAN)
+
+                  
+        if self.filetype == 'pg' or self.filetype == 'pk2':
+            cube = iris.load_cube(filename + '*', self.fieldname)
+            cubeyear = cube
+            cubeyear.coord('time').points = year 
+            cubeyear.coord('time').attributes = None
+            cubeyear.coord('time').units = 'year'
+               
+                
+       
+     
+        return cubeyear
+      
+        
+        
+    
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+#expt='xkvje'
+#startyear=2350
+#nyears=50
+#HadCM3='n'
+
+
+MODELTYPE = 'n' # n=HadGEM, C=HadCM3, Ca=HadCM3_alternate (long filenames)
+                 #F=Famous
+EXPT = 'xpsid'
+STARTYEAR = 900
+NYEARS=1000
+AVG_SEAS = 'ann' # ann, djf, jja
+
+if AVG_SEAS == 'ann':
+    NMONTHS = 12
+if AVG_SEAS == 'djf' or AVG_SEAS== 'jja':
+    NMONTHS =3
+
+FIELDS = [
+    'temp1.5','precip','cloud_cover','mslp',
+    #      'evapsea',
+          'seaiceconc','oceansurftemp',
+          'surfsalinity','MLD']
+
+#FIELDS = ['evapsea','seaiceconc','oceansurftemp',
+#          'surfsalinity','MLD']
+
+#FIELDS = ['AMOC']
+#FIELDS = ['temp1.5']
+
+for i, field in enumerate(FIELDS):
+    print(field)
+    obj = main(field)
+    print('got obj')
+    meancube, stdevcube = obj.main_get_field()
+
+    print('trying to write mean')
+    outfile = ('/nfs/hera1/earjcti/um/' + EXPT + '/average/' + EXPT + 
+           '_' + field + '_' + AVG_SEAS +'_mean_' + np.str(STARTYEAR) 
+               + '_' + np.str(STARTYEAR + NYEARS) + '.nc')
+    iris.save(meancube, outfile, netcdf_format='NETCDF3_CLASSIC',fill_value=1.0E20)
+
+    outfile = ('/nfs/hera1/earjcti/um/' + EXPT + '/stdev/' + EXPT + 
+           '_' + field + '_' + AVG_SEAS + '_stdev_'  + np.str(STARTYEAR) 
+               + '_' + np.str(STARTYEAR + NYEARS)  + '.nc')
+    iris.save(stdevcube, outfile, netcdf_format='NETCDF3_CLASSIC',fill_value=1.0E20)
+       
+

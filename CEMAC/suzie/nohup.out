@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/suzie/means_and_standard_deviations.py", line 316, in <module>
+    get_ann_avg()
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/suzie/means_and_standard_deviations.py", line 269, in get_ann_avg
+    avgcube,stdevcube = get_ann_average_for_variable(name)
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/suzie/means_and_standard_deviations.py", line 230, in get_ann_average_for_variable
+    cubeyravg = get_avg_for_year(year,variable)
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/suzie/means_and_standard_deviations.py", line 211, in get_avg_for_year
+    cube = iris.load_cube(filename,variable)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 334, in load_cube
+    cubes = _load_collection(uris, constraints, callback).cubes()
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 271, in _load_collection
+    result = _CubeFilterCollection.from_cubes(cubes, constraints)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/cube.py", line 104, in from_cubes
+    for cube in cubes:
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/__init__.py", line 256, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/io/__init__.py", line 208, in load_files
+    for cube in handling_format_spec.handler(
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/fileformats/netcdf.py", line 903, in load_cubes
+    cube = _load_cube(engine, cf, cf_var, filename)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/fileformats/netcdf.py", line 611, in _load_cube
+    _assert_case_specific_facts(engine, cf, cf_var.cf_group)
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/fileformats/netcdf.py", line 478, in _assert_case_specific_facts
+    for cf_var in cf.cf_group.formula_terms.values():
+  File "/nfs/hera1/earjcti/anaconda3/envs/foelinpy/lib/python3.10/site-packages/iris/fileformats/cf.py", line 931, in formula_terms
+    for cf_name, cf_var in self._cf_variables.items()
+KeyboardInterrupt

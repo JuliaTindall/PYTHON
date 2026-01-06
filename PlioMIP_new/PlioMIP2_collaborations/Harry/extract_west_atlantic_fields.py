@@ -1,0 +1,231 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on April 2023 by Julia
+
+This program will extract surface and deep temperature and salinity for the 
+Western Atlantic.  Harry asked for this on the 24/03/2023
+
+We will extract this from HadCM3
+
+We will use PlioMIP2 data
+
+Rerun on 02/06/2025 using PlioMIP3
+"""
+
+import os
+import sys
+import numpy as np
+#import matplotlib as mp
+import matplotlib.pyplot as plt
+#from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+#import netCDF4
+#from netCDF4 import Dataset, MFDataset
+import iris
+from iris.cube import CubeList
+import iris.analysis.cartography
+import iris.quickplot as qplt
+import iris.coord_categorisation
+import cartopy
+import cartopy.crs as ccrs
+
+#os.environ['PROJ_LIB'] = 'C:/Users/julia/Miniconda3/envs/py3/Library/share'
+#os.environ['PROJ_LIB'] = '/nfs/see-fs-02_users/earjcti/anaconda2/envs/py3/share/proj'
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+
+
+def get_avg_field(field,expt):
+    """
+    gets the required field and returns
+    """
+
+    directory = '/nfs/hera1/earjcti/um/'
+    yearstart=3900
+    yearend=4000
+   
+    #directory = '/nfs/hera1/earjcti/PLIOMIP3/LEEDS/HadCM3/'
+    if field == 'so':
+        filestart = (directory + expt + '/so/' + expt + '.so.')
+    if field == 'OceanTemp':
+        filestart = (directory + expt +'/OceanTemp/' + expt + '.OceanTemp.')
+
+    lonmin=260.0
+    lonmax=322.0
+
+    latmin=3.0
+    latmax=52.0
+
+    count=0.0
+    for year in range(yearstart,yearend):
+        filename = filestart + str(year).zfill(3) + '.nc'
+        cube = iris.load_cube(filename)
+        
+        lon_constraint = iris.Constraint(longitude=lambda cell:
+                                             lonmin <= cell <=lonmax)
+        lat_constraint = iris.Constraint(latitude=lambda cell:
+                                             latmin <= cell <=latmax)
+        lon_slice = cube.extract(lon_constraint)
+        data_slice = lon_slice.extract(lat_constraint)
+       
+        cube_data = data_slice.data
+        if field == 'so':
+            cube_data.mask = np.where(cube_data < 5.0, True, cube_data.mask)
+        if year == yearstart:
+            data = np.ma.array(cube_data,mask=cube_data.mask)
+        else:
+            data = data + cube_data
+        count=count+1.0
+
+    data = data / count 
+    print(data)
+    cube_avg = data_slice.copy(data=data)
+    del cube_avg.attributes["valid_min"]
+    del cube_avg.attributes["valid_max"]
+    #del cube_avg.attributes["invalid_units"]
+   
+    surface_constraint = iris.Constraint(depth_1 = lambda cell:
+                                             3.0 < cell <7.0)
+    surf_cube = cube_avg.extract(surface_constraint)
+   
+    return cube_avg, surf_cube
+
+
+def get_stats(cube, expt, field, surface_ind):
+    """
+    here we will get the minimum value, the maximum value and the mean value
+    """
+
+    print(surface_ind,cube)
+    mean_cube = cube.collapsed('t',iris.analysis.MEAN)
+    print('mean ' + field + ' ' + expt + ' at ' + surface_ind)
+    mean_cube.long_name='mean ' + field + ' ' + expt + ' at ' + surface_ind
+    min_cube = cube.collapsed('t',iris.analysis.MIN)
+    min_cube.long_name='min ' + field + ' ' + expt + ' at ' + surface_ind
+    max_cube = cube.collapsed('t',iris.analysis.MAX)
+    max_cube.long_name='max ' + field + ' ' + expt + ' at ' + surface_ind
+
+
+    return min_cube, max_cube, mean_cube
+
+def get_lowest_depth(cubesal, cubetemp,cubesal_skeleton,cubetemp_skeleton):
+    """
+    input:  a 4d cube time, depth, latitude, longitude
+    output:  the deepest level where there is data
+             a 3d cube (time, latitude, longitude) at the deepest level
+    """
+
+    datasal = cubesal.data
+    datatemp = cubetemp.data
+    depths = cubesal.coord('depth_1').points
+    mask=cubesal.data.mask
+    nt,nz,ny,nx = np.shape(datasal)
+    print(nt,nz,ny,nx)
+    deptharr=np.zeros((ny,nx))
+    datasaldepth = np.ma.zeros((nt,ny, nx))
+    datatempdepth = np.ma.zeros((nt,ny,nx))
+    
+    for j in range(0,ny):
+        for i in range(0,nx):
+            found='n'
+            for k in range(0,nz):
+                if mask[0,k,j,i] == True and found == 'n':
+                    if k == 0:
+                        deptharr[j,i] = 0.0
+                        datasaldepth[:,j,i] = -99999.
+                        datasaldepth[:,j,i].mask = True
+                        datatempdepth[:,j,i] = -99999.
+                        datatempdepth[:,j,i].mask = True
+                        found='y'
+                    else:
+                        deptharr[j,i]=depths[k-1]
+                        datasaldepth[:,j,i]=datasal[:,k-1,j,i]
+                        datatempdepth[:,j,i]=datatemp[:,k-1,j,i]
+                        found='y'
+                # case for depth of ocean at bottom of model
+                if k == 19 and mask[0,k,j,i] == False:
+                    deptharr[j,i]=depths[k]
+                    datasaldepth[:,j,i]=datasal[:,k,j,i]
+                    datatempdepth[:,j,i]=datatemp[:,k,j,i]
+                  
+    sal_depth_cube = cubesal_skeleton.copy(data=datasaldepth)
+    temp_depth_cube = cubetemp_skeleton.copy(data=datatempdepth)
+    cube2d = cubesal_skeleton[0,:,:]
+    depth_cube = cube2d.copy(data=deptharr)
+    depth_cube.long_name='depth_' + Timewrite.get(Timeperiod,Timeperiod)
+
+    return (sal_depth_cube, temp_depth_cube, depth_cube)
+
+##########################################################
+# main program
+
+#cubelist1 = iris.load('West_Atlantic_fields_LP.nc')
+#cubelist2 = iris.load('West_Atlantic_fields_PI.nc')
+
+#cubelist3 = CubeList([])
+#for i, cube in enumerate(cubelist1):
+#    cube2 = cubelist2[i]
+#    cubediff = cube-cube2
+#    cubelist3.append(cubediff)#
+
+#iris.save(cubelist3,  'temporary4.nc',
+#          netcdf_format='NETCDF3_CLASSIC',fill_value =-99999.)
+#sys.exit(0)
+
+
+
+
+
+Timeperiod = 'PI'
+Timewrite = {'e280_corr' : 'e280'}
+exptname = {'PI':'xqbwc','LP':'xqbwd','EP':'xqbwg'}
+cubelist = CubeList([])
+# 1. extract temperature and salinity 
+
+salinity_cube, sss_cube  = get_avg_field('so',
+                                         exptname.get(Timeperiod,Timeperiod))
+temperature_cube, surftemp_cube  = get_avg_field('OceanTemp',
+                                          exptname.get(Timeperiod,Timeperiod))
+
+
+# 2. obtain surface mean/max/min
+
+sss_min, sss_max, sss_mean = get_stats(sss_cube, Timewrite.get(Timeperiod,Timeperiod),'salinity','surface')
+cubelist.append(sss_mean)
+cubelist.append(sss_max)
+cubelist.append(sss_min)
+
+
+(surftemp_min, 
+ surftemp_max, 
+ surftemp_mean) = get_stats(surftemp_cube, Timewrite.get(Timeperiod,Timeperiod),
+                            'ocean temperature','surface')
+cubelist.append(surftemp_mean)
+cubelist.append(surftemp_max)
+cubelist.append(surftemp_min)
+
+
+# obtain lowest depth of ocean
+(deepsal_cube, 
+deeptemp_cube,
+depth) = get_lowest_depth(salinity_cube, temperature_cube,
+                                        sss_cube,surftemp_cube) 
+
+cubelist.append(depth)
+
+#  obtain statistics for deepest level of ocean
+
+deepsal_min, deepsal_max, deepsal_mean = get_stats(deepsal_cube, Timewrite.get(Timeperiod,Timeperiod),'salinity','depth')
+cubelist.append(deepsal_mean)
+cubelist.append(deepsal_max)
+cubelist.append(deepsal_min)
+
+deeptemp_min, deeptemp_max, deeptemp_mean = get_stats(deeptemp_cube, Timewrite.get(Timeperiod,Timeperiod),'ocean temperature','depth')
+cubelist.append(deeptemp_mean)
+cubelist.append(deeptemp_max)
+cubelist.append(deeptemp_min)
+
+
+iris.save(cubelist,'West_Atlantic_fields_' + 
+          Timewrite.get(Timeperiod,Timeperiod) + '.nc',
+          netcdf_format='NETCDF3_CLASSIC',fill_value =-99999.)
+

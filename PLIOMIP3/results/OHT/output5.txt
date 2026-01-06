@@ -1,0 +1,31 @@
+nohup: ignoring input
+total ocean heat transport / (0.0001 Gy) (t: 1; latitude: 143)
+    Dimension coordinates:
+        t                                  x            -
+        latitude                           -            x
+    Scalar coordinates:
+        depth_1                          2598.725 m, bound=(5.0, 5192.45) m
+        longitude                        180.625 degrees, bound=(0.625, 360.625) degrees
+    Cell methods:
+        0                                depth_1: sum
+    Attributes:
+        date                             '01/12/01'
+        name                             'field704'
+        source                           'Unified Model Output (Vn 4.5):'
+        time                             '00:00'
+        title                            'TOTAL OCEAN V-VELOCITY      CM S**-1'
+total ocean heat transport / (0.0001 Gy) (t: 1; latitude: 143)
+    Dimension coordinates:
+        t                                  x            -
+        latitude                           -            x
+    Scalar coordinates:
+        depth_1                          2598.725 m, bound=(5.0, 5192.45) m
+        longitude                        180.625 degrees, bound=(0.625, 360.625) degrees
+    Cell methods:
+        0                                depth_1: sum
+    Attributes:
+        date                             '01/12/01'
+        name                             'field704'
+        source                           'Unified Model Output (Vn 4.5):'
+        time                             '00:00'
+        title                            'TOTAL OCEAN V-VELOCITY      CM S**-1'

@@ -1,0 +1,679 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on April 3rd 2019
+
+
+#
+# This program will is a bit like the regridding program for PlioMIP.
+# However it will regrid non PlioMIP experiments for HadCM3
+# and calculate all the means.
+# There is also the option to calculate the means without regridding
+# 
+# Before this program preprocess data using extract_HadCM3_PlioMIP.py
+
+import numpy as np
+import iris
+from iris.cube import CubeList
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import iris.analysis.cartography
+import iris.coord_categorisation
+#from iris.experimental.equalise_cubes import equalise_attributes
+import cf_units as unit
+import sys
+#import os
+ 
+###################################################
+# get all data from files as a single cube
+##################################################
+
+def get_hadcm3_cube():
+    """
+    get's the datacube from hadcm3 or mri-cgcm2.3
+    """
+    allcubes = CubeList([])
+  
+    for i in range(startyear, endyear):
+        yearuse = str(i).zfill(3)
+        # for now getting data from b0164
+        #filenameuse = ('/nfs/b0164/Data/LEEDS/HadCM3/'+MIPname.get(exptnamein, exptnamein) + '/' + fieldnamein + '/' + MIPname.get(exptnamein,exptnamein) + '.' + fieldnamein + '.' + yearuse+'.nc')
+      
+        if fielduse == 'd18op_18o':
+            filenameuse = (filename+'d18op/' + exptnamein + '.d18op.' + yearuse+'.nc')
+            cubetemp = iris.load_cube(filenameuse,'18o')
+        elif fielduse == 'd18op_16o':
+            filenameuse = (filename+'d18op/' + exptnamein + '.d18op.' + yearuse+'.nc')
+            cubetemp = iris.load_cube(filenameuse,'16o')
+        else:
+            filenameuse = (filename+fieldnamein + '/' + exptnamein + '.' + fieldnamein + '.' + yearuse+'.nc')
+            cubetemp = iris.load_cube(filenameuse)
+        
+        u  =  unit.Unit('days since 0800-01-01 00:00:00',
+                                  calendar = unit.CALENDAR_360_DAY)
+        cubetemp.coord('t').rename('time')
+        cubetemp.coord('time').points = (np.arange(0, 12)+((i-startyear)*12))*30.
+
+        cubetemp.coord('time').units = u
+
+       # if i ==startyear:
+       #     allcubes = iris.cube.CubeList([])
+   
+        allcubes.append(cubetemp)
+
+    iris.util.equalise_attributes(allcubes)
+    cube_temp = allcubes.concatenate_cube()
+   
+    cube = iris.util.squeeze(cube_temp)
+   
+    return(cube)
+
+
+def reduce_years(cube100yr, fieldnamein):
+    """
+    this will supply a cube with 100 years of data
+    we reduce this to 50 years
+    """
+    
+    cubelist = iris.cube.CubeList([])
+    for i,  t_slice in enumerate(cube100yr.slices(['latitude', 'longitude'])):
+        if i >= 600:
+            t_slice.coord('time').bounds = None
+            t_slice2 = iris.util.new_axis(t_slice, 'time')
+            cubelist.append(t_slice2)
+
+    print(fieldnamein)
+    if fieldnamein == 'clt':
+        cube50yr = cube100yr
+    else:
+        print(cubelist)
+        cube50yr = cubelist.concatenate_cube()
+    return cube50yr
+
+######################################################
+def correct_start_month(cube):
+    """
+    parameters: cube
+    returns: the same cube
+    
+    if month doesn't start on january we will have to change some of the
+    years from the end to match those at the start to give 100 full years
+
+    
+    """
+    print('julia3')
+
+    print(cube.coord('time').points)
+    print(cube.coord('time').units)
+    print(cube.coord('year').points)
+    print(cube.coord('month').points)
+
+    
+    startyear = (cube.coord('year').points[0])
+    endyear = (cube.coord('year').points[-1])
+    # count the number of months that have the same year as the first index
+    nstart = 0
+    nend = 0
+    for i in range(0, 12):
+        if cube.coord('year').points[i]  == startyear:
+            nstart = nstart+1
+    for i in range(-13, 0):
+        if cube.coord('year').points[i]  == endyear:
+            nend = nend+1
+    if nend!= 12 or nstart!= 12:
+        # oops we don't have a full year at the start and the end
+        # check to see whether we can aggregate into one year
+        if nend+nstart  == 12:
+            for i in range(-1 * nend, 0):
+                # move the last few to the start of the cube
+                cube.coord('year').points[i] = startyear
+        
+
+        else:
+
+            print('you have a partial year somewhere')
+            print('correct input data to provide full years')
+            print(nend, nstart)
+            sys.exit(0)
+
+    
+    return cube
+
+######################################################    
+def cube_avg(cube):
+    """
+    Extract averaged data and standard deviation values from a cube
+
+    Parameters:
+    cube (iris cube): A cube with montly data that we average
+
+    Returns:
+    meanmonthcube (iris cube): the input cube averaged over each of the 12 calendar months
+    sdmonthcube (iris cube): the standard deviation on the values in meanmonthcube
+    meanyearcube (iris cube): annual average values for each calendar year
+    meancube (iris cube) : the long term mean value at each gridpoint
+    sdcube (iris cube): the interannual standard deviation on the mean at each gridpoint
+    """
+
+    meanmonthcube = cube.aggregated_by('month', iris.analysis.MEAN)
+
+    meanmonthcube.long_name = fieldnamein
+    
+    iris.util.promote_aux_coord_to_dim_coord(meanmonthcube, 'month')
+    sdmonthcube = cube.aggregated_by('month', iris.analysis.STD_DEV)
+    sdmonthcube.long_name = fieldnamein
+
+    # mean and standard deviation for each year
+    meanyearcube = cube.aggregated_by('year', iris.analysis.MEAN)
+    meanyearcube.long_name=fieldnamein
+
+    # mean and interannual standard deviation over dataset
+    meancube = meanmonthcube.collapsed('time', iris.analysis.MEAN)
+    meancube.long_name=fieldnamein
+    sdcube = meanyearcube.collapsed('time', iris.analysis.STD_DEV)
+    sdcube.long_name=fieldnamein
+
+    return [meanmonthcube, sdmonthcube, meanyearcube, sdcube, meancube]
+
+
+def mon_avg(cube):
+    """
+    get the monthly average data from a cube
+
+    Parameters:
+    cube (iris cube) contains monthly data (ie t=12)
+
+    Returns:
+    meanmon (np array) with mean global values for each of the 12 months
+    """
+
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    grid_areas2 = iris.analysis.cartography.area_weights(cube)
+    tempcube = cube.collapsed(['latitude', 'longitude'],
+                              iris.analysis.MEAN, weights=grid_areas2)
+    meanmon = tempcube.data
+
+    return meanmon
+
+def get_monthly_sd(cube):
+    """
+    get monthly values of the standard deviation on the
+    globally averaged mean from a cube
+
+    Parameters:
+        cube (iris cube) : a cube with monthly data from the whole dataset
+                           (tdim=nyears*nmonths)
+    Returns:
+        stdevmon (numpy array) : an array with the monthly standard deviation
+                                 on the monthly global mean
+
+    """
+
+
+    stdevmon = np.zeros(12)
+    for mon in range(1, 13):
+        # mon_slice is the slice from this month.  It should have a time
+        # dimension of t where t is the number of years
+        mon_slice = cube.extract(iris.Constraint(month=mon))
+        mon_slice.coord('latitude').guess_bounds()
+        mon_slice.coord('longitude').guess_bounds()
+        grid_areas = iris.analysis.cartography.area_weights(mon_slice)
+        mon_avg = mon_slice.collapsed(['latitude', 'longitude'],
+                                      iris.analysis.MEAN, weights=grid_areas)
+        stdevcube = mon_avg.collapsed(['time'], iris.analysis.STD_DEV)
+        stdevmon[mon-1] = stdevcube.data
+
+    return stdevmon
+
+
+
+def area_means(allmeancube, yearmeancube):
+    """
+    get the globally averaged mean and standard deviation
+    and latitudinal means and standard deviation
+
+    Parameters:
+    allmeancube (iris cube) lat/lon cube of temporal mean tdim=1
+    yearmeancube (iris cube)  lat/lon/time cube of yearly averages tdim=nyears
+
+    Returns
+    meanann (float) global long term mean
+    stdevann (float)  global long term standard deviation of the mean
+    mean lat (np.array(nlats) latitudinally averaged long term mean
+    stdevlat (np.array(nlats)standard deviation of the latitudinal mean
+
+    """
+
+    allmeancube.coord('latitude').guess_bounds()
+    allmeancube.coord('longitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(allmeancube)
+    tempcube = mean_data.collapsed(['latitude', 'longitude'],
+                                   iris.analysis.MEAN, weights=grid_areas)
+    meanann = tempcube.data
+
+
+    # get mean for each latitude
+    tempcube = allmeancube.collapsed(['longitude'], iris.analysis.MEAN)
+    meanlat = tempcube.data
+    meanlat = np.squeeze(meanlat)
+
+
+    # get standard deviation
+    # 1. mean for each year
+
+    yearmeancube.coord('latitude').guess_bounds()
+    yearmeancube.coord('longitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(yearmeancube)
+    tempcube = yearmeancube.collapsed(['latitude', 'longitude'],
+                                      iris.analysis.MEAN, weights=grid_areas)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevann = stdevcube.data
+
+
+    # get standard deviation for each latitude
+    tempcube = yearmeancube.collapsed(['longitude'], iris.analysis.MEAN)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    #stdevann=stdevcube.data
+    stdevlat = stdevcube.data
+    stdevlat = np.squeeze(stdevlat)
+
+    return [meanann, stdevann, meanlat, stdevlat]
+
+##############################################
+def regrid_data(fieldnamein, exptnamein):
+    """
+    regrid the data
+    """
+
+  
+    print('filename is', filename)
+    print('fielduse is', fielduse)
+    print('exptnamein is', exptnamein)
+
+    if avgallyears == 'y':
+        regridded = str(startyear) + '_' + str(endyear)
+    else:
+        regridded = '_'
+
+    if REGRID == 'y':
+        regridded = 'regridded' + regridded
+   
+
+    # outfile
+    if linux_win  == 'l':
+        print(regridded,  exptnameout, fieldnameout)
+        if REGRID == 'n':
+            outstart = (filename + fieldnameout + '/means/' )
+        if REGRID == 'y':
+            outstart = (filename + fieldnameout + '/regriddedmeans/' )
+        lsmstart = '/nfs/hera1/earjcti/' + regridded
+    else:
+        outstart = ('C:\\Users\\julia\\OneDrive\\WORK\\DATA\\' + regridded
+              +modelname+'\\'+exptnameout+'.'+fieldnameout+'.')
+        lsmstart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+
+   
+    #####################################
+    # get all data in a single cube
+    cube100 = get_hadcm3_cube()
+    ###########################################
+    # reduce number of years to 50
+
+    if avgallyears == 'y':
+        cube = cube100
+    else:
+        cube = reduce_years(cube100, fielduse)
+    cube.data = cube.data.astype('float32')
+    ndim = cube.ndim
+
+
+    # now regrid the cube onto a 1X1 grid (we will first try regridding the raw data)
+    # we have stored the grid we want in a file 'one_lev_one_deg.nc'
+
+    # do not need to regrid CCSM4_UoTdata or a field that was originally on a tripolar grid
+   
+    if REGRID == 'n':
+        regridded_cube = cube
+    else:
+        cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+        regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
+
+
+
+    refdate = 'days since 0800-01-01 00:00:00'
+
+    if fieldnamein  == 'tas' or fieldnamein  == 'SST':
+        regridded_cube.convert_units('Celsius')
+        cube.convert_units('Celsius')
+
+  
+
+    # add auxillary coordinates month and year
+    iris.coord_categorisation.add_month_number(regridded_cube,  'time',  name = 'month')
+    iris.coord_categorisation.add_year(regridded_cube,  'time',  name = 'year')
+    
+    # correct the start month if required
+    regridded_cube=correct_start_month(regridded_cube)
+    
+    # calculate averages
+    mean_mon_data, sd_mon_data, mean_year_data, sd_data, mean_data = cube_avg(regridded_cube)
+
+
+   
+    print('j4 all mon', np.shape(mean_data))
+    print('j5 all year', np.shape(sd_data))
+
+    # extract monthly data from cubes
+
+    jan_slice  =  regridded_cube.extract(iris.Constraint(month = 1))
+    feb_slice  =  regridded_cube.extract(iris.Constraint(month = 2))
+    mar_slice  =  regridded_cube.extract(iris.Constraint(month = 3))
+    apr_slice  =  regridded_cube.extract(iris.Constraint(month = 4))
+    may_slice  =  regridded_cube.extract(iris.Constraint(month = 5))
+    jun_slice  =  regridded_cube.extract(iris.Constraint(month = 6))
+    jul_slice  =  regridded_cube.extract(iris.Constraint(month = 7))
+    aug_slice  =  regridded_cube.extract(iris.Constraint(month = 8))
+    sep_slice  =  regridded_cube.extract(iris.Constraint(month = 9))
+    oct_slice  =  regridded_cube.extract(iris.Constraint(month = 10))
+    nov_slice  =  regridded_cube.extract(iris.Constraint(month = 11))
+    dec_slice  =  regridded_cube.extract(iris.Constraint(month = 12))
+
+
+
+
+    # write the cubes out to a file
+    
+    outfile = outstart+fieldnamein +'_' +MIPname.get(exptnamein,exptnamein) + '_Monthly_Average_'+ str(startyear) + '_' + str(endyear) + '.nc'
+    print('writing outfile',outfile)
+    iris.save(mean_mon_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    outfile = outstart+fieldnamein +'_' +MIPname.get(exptnamein,exptnamein) +'_Monthly_Stddev_'+ str(startyear) + '_' + str(endyear) + '.nc'
+    iris.save(sd_mon_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    outfile = outstart+fieldnamein +'_' +MIPname.get(exptnamein,exptnamein) +'_Annual_Average_'+ str(startyear) + '_' + str(endyear) + '.nc'
+    iris.save(mean_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    outfile = outstart+fieldnamein +'_' + MIPname.get(exptnamein,exptnamein) +'_Annual_Stddev_'+ str(startyear) + '_' + str(endyear) + '.nc'
+    iris.save(sd_data, outfile, netcdf_format = 'NETCDF3_CLASSIC', fill_value = 2.0E20)
+
+    ##########################################################################
+    # get the global mean and standard deviation and write them all out to a file
+    #
+    textout = outstart + fieldnamein +'_' + MIPname.get(exptnamein,exptnamein) +'data_'+ str(startyear) + '_' + str(endyear) +'.txt'
+
+    file1 =  open(textout, "w")
+
+    # get mean field for cube
+
+    if mean_data.coord('latitude').has_bounds():
+        mean_data.coord('latitude').bounds
+    else:
+        mean_data.coord('latitude').guess_bounds()
+
+    if mean_data.coord('longitude').has_bounds():
+        mean_data.coord('longitude').bounds
+    else:
+        mean_data.coord('longitude').guess_bounds()
+
+    grid_areas  =  iris.analysis.cartography.area_weights(mean_data)
+    tempcube = mean_data.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas)
+    meanann = tempcube.data
+
+
+    # get mean for each latitude
+    tempcube = mean_data.collapsed(['longitude'], iris.analysis.MEAN)
+    meanlat = tempcube.data
+    meanlat = np.squeeze(meanlat)
+
+
+    # get standard deviation
+    # 1. mean for each year
+
+    if mean_year_data.coord('latitude').has_bounds():
+        mean_year_data.coord('latitude').bounds
+    else:
+        mean_year_data.coord('latitude').guess_bounds()
+
+    if mean_year_data.coord('longitude').has_bounds():
+        mean_year_data.coord('longitude').bounds
+    else:
+        mean_year_data.coord('longitude').guess_bounds()
+
+    grid_areas  =  iris.analysis.cartography.area_weights(mean_year_data)
+    tempcube = mean_year_data.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevann = stdevcube.data
+
+    plt.plot(tempcube.data)
+    plt.plot([0, 100], [meanann, meanann])
+    plt.plot([0, 100], [meanann+stdevann+stdevann, meanann+stdevann+stdevann])
+    plt.plot([0, 100], [meanann-stdevann-stdevann, meanann-stdevann-stdevann])
+    plt.title('data and data+/-2sd')
+
+    # get standard deviation for each latitude
+    tempcube = mean_year_data.collapsed(['longitude'],  iris.analysis.MEAN)
+    stdevcube = tempcube.collapsed(['time'], iris.analysis.STD_DEV)
+    #stdevann = stdevcube.data
+    stdevlat = stdevcube.data
+    stdevlat = np.squeeze(stdevlat)
+
+
+
+
+
+
+    # write out to a file
+    file1.write('global annual mean and standard deviation\n')
+    file1.write('------------------------------------------\n')
+    if ndim>= 4:
+        file1.write(np.str(np.round(meanann[0], 2))+', '+np.str(np.round(stdevann[0], 3))+'\n')
+    else:
+        file1.write(np.str(np.round(meanann, 2))+', '+np.str(np.round(stdevann, 3))+'\n')
+
+    # get monthly means and standard deviation
+    file1.write('monthly means and standard deviations \n')
+    file1.write('----------------------------------------')
+    file1.write('month    mean    sd  \n')
+
+
+    if mean_mon_data.coord('latitude').has_bounds():
+        mean_mon_data.coord('latitude').bounds
+    else:
+        mean_mon_data.coord('latitude').guess_bounds()
+
+    if mean_mon_data.coord('longitude').has_bounds():
+        mean_mon_data.coord('longitude').bounds
+    else:
+        mean_mon_data.coord('longitude').guess_bounds()
+    
+    grid_areas2  =  iris.analysis.cartography.area_weights(mean_mon_data)
+    tempcube = mean_mon_data.collapsed(['latitude', 'longitude'],
+                                iris.analysis.MEAN, weights = grid_areas2)
+    meanmon = tempcube.data
+
+    # get monthly average using grid areas from year average
+    # to calculate standard deviation
+    #print(np.shape(jan_slice))
+    #print(np.shape(grid_areas))
+    #sys.exit(0)
+
+    jan_avg = jan_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    feb_avg = feb_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    mar_avg = mar_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    apr_avg = apr_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    may_avg = may_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    jun_avg = jun_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    jul_avg = jul_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    aug_avg = aug_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    sep_avg = sep_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    oct_avg = oct_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    nov_avg = nov_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+    dec_avg = dec_slice.collapsed(['latitude', 'longitude'], iris.analysis.MEAN, weights = grid_areas)
+
+    stdevmon = np.zeros(12)
+
+    stdevcube = jan_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[0] = stdevcube.data
+    stdevcube = feb_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[1] = stdevcube.data
+    stdevcube = mar_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[2] = stdevcube.data
+    stdevcube = apr_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[3] = stdevcube.data
+    stdevcube = may_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[4] = stdevcube.data
+    stdevcube = jun_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[5] = stdevcube.data
+    stdevcube = jul_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[6] = stdevcube.data
+    stdevcube = aug_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[7] = stdevcube.data
+    stdevcube = sep_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[8] = stdevcube.data
+    stdevcube = oct_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[9] = stdevcube.data
+    stdevcube = nov_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[10] = stdevcube.data
+    stdevcube = dec_avg.collapsed(['time'], iris.analysis.STD_DEV)
+    stdevmon[11] = stdevcube.data
+
+    for i in range(0, 12):
+        if ndim>= 4:
+            file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i].data[0], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+        else:
+            file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+
+    # get latitudinal means and standard deviation
+    file1.write('zonal means and standard deviations \n')
+    file1.write('----------------------------------------\n')
+    file1.write('latitude    mean    sd  \n')
+    for i in range(0, len(meanlat)):
+        file1.write(np.str(mean_data.coord('latitude').points[i])+', '+np.str(np.round(meanlat[i], 2))+', '+np.str(np.round(stdevlat[i], 3))+'\n')
+
+    file1.close()
+
+
+    ########################################################
+    # check that we have averaged properly.  To do this we are
+    # going to plot the annual cycle of the global mean field
+    # for the regridded dataset and also for each year
+
+
+
+    #global mean
+    plt.subplot(2, 2, 1) # global mean from each year
+    #subcube = subcube_mean_mon.copy(data = )  # set up structure of subcube
+
+    if cube.coord('latitude').has_bounds():
+        cube.coord('latitude').bounds
+    else:
+        cube.coord('latitude').guess_bounds()
+
+    if cube.coord('longitude').has_bounds():
+        cube.coord('longitude').bounds
+    else:
+        cube.coord('longitude').guess_bounds()
+
+    grid_areas  =  iris.analysis.cartography.area_weights(cube)
+    newcube = cube.collapsed(['latitude', 'longitude'],  iris.analysis.MEAN, weights = grid_areas)
+    nt = len(newcube.data)
+    nyears = np.int64(nt/12)
+    print('nyears is', nyears)
+
+    for i in range(0, nyears):
+        tstart = i*12
+        tend = (i+1)*12
+        plotdata = newcube.data[tstart:tend]
+        plt.plot(plotdata, color = 'r')
+
+
+
+    # global mean from average
+
+    grid_areas  =  iris.analysis.cartography.area_weights(mean_mon_data)
+    temporal_mean  =  mean_mon_data.collapsed(['latitude', 'longitude'],  iris.analysis.MEAN, weights = grid_areas)
+
+    plt.plot(temporal_mean.data, color = 'b', label = 'avg')
+    plt.title('globavg '+fieldnamein)
+    plt.legend()
+
+
+
+
+    # check at 30N
+    plt.subplot(2, 2, 2)
+
+    bounds = cube.coord('latitude').bounds
+    nbounds = cube.coord('latitude').nbounds
+    nbounds, dummy = np.shape(bounds)
+    for i in range(0, nbounds):
+        if (bounds[i, 0]>= 32. >= bounds[i, 1] or bounds[i, 0]<= 32. <bounds[i, 1]):
+            index = i
+    #print(cube)
+    if ndim>= 4:
+        subcube = cube[:, :, index, :]
+    else:
+        subcube = cube[:, index, :]
+    cube_avg_30N = subcube.collapsed(['longitude'], iris.analysis.MEAN)
+
+    for i in range(0, nyears):
+        tstart = i*12
+        tend = (i+1)*12
+        plotdata = cube_avg_30N.data[tstart:tend]
+        plt.plot(plotdata, color = 'r')
+
+    #mean at 30N
+    slice_30N =  mean_mon_data.extract(iris.Constraint(latitude = 32))
+    mean_30N = slice_30N.collapsed(['longitude'],  iris.analysis.MEAN)
+
+
+    plt.plot(mean_30N.data, color = 'b', label = 'avg')
+    plt.title('average at 30N by month')
+    plt.legend()
+    #plt.show()
+    plt.close()
+
+
+
+##########################################################
+# main program
+
+filename  =  ' '
+linux_win  =  'l'
+
+# this is regridding where all results are in a single file
+avgallyears = 'y'
+
+fieldnamein = 'd18op_18o'  # if you are doing d18op do 18o and 16o seperately
+                           # call them d18op_18o and d18op_16o
+exptnamein = 'xozzf'
+REGRID = 'n'
+startyear = 2450
+endyear = 2500
+  
+MIPname = {'tenvs' : 'e560',
+           'tenvo' : 'e280',
+           'tenvq' : 'e400'}
+ 
+if linux_win  == 'l':
+    filestart = '/nfs/hera1/earjcti/um/' + exptnamein + '/' 
+    #filestart = '/nfs/hera1/earjcti/PLIOMIP2/'
+else:
+    filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
+
+fielduse = fieldnamein
+filename = filestart
+     
+print(fielduse,filename)
+
+
+if fieldnamein[0:5] == 'd18op':
+    fieldnameout = 'd18op'
+else:
+    fieldnameout = fieldnamein
+exptnameout = exptnamein
+regrid_data(fieldnamein, exptnamein)

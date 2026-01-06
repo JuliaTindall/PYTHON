@@ -1,0 +1,267 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on 29.03.2022 by Julia
+
+this is an experimental program to see what is in the MOSIS-WS***nc4 file
+"""
+import numpy as np
+import iris
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+import sys
+
+def plot_ISCCP_weather_states(ISCCP_cube):
+    """
+    plots the ISCCP cloud regiemes for reference
+    """
+    fig = plt.figure(figsize=[10,10])
+
+    plotno=0
+    for i in range(0,10):
+        plotno=plotno+1
+        WS_cube = ISCCP_cube[:, :, i]
+        WS_cube.coord('cloud top pressure dimension').rename('ctp')
+        WS_cube.coord('cloud optical thickness dimension').rename('tau')
+        fig.add_subplot(4,3,plotno)
+        cs = plt.pcolormesh(WS_cube.data)
+        cbar = plt.colorbar(cs)
+        plt.yticks(ticks=np.arange(7),labels = WS_cube.coord('ctp').points)
+        plt.xticks(ticks=np.arange(6),labels = WS_cube.coord('tau').points,rotation=45)
+        plt.title('WS ' + str(i+1))
+       
+    plt.tight_layout()
+    plt.savefig('ISCCP_weather_states.eps')
+   
+def reformat_hist(orighist):
+    """
+    note the ISCCP data has 6 categories of cloud optical thickness
+    the cosp2 histograms have 7.  Combine the lower two catogeries so that
+    they match.  
+    """
+
+    auxcoordpoints = np.copy(orighist.coord('atmosphere_optical_thickness_due_to_cloud').points)
+    auxcoordpoints[0] = 0.635
+    auxcoordpoints[1] = 0.635
+  
+    taucoord = iris.coords.AuxCoord(points = auxcoordpoints, long_name = 'tau')
+
+    
+    orighist.add_aux_coord(taucoord, data_dims = 1)
+    
+    newhist = orighist.aggregated_by(taucoord, iris.analysis.SUM)
+    iris.util.promote_aux_coord_to_dim_coord(newhist,'tau')
+
+    return newhist
+
+def find_euclidian_distances(in_hist, ISCCP_cube):
+
+    """
+    in_hist is shape 7,6
+    ISCCP_cube shape is 7, 6, 10
+    finds 10 ISCCP weather states and finds the euclidian distance between
+    the input histogram and each isccp westher states
+    """
+   
+    sum_squares_clear = np.sum(np.square(in_hist.data))
+   
+    sum_sq_WS = np.zeros(10)
+    for i in range(0,10):
+        WS_cube = ISCCP_cube[:, :, i]
+        #print(i,WS_cube.data)
+        anomaly = in_hist.data - WS_cube.data
+        sum_sq_WS[i] = np.sum(np.square(anomaly))
+       
+    return sum_squares_clear, sum_sq_WS
+ 
+def get_ind_weather_state(cosp2hist, ISCCP_WS_cube):
+    """
+    we have a histogram (hist) from cosp2
+    we will calculate the euclidean distance from this histogram to 
+    each of the histograms in the ISCCP_WS.
+    we will figure out which is the minimum euclidean distance and
+    pass this back as the cloud regieme.  
+    """
+    cosp2R_hist = reformat_hist(cosp2hist) # reformat histogram for
+                                           # comparing to ISCCP
+
+    # gets the euclidian distances between WS and each of the 10 ISCCP
+    # weather states.  (Will return 10 numbers)
+    (euclidian_distances_clear,
+     euclidian_distance_WS)= find_euclidian_distances(cosp2R_hist / 100., 
+                                                      ISCCP_WS_cube)
+
+    #print('distances',euclidian_distances_clear)
+    #for i, dist in enumerate(euclidian_distance_WS):
+    #    print(i+1,dist)
+    # add the cloud regieme with the lowest euclidian distance
+
+    print(euclidian_distance_WS)
+    if euclidian_distances_clear == 0:
+        WS_ass = 10 # clear sky
+    else:
+        WS_ass = np.argmin(euclidian_distance_WS)
+   
+    return WS_ass, cosp2R_hist
+
+
+def get_all_weather_states(cosp2_test_cube, ISCCP_WS_cube):
+    """
+    get the cloud regiemes.  Put into a cube showing all the cosp2 histograms in each cloud regieme
+    """
+
+    weather_state_tally = np.zeros(11) # to store the number in each weather state
+    WS1_cubes = iris.cube.CubeList([])   
+    WS2_cubes = iris.cube.CubeList([])
+    WS3_cubes = iris.cube.CubeList([])   
+    WS4_cubes = iris.cube.CubeList([])
+    WS5_cubes = iris.cube.CubeList([])   
+    WS6_cubes = iris.cube.CubeList([])
+    WS7_cubes = iris.cube.CubeList([])   
+    WS8_cubes = iris.cube.CubeList([])
+    WS9_cubes = iris.cube.CubeList([])   
+    WS10_cubes = iris.cube.CubeList([])
+    WS_clear_cubes = iris.cube.CubeList([])
+
+    for histno in range(0,1236):
+    #for histno in range(18,19):
+        hist = cosp2_test_cube[:, :, histno]
+        weather_state, newhist = get_ind_weather_state(hist,ISCCP_WS_cube)
+  
+        weather_state_tally[weather_state] = weather_state_tally[weather_state] + 1
+
+        print('hist',newhist.data)
+        print(histno,'assigned',weather_state)
+        print(' ')
+        #if histno > 100:
+        #    sys.exit(0)
+        if weather_state == 0:  # WS1
+            WS1_cubes.append(newhist)
+        elif weather_state == 1:  # WS2
+            WS2_cubes.append(newhist)
+        elif weather_state == 2:  # WS3
+            WS3_cubes.append(newhist)
+        elif weather_state == 3:  # WS4
+            WS4_cubes.append(newhist)
+        elif weather_state == 4:  # WS5
+            WS5_cubes.append(newhist)
+        elif weather_state == 5:  # WS6
+            WS6_cubes.append(newhist)
+        elif weather_state == 6:  # WS7
+            WS7_cubes.append(newhist)
+        elif weather_state == 7:  # WS8
+            WS8_cubes.append(newhist)
+        elif weather_state == 8:  # WS9
+            WS9_cubes.append(newhist)
+        elif weather_state == 9:  # WS10
+            WS10_cubes.append(newhist)
+        elif weather_state == 10:  # clear
+            WS_clear_cubes.append(hist)
+        else:
+            print('missing cloud regieme',weather_state)
+            sys.exit(0)
+   
+    # save the cubelists for each cloud regiems
+    if len(WS1_cubes) > 0:
+        iris.save(WS1_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS1.nc')
+    if len(WS2_cubes) > 0:
+        iris.save(WS2_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS2.nc')
+    if len(WS3_cubes) > 0:
+        iris.save(WS3_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS3.nc')
+    if len(WS4_cubes) > 0:
+        iris.save(WS4_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS4.nc')
+    if len(WS5_cubes) > 0:
+        iris.save(WS5_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS5.nc')
+    if len(WS6_cubes) > 0:
+        iris.save(WS6_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS6.nc')
+    if len(WS7_cubes) > 0:
+        iris.save(WS7_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS7.nc')
+    if len(WS8_cubes) > 0:
+        iris.save(WS8_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS8.nc')
+    if len(WS9_cubes) > 0:
+        iris.save(WS9_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS9.nc')
+    if len(WS10_cubes) > 0:
+        iris.save(WS10_cubes,ISCCP_ISCCP_IND + '_map_cosp2test_WS10.nc')
+  
+  
+    # check how many assigned to each cloud regieme
+    for i,WS in enumerate(weather_state_tally):
+        print(str(i+1), WS)
+   
+def plot_avg_weather_state():
+    """
+    plots the average of the histograms in each cloud regieme
+    the histograms are from the cosp2 test data
+    they are all in a file
+    """
+    
+    fig = plt.figure(figsize=[10,10])
+    plotno=0
+ 
+    for WS in range(1,11):
+        plotno=plotno+1
+        
+        try:
+            cubes = iris.load(ISCCP_ISCCP_IND + '_map_cosp2test_WS' + str(WS) + '.nc')
+        except:
+            continue
+
+        # merge cubes for averaging
+        cubes_2 = iris.cube.CubeList([])
+        iris.util.equalise_attributes(cubes)
+        for i,cube in enumerate(cubes):
+            cube.attributes = None
+            cube2 = iris.util.new_axis(cube,scalar_coord='loc')
+            cube2.coord('loc').points = i
+            cube2.coord('loc').var_name = None
+            cube2.var_name = None
+            cube2.cell_methods = None
+            
+            print(cube2.metadata)
+            
+            cubes_2.append(cube2)
+        
+        cube = cubes_2.concatenate_cube()
+        mean_cube = cube.collapsed('loc',iris.analysis.MEAN)
+
+        # plot it
+        fig.add_subplot(4,3,plotno)
+        cs = plt.pcolormesh(mean_cube.data)
+        cbar = plt.colorbar(cs)
+        plt.yticks(ticks=np.arange(7),labels = mean_cube.coord('air_pressure').points)
+        plt.xticks(ticks=np.arange(6),labels = mean_cube.coord('tau').points,rotation=45)
+        plt.title('WS :' + str(WS) + ' number:' + str(i+1))
+       
+    plt.tight_layout()
+    plt.savefig(ISCCP_ISCCP_IND + '_cosp2_avg_weather_states.eps')
+        
+
+
+########    START OF PROGRAM ########################
+# isccp weather state has index ctp, cot, cr
+ISCCP_WS_cube = iris.load_cube('ISCCP_weather_states.nc')
+#plot_ISCCP_weather_states(ISCCP_WS_cube)
+
+#isccp histogram has index ctp, cot, loc
+
+ISCCP_ISCCP_IND = 'ISCCP'  # options Modic, ISCCP
+
+cubes = iris.load('../CFMIP/COSPv2.0_juliatest/driver/data/outputs/UKMO/cosp2_output_um_julia_default.nc','cloud_area_fraction_in_atmosphere_layer')  
+for cube in cubes:
+    if ISCCP_ISCCP_IND == 'Modis' and cube.var_name == 'clmodis':
+        cosp2_test_cube = cube
+    if ISCCP_ISCCP_IND == 'ISCCP' and cube.var_name == 'clisccp':
+        cosp2_test_cube = cube
+
+####################################################################
+# get the cloud regieme for each histogram and group the histograms
+# this program will also write them out to a file
+
+#get_all_weather_states(cosp2_test_cube, ISCCP_WS_cube)
+#sys.exit(0)
+
+##################################################################
+# plot the average histogram from the test data in each cloud regieme.
+# it uses the files written out in the previous steop
+
+plot_avg_weather_state()
