@@ -1,0 +1,88 @@
+
+# redo to use theta rather than deltaT
+
+
+# we are going to calculate the ocean heat transport over the full depth
+# of the ocean. I think this is fine as temperature gradients are not very
+# large at the deepest layers
+import iris
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+filename = '/home/earjcti/um/xqbwd/pg/xqbwdo#pg000003995c1+.nc'
+
+
+
+def calculate_heat_transport(vcube, Tcube):
+    """
+    Calculates ocean heat transport in Watts.
+    dx: grid spacing in meters (horizontal)
+    depth: layer thickness in meters
+    """
+    density=1025
+    cp=4000
+
+    # get stuff we need for area
+    depths = vcube.coord('depth_1').points
+    lons = vcube.coord('longitude').points
+    lats = vcube.coord('latitude').points
+    lonres=lons[1]-lons[0]
+    latres=lats[1]-lats[0]
+    depdiff = np.zeros(20)
+    for k in range(1,19):
+        depdiff[k]=(depths[k+1] - depths[k-1]) / 2.0
+    depdiff[0]=depths[1]-depths[0]
+    depdiff[19]=depths[19]-depths[18]
+
+    lats = vcube.coord('latitude').points
+    coslats = np.cos(lats * 2.0 * np.pi / 360.) # cos latitude of vacross
+    onedeg=111100.   # 111.1 km
+
+    area_arr = np.zeros_like(vcube.data,dtype=float)
+    area_arr[:]=depdiff[:,np.newaxis,np.newaxis] # add depth
+    area_arr[:]=(area_arr[:] *
+                 onedeg * coslats[np.newaxis,:,np.newaxis] * lonres)
+    area_cube = vcube.copy(data=area_arr)
+    
+    Qcube = density * cp * vcube * Tcube * area_cube
+    Qcube = Qcube / 1.0E15
+    Qcube.data = np.ma.where(Qcube.data.mask,-99999.,Qcube.data)
+    Qcube.data = np.ma.masked_where(Qcube.data==-99999.,Qcube.data)
+    Qcube.units = 'PW'
+    Qcube.long_name = 'Ocean heat transport petawatts'
+    Tcube.data = np.ma.where(Tcube.data.mask,-99999.,Tcube.data)
+    Tcube.long_name = 'potT'
+    Qcube_zm = Qcube.collapsed('longitude',iris.analysis.SUM)
+    Qcube_zm.long_name = 'Ocean heat transport (PW) summed over longitude'
+    Qcube_int = Qcube_zm.collapsed('depth_1',iris.analysis.SUM)
+    Qcube_int.long_name = 'Depth integrated Ocean heat transport (PW)'
+
+    plt.plot(lats,Qcube_int.data)
+    plt.title=filename
+    plt.show()
+    sys.exit(0)
+   
+    iris.save([Qcube,deltaTcube,Qcube_zm,Qcube_int],'temporary.nc',fill_value = -99999.)
+    print(Qcube.shape)
+    sys.exit(0)
+    return np.sum(Q)
+
+
+
+
+vcube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+vcube = iris.util.squeeze(vcube) / 100. # convert to m/s
+Tcube = iris.util.squeeze(iris.load_cube(filename,
+                    'POTENTIAL TEMPERATURE (OCEAN)  DEG.C'))
+
+# get deltaT.  Easy cos its on a staggered grid
+#deltaT_data = Tcube.data[:,1:,:]-Tcube.data[:,:-1,:]
+#deltaT_mask = Tcube.data.mask[:,1:,:] | Tcube.data.mask[:,:-1,:]
+#deltaT_np = np.ma.array(deltaT_data,mask=deltaT_mask)
+#deltaT_cube = vcube.copy(data=deltaT_np)
+Tregrid_cube = Tcube.regrid(vcube,iris.analysis.Linear())
+
+#    # Calculate total heat transport
+total_Q = calculate_heat_transport(vcube, Tregrid_cube)
+#    print(f"🌊 Estimated Ocean Heat Transport: {total_Q:.2e} W")

@@ -1,0 +1,166 @@
+20a21
+> 
+33,34c34,35
+<             filename = (FILESTART_UM + expt + '/pd/' + expt + 
+<                         'a@pdp' + np.str(year) + month + '.nc')
+---
+>             filename = (FILESTART + expt + '/netcdf/' + expt + 
+>                         'a@pdk' + np.str(year) + month + '.nc')
+39d39
+< 
+43d42
+<         
+66,69c65
+<     try:
+<         monthscube.coord('t').rename('time')
+<     except:
+<         pass
+---
+>     #'monthscube.coord('t').rename('time')
+72,83c68,69
+<     print(monthscube)
+< 
+<     # setup missing data attribute
+<     monthscube.attributes["missing_value"] = -9999.
+<     #monthscube.attributes["scale_factor"] = "0.0"
+<     #monthscube.attributes["add_offset"] = "0.0"
+<     print(monthscube)
+< 
+<     # get rid of superflous dimensions
+<     outcube = iris.util.squeeze(monthscube)
+< 
+<     return outcube
+---
+>   
+>     return monthscube
+89c75,76
+<     filename = (FILESTART_BIOME + '/inputdata.nc')
+---
+>     filename = ('/nfs/see-fs-02_users/earjcti/BIOME4/'+
+>                 'biome4_pliomip2/inputdata.nc')
+91,98c78
+< 
+<     if (field == 'monthly mean temperature'
+<     or field == 'mean monthly percent of possible sunshine'):
+<      # divide by 10 because it was in the wrong units in the original file
+<         cube = cube / 10.
+< 
+< 
+<     cubegrid = iris.load_cube(FILESTART_BIOME + 'files/P4_enh_qrparm.mask.nc', 'LAND MASK (LOGICAL: LAND=TRUE)')
+---
+>     cubegrid = iris.load_cube('/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_qrparm.mask.nc', 'LAND MASK (LOGICAL: LAND=TRUE)')
+128c108
+<         anom_data = np.ma.where(anom_data < 100, anom_data, 100.0)
+---
+>         anom_data = np.ma.where(anom_data < 1000, anom_data, 1000.0)
+148c128,129
+<     cube.data = cube.data - 273.15 # convert to celcius
+---
+>        
+>     cube.data = cube.data * 10.0
+153c134,135
+<     pi_cube.data = pi_cube.data - 273.15
+---
+>     pi_cube.data = pi_cube.data * 10.0
+> 
+178,179c160
+<     # convert to mm/month multiply by (60. * 60. * 24. * 30)
+<     cube.data = cube.data * 60. * 60. * 24. * 30.
+---
+>     cube.data = cube.data * 30.0
+184c165
+<     pi_cube.data = pi_cube.data * 60. * 60. * 24. * 30.
+---
+>     pi_cube.data = pi_cube.data * 30.0
+199c180
+<     4. multiplies by 100 to get percentage
+---
+>     4. multiplies by 1000 to get biome units.
+206,211c187,189
+<     cube_mPWP.attributes["name"] = 'sun'
+<     cube_mPWP.long_name = 'cloud amount (inverse)'
+<     cube_mPWP.rename('sun')
+<     cube_mPWP.data = (cube_mPWP.data * (-1.0) + 1.0) * 100.
+<     print(cube_mPWP.data)
+<     #sys.exit(0)
+---
+>     cube_mPWP.short_name = 'sun'
+>     cube_mPWP.data = cube_mPWP.data / 100.
+>     cube_mPWP.data = (cube_mPWP.data * (-1.0) + 1.0) * 1000.
+217,220c195,198
+<     cube_PI.data = (cube_PI.data * (-1.0) + 1.0) * 100.
+<     cube_PI.attributes["name"] = 'cld'
+<     cube_PI.long_name = 'cloud amount (inverse)'  
+<     cube_PI.attributes["name"] = 'cld'  
+---
+>     cube_PI.data = cube_PI.data / 100.
+>   
+>     cube_PI.short_name = 'sun'
+>     cube_PI.data = (cube_PI.data * (-1.0) + 1.0) * 1000.
+257c235
+<     cubegrid = iris.load_cube(FILESTART_BIOME + 'files/P4_enh_qrparm.mask.nc', 'LAND MASK (LOGICAL: LAND=TRUE)')
+---
+>     cubegrid = iris.load_cube('/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_qrparm.mask.nc', 'LAND MASK (LOGICAL: LAND=TRUE)')
+262c240,241
+<     file_soils_mPWP = (FILESTART_BIOME + 'files/PRISM3_soil_alternative_whc.nc')
+---
+>     file_soils_mPWP = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+>                        'PRISM3_soil_alternative_whc.nc')
+265c244,245
+<     file_perc_mPWP = (FILESTART_BIOME + 'files/PRISM3_soil_alternative_perc.nc')
+---
+>     file_perc_mPWP = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+>                       'PRISM3_soil_alternative_perc.nc')
+272c252,253
+<     file_soils_PI = (FILESTART_BIOME + 'files/MODERN_soil_alternative_whc.nc')
+---
+>     file_soils_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+>                        'MODERN_soil_alternative_whc.nc')
+275c256,257
+<     file_perc_PI = (FILESTART_BIOME + 'files/MODERN_soil_alternative_perc.nc')
+---
+>     file_perc_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+>                       'MODERN_soil_alternative_perc.nc')
+299c281
+<     lsm = FILESTART_BIOME + '/files/Plio_enh_LSM_v1.0.nc'
+---
+>     lsm = '/nfs/hera1/earjcti/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc'
+301c283
+<     cubegrid = iris.load_cube(FILESTART_BIOME + '/files/P4_enh_qrparm.mask.nc', 'LAND MASK (LOGICAL: LAND=TRUE)')
+---
+>     cubegrid = iris.load_cube('/nfs/hera1/earjcti/ancil/P4_enh/P4_enh_qrparm.mask.nc', 'LAND MASK (LOGICAL: LAND=TRUE)')
+341,342c323,324
+<     #allcubes_plio.append(abs_min_cube_plio)
+<     #allcubes_anom.append(abs_min_cube_anom)
+---
+>     allcubes_plio.append(abs_min_cube_plio)
+>     allcubes_anom.append(abs_min_cube_anom)
+349,350c331
+<     allcubes_plio_land = apply_lsm(allcubes_plio)
+<     iris.save(allcubes_plio_land,OUTFILE + 'absolute.nc', 
+---
+>     iris.save(allcubes_plio,OUTFILE + 'absolute.nc', 
+362,366c343,344
+< #####################################################################
+< 
+< FILESTART_UM = '/home/earjcti/umdata/'
+< FILESTART_BIOME = '/home/earjcti/BIOME4-main/'
+< EXPTNAME = 'xozzb'
+---
+> FILESTART = '/nfs/hera1/earjcti/um/'
+> EXPTNAME = 'xozzh'
+368,377c346,348
+< STARTYEAR = 70
+< ENDYEAR=100
+< 
+< FOR_ORIG = 'Y' # this is if we are obtaining the data to be run with the
+<                # pre 2023 version of BIOME4
+< 
+< OUTFILE = FILESTART_UM + EXPTNAME + '/biome4/inputdata_'
+< 
+< if FOR_ORIG == 'Y':
+<     OUTFILE = OUTFILE + 'orig_'
+---
+> STARTYEAR = 40
+> ENDYEAR=60
+> OUTFILE = FILESTART + EXPTNAME + '/biome4/inputdata_'

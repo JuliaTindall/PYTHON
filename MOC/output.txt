@@ -1,0 +1,5 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "/localhome/home/earjcti/PYTHON/MOC/regrid_density_coords.py", line 10, in <module>
+    import iris
+ModuleNotFoundError: No module named 'iris'

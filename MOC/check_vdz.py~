@@ -1,0 +1,212 @@
+#NAME
+#    correct_vdz
+#PURPOSE 
+#
+# I have written a program to put dz and v onto density coordinates.
+# However I think there are problems as some of the dz are very large and
+# so small errors in 'v' as we get from the interpolation leads to huge errors
+# in vdz.
+#
+# I do not think there is any way to fix this properly, so here is what I will
+# do for each (longitude,latitude)
+#
+# 1.use the file xqbwco#pg to calculate sum vdz down through the layers
+# 2.use my file ocean_data_rho_potential to calculate sum vdz through the
+#   layers
+# 3.if they are different adjust v in proportion to the depth of the gridbox
+# 4.write to a file on sigma levels
+#   a) dz
+#   b) newv
+#   c) oldv
+#   d) difference between newv and oldv in m/s
+#   e) difference between newv and oldv as a percentage
+# 5.write out to the screeen all places where v has changed by more than 10%
+#
+
+# Import necessary libraries
+import iris
+import iris.quickplot as qplt
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+def get_sum_vdz_depth(filename):
+    """
+    get sum vdz for each latitude and longitude 
+    returns:  sum_vdz_depth_grid this is a numpy array shape (lats,lons)
+              v_cube (for masking density stuff)
+
+    """
+    # get v
+    v_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    v_cube.data = v_cube.data / 100.
+    v_data = v_cube.data
+
+    # get dz (called thickness)
+    w_cube = iris.load_cube(filename,'VERT.VEL. ON OCEAN HALF LEVELS  CM/S')
+    depths=w_cube.coord('depth').points
+    thickness=np.zeros(20)
+    for k in range(1,19):
+        thickness[k]=depths[k]-depths[k-1]
+    thickness[0]=depths[0]
+    thickness[19]= thickness[18]
+
+    # get vdz
+    vdz_data = np.ma.zeros(np.shape(v_cube[0,0,:,:].data))
+    lons = v_cube.coord('longitude').points
+    lats = v_cube.coord('latitude').points
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            if v_data.mask[0,0,j,i]:
+                vdz_data[j,i] = np.ma.masked
+            else:
+                for k in range(0,20):
+                    if v_data.mask[0,k,j,i]:
+                        break
+                    else:
+                        vdz_data[j,i]=(vdz_data[j,i] +
+                                       (v_data[0,k,j,i] * thickness[k]))
+
+    vdz_cube = v_cube[0,0,:,:].copy(data=vdz_data)
+    vdz_cube.long_name='vdz using depth coords - units m/2 s-1'
+    vdz_cube.units=None
+
+    return vdz_cube, iris.util.squeeze(v_cube)
+
+#==========================================================================
+def get_info_from_sigma_file(filename,v_depth_cube):
+    """
+    reads in the v and the dz from the sigma file (filename)
+    """
+    v_sigma_cube = iris.util.squeeze(iris.load_cube(filename,'alternative V cube'))
+    dz_sigma_cube = iris.util.squeeze(iris.load_cube(filename,'thickness (dz)'))
+
+    v_sigma_cube.coord('longitude').attributes = v_depth_cube.coord('longitude').attributes
+    v_sigma_cube.coord('latitude').attributes = v_depth_cube.coord('latitude').attributes
+    v_sigma_cube.coord('longitude').circular = True
+    v_sigma_cube.coord('longitude').rename('longitude')
+    v_sigma_cube.coord('latitude').rename('latitude')
+    
+    dz_sigma_cube.coord('longitude').attributes = v_depth_cube.coord('longitude').attributes
+    dz_sigma_cube.coord('latitude').attributes = v_depth_cube.coord('latitude').attributes
+    dz_sigma_cube.coord('longitude').circular = True
+    dz_sigma_cube.coord('latitude').rename('latitude')
+
+    
+    return (v_sigma_cube,dz_sigma_cube)
+
+#==========================================================================
+def get_sum_vdz_sigma(v_sigma_cube,dz_cube,v_depth_cube):
+    """
+    calculates sum v dz using v and dz from the sigma grid. 
+    returns vdz_cube on sigma grid which has shape (latitudes,longitudes)
+    """
+
+    v_depth_data = v_depth_cube.data
+    v_sigma_data = v_sigma_cube.data
+    dz_data = dz_cube.data
+    
+    vdz_data = np.ma.zeros(np.shape(v_sigma_cube[0,:,:].data))
+    lons = v_sigma_cube.coord('longitude').points
+    lats = v_sigma_cube.coord('latitude').points
+    sigma_levs = v_sigma_cube.coord('sigma').points
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            if v_depth_data.mask[0,j,i]:
+                vdz_data[j,i] = np.ma.masked
+            else:
+                for k in range(0,len(sigma_levs)):
+                    if not v_sigma_data.mask[k,j,i]:
+                        vdz_data[j,i]=(vdz_data[j,i] +
+                                   (v_sigma_data[k,j,i] * dz_data[k,j,i]))
+
+    vdz_cube = v_sigma_cube[0,:,:].copy(data=vdz_data)
+    vdz_cube.long_name='vdz using sigma coords - units m/2 s-1'
+    vdz_cube.units=None
+
+    
+    return vdz_cube
+                        
+
+#============================================================================
+def adjust_v_sigma(v_sigma_cube, dz_sigma_cube, diff_vdz_cube):
+    """
+    adjust v_sigma_cube as follows
+    1. look for any depths greater than 1000 metres and adjust here
+    """
+
+        
+    lats = diff_vdz_cube.coord('latitude').points
+    lons = diff_vdz_cube.coord('longitude').points
+    diff_data = diff_vdz_cube.data
+    dz_data = dz_sigma_cube.data
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            if not diff_data.mask[j,i]:
+                if np.abs(diff_data[j,i]) > 10.0:
+                    max_depth = np.max(dz_data[:,j,i])
+                    print(i,j,lons[i],lats[j],diff_data[j,i],max_depth)
+    sys.exit(0)
+                   
+
+#=============================================================================
+
+filename = 'xqbwco#pg000003999c1+.nc'
+
+#1. get sum vdz for each lat and lon (sum_vdz_depth_cube shape = (lat,lon))
+(sum_vdz_depth_cube,
+ v_depth_cube) = get_sum_vdz_depth(filename)
+print('depth sum',sum_vdz_depth_cube.data[140,202])
+print('v depth',v_depth_cube.data[:,140,202])
+
+
+#2a. get the v-velocity and thickness as cubes shape (sigma,lat,lon)
+(v_sigma_cube,
+ dz_sigma_cube)    = get_info_from_sigma_file('Vdz.nc',
+                                              v_depth_cube)
+
+
+#2b. get sum vdz on a sigma grid (cube shape (lat, lon)
+sum_vdz_sigma_cube = get_sum_vdz_sigma(v_sigma_cube,dz_sigma_cube,v_depth_cube)
+for k in range(0,93):
+    if dz_sigma_cube.data[k,140,202] > 0.0:
+        print(k,v_sigma_cube.data[k,140,202]*100.,dz_sigma_cube.data[k,140,202],
+              v_sigma_cube.data[k,140,202]*dz_sigma_cube.data[k,140,202])
+print('sum of depths',np.sum(dz_sigma_cube.data[:,140,202]))
+print('sigma sum',sum_vdz_sigma_cube.data[140,202])
+
+sys.exit(0)
+
+#3a. plot difference between sum_vdz on depth_grid and sum_vdz on sigma_grid
+
+
+diff_vdz_cube=sum_vdz_depth_cube.copy(
+                      data= sum_vdz_depth_cube.data- sum_vdz_sigma_cube.data)
+diff_vdz_cube.long_name = 'difference vdz'
+percent_diff_vdz_cube = sum_vdz_depth_cube.copy(
+                      data= (diff_vdz_cube.data / sum_vdz_depth_cube.data)*100.)
+percent_diff_vdz_cube.long_name = 'percent difference'
+
+#plt.subplot(221)
+#qplt.contourf(sum_vdz_depth_cube,levels=np.arange(-100,110,10),cmap='RdBu_r',
+#              extend='both')
+#plt.subplot(222)
+#qplt.contourf(sum_vdz_sigma_cube,levels=np.arange(-100,110,10),cmap='RdBu_r',ex#tend='both')
+
+#plt.subplot(223)
+#qplt.contourf(diff_vdz_cube,levels=np.arange(-10,11,1),cmap='RdBu_r',extend='both')
+
+#plt.subplot(224)
+#qplt.contourf(percent_diff_vdz_cube,levels=np.arange(-100,110,10),cmap='RdBu_r',extend='both')
+
+#plt.show()
+#sys.exit(0)
+
+
+#3b. adjust v according to the depth
+v_new_sigma_cube = adjust_v_sigma(v_sigma_cube, dz_sigma_cube, diff_vdz_cube)
+
+

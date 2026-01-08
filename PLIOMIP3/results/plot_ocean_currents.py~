@@ -1,0 +1,183 @@
+"""
+#NAME
+#    plot_ocean_currents.py
+#PURPOSE 
+#
+#  This program will plot the average ocean currents over the top 200m of the
+#  ocean
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import math
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+import iris.plot as iplt
+from netCDF4 import Dataset, MFDataset
+import sys
+#from netCDF4 import Dataset, MFDataset
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_avg(jobid, startyear,field):
+    """
+    gets the average data fpr the field
+    """  
+
+    filestart ='/home/earjcti/um/' + jobid + '/pg/' + jobid + 'o#pg'
+
+    allcubes = CubeList([])
+    
+    for year in range(startyear, startyear+NYEARS):
+        
+        fieldcube = iris.load_cube(filestart + str(year).zfill(9) + 'c1+.nc',
+                                   field)
+        allcubes.append(fieldcube)
+        
+
+    iris.util.equalise_attributes(allcubes)
+    onecube = allcubes.concatenate_cube()
+    
+    avgcube=onecube.collapsed(['t'],iris.analysis.MEAN)
+
+
+    # average over top 100m
+
+    depth_coord = avgcube.coord('depth_1')
+    nearest_100m = depth_coord.points[np.argmin(np.abs(depth_coord.points - 100))]
+
+    top_100m_constraint = iris.Constraint(depth_1=lambda d: d <= nearest_100m)
+    shallow_cube = avgcube.extract(top_100m_constraint)
+    ndepths = len(shallow_cube.coord('depth_1').points)
+   
+    topdepth = np.zeros(ndepths)
+    botdepth = np.zeros(ndepths)
+    topdepth[0]=0.0
+    for i in range(1,ndepths):
+        topdepth[i]=((depth_coord.points[i] -depth_coord.points[i-1])
+                     + topdepth[i-1])
+        botdepth[i-1]=((depth_coord.points[i] -depth_coord.points[i-1])
+                     + topdepth[i-1])
+    botdepth[ndepths-1]=((depth_coord.points[ndepths-1]
+                          -depth_coord.points[ndepths-2])
+                         + topdepth[ndepths-1])
+    
+    layer_thickness = botdepth-topdepth
+
+   
+    weights = iris.util.broadcast_to_shape(layer_thickness, shallow_cube.shape, (0,))
+
+    depthavg_cube = shallow_cube.collapsed('depth_1', iris.analysis.MEAN, weights=weights)
+
+    
+    return depthavg_cube
+
+
+def plot_ocean_currents(u_cube,v_cube):
+
+
+    lats = u_cube.coord('latitude').points
+    lons = u_cube.coord('longitude').points
+
+    # Extract data arrays (e.g., surface layer or collapsed depth)
+    u = u_cube.data / 100.
+    v = v_cube.data / 100.
+
+    # Compute speed for color scale
+    speed = np.sqrt(u**2 + v**2)
+
+    # Create meshgrid for plotting
+    lon_grid, lat_grid = np.meshgrid(lons, lats)
+
+    # Plot quiver
+    plt.figure(figsize=(10, 6))
+    #Q = plt.quiver(lon_grid, lat_grid, u, v, speed, cmap='viridis', scale=5)
+    #contour = plt.contourf(lons, lats, speed, cmap='viridis')
+
+    contour = plt.contourf(lons, lats, speed, cmap='viridis',
+                       norm=LogNorm(vmin=speed.min()+1e-3, vmax=speed.max()))
+
+    step=10
+    plt.quiver(lon_grid[::step, ::step], lat_grid[::step, ::step],
+           u[::step, ::step], v[::step, ::step],
+           color='black', scale=10)
+
+    plt.colorbar(contour, label='Speed (m/s)')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.title('Ocean Currents')
+    plt.show()
+
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+
+
+LINUX_WIN='l'
+NYEARS = 30
+SEASON = 'ann'
+
+# data from new experiemnt
+MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
+
+EXPT = 'xqbwc'  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPT_STARTYEAR = 3970
+#EXPT = 'Eoi400_ARC4_2450-2499'
+
+
+v_cube = get_avg(EXPT,EXPT_STARTYEAR,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+u_cube = get_avg(EXPT,EXPT_STARTYEAR,'TOTAL OCEAN U-VELOCITY      CM S**-1')
+
+plot_ocean_currents(u_cube,v_cube)
+
+print(u_cube)
+sys.exit(0)
+
+print('got cntl cube')
+ 
+for EXPT in EXPTS:
+    expt_cube = get_avg(EXPT,EXPT_STARTYEAR)
+    print('got expt_cube')
+    diff_cube = expt_cube - cntl_cube
+
+    # get means
+    diff_cube.coord('longitude').guess_bounds()
+    diff_cube.coord('latitude').guess_bounds()
+    grid_areas = iris.analysis.cartography.area_weights(diff_cube)
+    meandiff = diff_cube.collapsed(['longitude','latitude'],
+                                   iris.analysis.MEAN, weights=grid_areas)
+    diffchar = str(np.around(meandiff.data,2))
+   
+    print('about to plot')
+    vals = np.arange(-4.0, 4.5,0.5)
+    #vals = np.arange(-8.0, 9.0, 1.0)
+
+    if CNTL == 'xpsid' or CNTL == 'xpsig' or CNTL == 'xpsie':
+        vals = np.arange(-4.0, 4.5,0.5)
+#    if CNTL == 'xpsic' or CNTL == 'xqbwc' or CNTL == 'xqbwi':
+#        vals = np.arange(-8.0, 9.0, 1.0)
+    if EXPT == 'xpsin' or EXPT=='xpsio' or EXPT == 'xpsip' or EXPT == 'xpsiq':
+        vals = np.arange(-6.0, 7.0, 1.0)
+    qplt.contourf(diff_cube,levels=vals,extend='both',cmap='RdBu_r')
+    titlename = EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) + '.Meandiff =' +  diffchar
+    plt.title(titlename, fontsize=10)
+    plt.gca().coastlines()
+      
+    print('about to write to file')
+    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field + '.eps')
+    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field + '.png')
+    plt.close()

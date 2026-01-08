@@ -1,0 +1,19 @@
+
+# plot the ocean heat transport obtained in get_oceanheat_trahsport
+
+
+# we are going to calculate the ocean heat transport over the full depth
+# of the ocean. I think this is fine as temperature gradients are not very
+# large at the deepest layers
+import iris
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+expt='xqbwe'
+startyear=3970
+endyear=3973
+
+
+
+

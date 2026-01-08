@@ -1,0 +1,115 @@
+# 
+# plots density poleward of 60S with depth.  We need to already have produced
+# basin_diagnostics/mean_xpsid_Pacific1400_1499.nc using program
+# plot_density_by_basin.py
+#
+
+import xarray as xr
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+# --- File setup ---
+
+field='Temperature'  #density, Temperature, salinity
+fieldname = {'density':'insitu_T_0','Temperature':'insitu_T_1'}             
+linestyles = {'LP':'--','EP':'dashdot'}
+
+expt = 'xpsid'
+abs_anom_ind = 'abs'  # abs - absolute values;  anom-anomaly relative to 1
+filestart = '/home/earjcti/um/'+expt+'/basin_diagnostics/mean_'+expt+'_Pacific'
+filename1 = filestart + '1400_1499.nc'
+filename2 = filestart.replace('xpsid', 'xpsie') + '1400_1499.nc'
+filename3 = filestart.replace('xpsid', 'xpsie') + '1600_1699.nc'
+#filename4 = filestart.replace('xpsid', 'xpsie') + '2000_2099.nc'
+filename5 = filestart.replace('xpsid', 'xpsig') + '1400_1499.nc'
+
+#filenames = [filename1, filename2, filename3,filename4,filename5]
+filenames = [filename1, filename2, filename3,filename5]
+#filenames = [filename1]
+legends   = ['LP', 'EP400:1400', 'EP400:1600','EP']
+#legends = [expt]
+depth_name = 'depth_1'
+lat_name   = 'latitude'
+
+dens_name  = fieldname.get(field,field) 
+
+ranges = [(0, 200), (200, 1000), (1000, 4000)]
+
+#ranges = [(200, 1000), (1000, 4000)]
+
+fig, axes = plt.subplots(3, 1, figsize=(6, 9), sharex=True)
+
+for i, file_path in enumerate(filenames):
+    ds = xr.open_dataset(file_path)
+    density = ds[dens_name]
+    lat     = ds[lat_name]
+    depth   = ds[depth_name]
+
+    # Select latitudes south of 60S
+    valmin=-90  # should be None
+    valmax=-60  # should be -60
+    #density_south = density.sel(latitude= slice(None,-60))
+    density_south = density.sel(latitude= slice(valmin,valmax))
+    #print(density_south[depth_name].values)
+    #print(density_south.values)
+    lat_south     = lat.sel({lat_name: slice(valmin,valmax)})
+
+    # Area weights
+    weights = np.cos(np.deg2rad(lat_south))
+
+    # Weighted average over latitude
+    dens_w = density_south.weighted(weights).mean(dim=lat_name)
+    if abs_anom_ind == 'anom':
+        if i==0:
+            dens_cntl = dens_w
+        else:
+            dens_w = dens_w - dens_cntl
+        
+    # print out
+    print('density w: '+file_path)
+    for dens,dep in zip(dens_w.values,dens_w[depth_name].values):
+        print(dep,dens)
+
+    # Plot each depth band in its own panel
+    for ax, (dmin, dmax) in zip(axes, ranges):
+        dcoord = dens_w[depth_name]
+        mask   = (dcoord >= dmin) & (dcoord <= dmax)
+        dens_band  = dens_w.where(mask, drop=True)
+        depth_band = dcoord.where(mask, drop=True)
+
+        if i==0 and abs_anom_ind == 'anom':
+            pass
+        else:
+            ax.plot(dens_band.values, depth_band.values, label=legends[i], linewidth=2,linestyle=linestyles.get(legends[i],None))
+        
+            #ax.set_title(f'{dmin}-{dmax} m', fontsize=12)
+            ax.tick_params(axis='both',which='major',labelsize=14)
+            ax.grid(True)
+            ax.set_ylim(dmax, dmin)  # invert y-axis
+
+# Add y-labels for each subplot
+for i,ax in enumerate(axes):
+    if i == 1:
+        ax.set_ylabel('Depth (m)', fontsize=14)
+
+# Shared x-label
+if field == 'density':
+    if abs_anom_ind == 'abs':
+        plt.xlim(36.3, None)
+    fig.text(0.5, 0.04, r'$\sigma_2$ (kg m$^{-3}$)', ha='center', fontsize=14)
+
+if field == 'Temperature':
+    fig.text(0.5, 0.04, r'Temperature ($^\circ$C)', ha='center', fontsize=14)
+
+if field == 'salinity':
+    fig.text(0.5, 0.04, r'Salinity (psu)', ha='center', fontsize=14)
+
+# Legend in bottom panel
+if field == 'density':
+    axes[-1].legend(fontsize=14)
+
+plt.tight_layout(rect=[0, 0.06, 1, 1])
+plt.savefig(field + '_depth.png')
+#plt.show()
+plt.close()

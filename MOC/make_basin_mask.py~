@@ -1,0 +1,173 @@
+#NAME
+#    make basin mask
+#PURPOSE 
+#
+#  This program will make a basin mask on a T and a v grid
+#
+#
+
+# Import necessary libraries
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import numpy as np
+import matplotlib.pyplot as plt
+import gsw
+from scipy.interpolate import interp1d
+import sys
+
+def get_mask_PJV(filename):
+    """
+    gets the mask based on the basin file and the land sea mask
+    """
+
+    # read the basin file
+
+    f=open(filename,'r')
+    #discard first 3 lines
+    content=f.readline()
+    content=f.readline()
+    content=f.readline()
+
+    Atlantic_mask = np.ma.zeros((144,288))
+    Pacific_mask = np.ma.zeros((144,288))
+    Indian_mask = np.ma.zeros((144,288))
+    Global_mask = np.ma.zeros((144,288))
+  
+
+    for j in range(144,0,-1):
+        content=f.readline()
+        # we have 4 basins - each are split into two divisions with a start
+        # and end point
+        (rowno,
+         bas1_d1_s,bas1_d1_e,bas1_d2_s,bas1_d2_e,
+         bas2_d1_s,bas2_d1_e,bas2_d2_s,bas2_d2_e,
+         bas3_d1_s,bas3_d1_e,bas3_d2_s,bas3_d2_e,
+         bas4_d1_s,bas4_d1_e,bas4_d2_s,bas4_d2_e)=content.split()
+        
+        for i in range(int(bas1_d1_s),int(bas1_d1_e)+1):
+            Indian_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas1_d2_s),int(bas1_d2_e)+1):
+            Indian_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        for i in range(int(bas2_d1_s),int(bas2_d1_e)+1):
+            Pacific_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas2_d2_s),int(bas2_d2_e)+1):
+            Pacific_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        for i in range(int(bas3_d1_s),int(bas3_d1_e)+1):
+            Atlantic_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas3_d2_s),int(bas3_d2_e)+1):
+            Atlantic_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+    
+        for i in range(int(bas4_d1_s),int(bas4_d1_e)+1):
+            Global_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas4_d2_s),int(bas4_d2_e)+1):
+            Global_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+    f.close
+
+
+    return Atlantic_mask,Pacific_mask,Indian_mask,Global_mask
+
+
+
+def get_mask(T_grid_cube,V_grid_cube,mask_data,basin):
+    """
+    gets the Atlantic mask
+    """
+  
+    # T_grid
+     
+    T_grid_mask_cube = T_grid_cube.copy(data=mask_data)
+    T_grid_mask_cube.data = np.ma.where(T_grid_cube.data.mask,-99999.,
+                                     T_grid_mask_cube.data)
+    T_grid_mask_cube.data.mask = T_grid_cube.data.mask
+    T_grid_mask_cube.long_name = basin + ' mask T_grid'
+
+    # V is on a staggered grid
+    # only mask if all surrounding points are masked
+    #    longitude:
+    #original (longitude goes from 0, 1.25 etc.
+    #vgrid    (longitude goes from 0.625, 1.875 etc.
+
+    #so we will set vgrid_mask(i) as 1 if orig(i) and orig(i+1) are also 1
+
+    #latitude:
+    #original (latitude goes from -89.375, -88.125  etc
+    #vgrid    (latitude goes from -88.75, -87,5 etc
+
+    #so we will set vgrid_mask[j] to 1 if orig[j] and orig[j+1] are also 1
+
+    V_data = V_grid_cube.data
+    ny_v, nx_v = V_data.shape
+    print(ny_v,nx_v)
+    
+    vmaskdata=np.ma.zeros((ny_v,nx_v))
+    print(vmaskdata)
+    print(vmaskdata.shape)
+
+    for j in range(0,ny_v):
+        for i in range(0,nx_v):
+                ip1=np.mod(i+1,nx_v)
+                if (mask_data[j,i] ==1 and mask_data[j+1,i]==1 and
+                    mask_data[j,ip1]==1 and mask_data[j+1,ip1]==1):
+                    vmaskdata[j,i]=1.0
+                else: #mask
+                    vmaskdata[j,i]=0.0
+        
+    V_grid_mask_cube = V_grid_cube.copy(data=vmaskdata)
+    V_grid_mask_cube.data = np.ma.where(V_grid_cube.data.mask,-99999.,
+                                     V_grid_mask_cube.data)
+    V_grid_mask_cube.data.mask = V_grid_cube.data.mask
+    V_grid_mask_cube.long_name = basin + ' mask V_grid'
+  
+    
+    return (T_grid_mask_cube, V_grid_mask_cube)
+
+
+#=============================================================================
+
+filename = 'xqbwco#pg000003999c1+.nc'
+
+T_grid_cube = iris.load_cube(filename,'TEMPERATURE (OCEAN)  DEG.C')
+V_grid_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+
+# get pauls mask
+[Atlantic_mask_data,
+ Pacific_mask_data,
+ Indian_mask_data,
+ Global_mask_data]= get_mask_PJV('basin_hadcm3')
+
+
+(Atlantic_mask_T_cube,
+ Atlantic_mask_V_cube) = get_mask(T_grid_cube[0,0,:,:],
+                                  V_grid_cube[0,0,:,:],Atlantic_mask_data,
+                                  'Atlantic')
+(Pacific_mask_T_cube,
+ Pacific_mask_V_cube)= get_mask(T_grid_cube[0,0,:,:],
+                                V_grid_cube[0,0,:,:],Pacific_mask_data,
+                                'Pacific')
+(Indian_mask_T_cube,
+ Indian_mask_V_cube)= get_mask(T_grid_cube[0,0,:,:],
+                               V_grid_cube[0,0,:,:],Indian_mask_data,
+                               'Indian')
+(Global_mask_T_cube,
+ Global_mask_V_cube)  = get_mask(T_grid_cube[0,0,:,:],
+                                 V_grid_cube[0,0,:,:],Global_mask_data,
+                                 'Global')
+print(Atlantic_mask_T_cube,Atlantic_mask_V_cube)
+print(Global_mask_V_cube)
+
+masks_cubelist = CubeList([Atlantic_mask_T_cube,
+                           Atlantic_mask_V_cube,
+                           Pacific_mask_T_cube,
+                           Pacific_mask_V_cube,
+                           Indian_mask_T_cube,
+                           Indian_mask_V_cube,
+                           Global_mask_T_cube,
+                           Global_mask_V_cube])
+print(masks_cubelist)
+
+iris.save(masks_cubelist,'masks.nc',fill_value = -99999.)
+  

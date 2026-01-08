@@ -1,0 +1,2705 @@
+::::::::::::::
+AMOC_based_on_PJV.py
+::::::::::::::
+#NAME
+#    AMOC_based_on_PJV
+#PURPOSE 
+#
+#  This program will try and reproduce Pauls AMOC plot but written by me and
+#  in python
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_mask(filename):
+    """
+    gets the mask based on the basin file and the land sea mask
+    """
+
+    # read the basin file
+
+    filename = 'basin_hadcm3'
+    f=open(filename,'r')
+    #discard first 3 lines
+    content=f.readline()
+    content=f.readline()
+    content=f.readline()
+
+    Atlantic_mask = np.ma.zeros((20,144,288))
+    Pacific_mask = np.ma.zeros((20,144,288))
+    Indian_mask = np.ma.zeros((20,144,288))
+    Global_mask = np.ma.zeros((20,144,288))
+  
+
+    for j in range(144,0,-1):
+        content=f.readline()
+        # we have 4 basins - each are split into two divisions with a start
+        # and end point
+        (rowno,
+         bas1_d1_s,bas1_d1_e,bas1_d2_s,bas1_d2_e,
+         bas2_d1_s,bas2_d1_e,bas2_d2_s,bas2_d2_e,
+         bas3_d1_s,bas3_d1_e,bas3_d2_s,bas3_d2_e,
+         bas4_d1_s,bas4_d1_e,bas4_d2_s,bas4_d2_e)=content.split()
+        
+        for i in range(int(bas1_d1_s),int(bas1_d1_e)+1):
+            Indian_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas1_d2_s),int(bas1_d2_e)+1):
+            Indian_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        for i in range(int(bas2_d1_s),int(bas2_d1_e)+1):
+            Pacific_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas2_d2_s),int(bas2_d2_e)+1):
+            Pacific_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        for i in range(int(bas3_d1_s),int(bas3_d1_e)+1):
+            Atlantic_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas3_d2_s),int(bas3_d2_e)+1):
+            Atlantic_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+    
+        for i in range(int(bas4_d1_s),int(bas4_d1_e)+1):
+            Global_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas4_d2_s),int(bas4_d2_e)+1):
+            Global_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+
+    f.close
+
+    # get LSM from temperature:
+
+
+    # put the data on a land sea mask
+    cube_full = iris.load_cube('xqbwgo#pg000003999c1+.nc',
+                           'TEMPERATURE (OCEAN)  DEG.C')
+    cube = cube_full[0,:,:,:]
+    cube_data = cube.data
+   
+    Atlantic_mask.mask = cube.data.mask
+    Atlantic_cube = cube.copy(data=Atlantic_mask)
+    #plt.subplot(2,2,1)
+    #qplt.contourf(Atlantic_cube[0,:,:])
+    #plt.subplot(2,2,2)
+    #qplt.contourf(Atlantic_cube[15,:,:])
+    #plt.subplot(2,2,3)
+    #qplt.contourf(Atlantic_cube[18,:,:])
+    #plt.subplot(2,2,4)
+    #qplt.contourf(Atlantic_cube[19,:,:])
+    #plt.show()
+    #sys.exit(0)
+   
+    #Pacific_mask.mask = cube.data.mask
+    Pacific_cube = cube.copy(data=Pacific_mask)
+    #qplt.contourf(Pacific_cube)
+    #plt.title('Pacific')
+    #plt.savefig('Pacific_mask.png')
+    #plt.close()
+
+    Indian_mask.mask = cube.data.mask
+    Indian_cube = cube.copy(data=Indian_mask)
+    #qplt.contourf(Indian_cube)
+    #plt.title('Indian')
+    #plt.savefig('Indian_mask.png')
+
+
+
+    return Atlantic_cube
+
+
+
+####################################################################
+def get_params(filename):
+    """
+    gets the spacing
+    """
+
+    # thickness
+    cube = iris.load_cube(filename,'W')
+    depths=np.copy(cube.coord('depth').points)
+    depths2=np.zeros(21) # depths used to calculate thickness
+    ndepths = len(depths)
+    thickness=np.zeros(20)
+    
+    for k in range(ndepths,0,-1):
+        depths2[k]=depths[k-1]
+    depths2[0]=0.0
+    depths2[20]=depths2[19]+(depths2[19]-depths2[18])
+
+    for k in range(0,20):
+        thickness[k]=depths2[k+1]-depths2[k]
+
+    # get latitude and dx from the v field (also save v)
+    v_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    v_cube = iris.util.squeeze(v_cube)
+    v_cube.data = v_cube.data / 100.  # convert to m/2
+    lats = v_cube.coord('latitude').points
+    coslats= np.cos(lats * 2. * np.pi / 360.)
+    lons=v_cube.coord('longitude').points
+
+    # length of a longitude box at the equator
+    dx=(lons[1]-lons[0]) * 111320.
+ 
+
+
+    return (dx,thickness,lats, coslats, v_cube)
+
+###################################################
+def V_grid_mask(orig_cube,vgrid_cube):
+    """
+    put mask onto a v_grid 
+    v is staggered in longitude compared to temperature.
+    we will only use the mask if all surrounding points are masked
+
+    longitude:
+    original (longitude goes from 0, 1.25 etc.
+    vgrid    (longitude goes from 0.625, 1.875 etc.
+
+    so we will set vgrid_mask(i) as 1 if orig(i) and orig(i+1) are also 1
+
+    latitude:
+    original (latitude goes from -89.375, -88.125  etc
+    vgrid    (latitude goes from -88.75, -87,5 etc
+
+    so we will set vgrid_mask[j] to 1 if orig[j] and orig[j+1] are also 1
+    
+    """
+    lon_orig=orig_cube.coord('longitude').points
+    nlonorig=len(lon_orig)
+    lon_vgrid=vgrid_cube.coord('longitude').points
+    nlonv=len(lon_vgrid)
+    lat_orig=orig_cube.coord('latitude').points
+    nlatorig=len(lat_orig)
+    lat_vgrid=vgrid_cube.coord('latitude').points
+    nlatv=len(lat_vgrid)
+
+    origdata=orig_cube.data
+    vmaskdata=np.ma.masked_array(np.zeros(np.shape(v_cube.data)),
+                                 mask=np.zeros(np.shape(v_cube.data)))
+
+    for k in range(0,20):
+        for j in range(0,nlatv):
+            for i in range(0,nlonv):
+                ip1=np.mod(i+1,nlonorig)
+                if (origdata[k,j,i] ==1 and origdata[k,j+1,i]==1 and
+                    origdata[k,j,ip1]==1 and origdata[k,j+1,ip1]==1):
+                    vmaskdata[k,j,i]=1.0
+                else: #mask
+                    vmaskdata.mask[k,j,i]=1.0
+
+    vmaskcube = vgrid_cube.copy(data=vmaskdata)
+                
+    
+    return vmaskcube
+
+def calc_stream(V_cube,dx,dz,coslats):
+    """
+    this calculates the streamfunction in the same way that PJV did
+    """
+    #calculate zonal integral m2/s-1 (note everything we dont want to use
+    #                                 should be masked
+    #we multiply it by the width of the gridbox (ie dx * cos latitude)
+     
+    ztotalV=np.sum(V_cube.data,axis=2) * dx * coslats
+    ztotalV_cube=(V_cube.collapsed('longitude',iris.analysis.SUM)
+                  * dx * coslats)
+
+    vdz_cube = ztotalV_cube.copy()
+    for k in range(0,20):
+        vdz_cube.data[k,:]=vdz_cube.data[k,:] * dz[k]
+        
+    
+    # now calculate vertical integral (this is the streamfunction).
+    # note that if streamfunction is zero it means that at this level
+    # everything that has gone north has also gone south and we have a closed
+    # circuit
+
+    phi_data=np.ma.zeros(np.shape(vdz_cube.data))
+    phi_data[0,:]=0.0
+    for k in range(1,20):
+        phi_data[k,:]=(vdz_cube.data[k-1,:]+phi_data[k-1,:]) 
+    phi_data.mask = np.where(vdz_cube.data.mask == 1.0, 1.0, 0.0)
+    phi_cube=vdz_cube.copy(data=phi_data / 1.0E6)
+
+    # read in the original for plotting
+    orig_AMOC = iris.load_cube('xqbwgo#pk000003999c1+.nc',
+                    'Meridional Overturning Stream Function (Atlantic)')
+    orig_AMOC = iris.util.squeeze(orig_AMOC)
+
+    # try calculating in reverse
+    phi_data_rev=np.ma.zeros(np.shape(vdz_cube.data))
+    for k in range(19,0,-1):
+        if k == 19:
+            phi_data_rev[k,:]= (-1.0) *  vdz_cube.data[k,:]
+            #print(k,phi_data_rev[k,55])
+        else:
+            phi_data_rev[k,:]=(phi_data_rev[k+1,:] - vdz_cube.data[k,:])
+            #print('55',k,phi_data_rev[k,55],phi_data[k+1,55],vdz_cube.data[k,55])
+            #sys.exit(0)
+    phi_cube_rev = vdz_cube.copy(data=phi_data_rev / 1.0E6)
+
+
+    #for j,lat in enumerate(vdz_cube.coord('latitude').points):
+    #    if lat == -20.0:
+    #        for k,dep in enumerate(vdz_cube.coord('depth_1').points):
+    #            print(dep,vdz_cube[k,j].data/1.0E6,phi_data_rev[k,j]/1.0E6)
+    #        print('sum=',j,np.sum(vdz_cube.data[:,j])/1.0E6)
+        
+#    sys.exit(0)
+    plt.figure(figsize=(10,10))
+    plt.subplot(3,2,1)
+    vals=np.arange(-20.,22.,2.)
+    qplt.contourf(phi_cube,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('mine')
+    plt.subplot(3,2,2)
+    qplt.contourf(orig_AMOC[0:20,:],levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('Pauls')
+    plt.subplot(3,2,3) 
+    vals=np.arange(-20.,22.,2.)
+    qplt.contourf(phi_cube_rev,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('mine reversed')
+    plt.subplot(3,2,4) 
+    vals=np.arange(-20.,22.,2.)
+    qplt.contourf(phi_cube_rev - phi_cube,levels=vals,extend='both',cmap='RdBu_r')
+    plt.subplot(3,2,5) 
+    vals=np.arange(-10.,12.,1.)
+    qplt.contourf(vdz_cube / 1.0E6,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('mine reversed - orig')
+    plt.show()
+    sys.exit(0)
+    plt.savefig('AMOC_diff.png')
+
+    #plt.show()
+    plt.close()
+
+#####################################################################
+
+# gets the basins over which we calculate
+filename = 'xqbwgo#pg000003999c1+.nc'
+Atlantic_cube=get_mask(filename)
+
+# get other parameters we need
+(dx,dz,lats,coslats,v_cube) = get_params(filename)
+
+# put masks onto a V-grid
+Atlmask_cube = V_grid_mask(Atlantic_cube,v_cube)
+
+# show V in the Atlantic mask
+V_atl = Atlmask_cube * v_cube # this is on grid 20 * 144 * 288
+
+# calculate stream function for the basin
+calc_stream(V_atl,dx,dz,coslats)
+#sys.exit(0)
+
+
+#plt.subplot(2,2,1)
+#vals=np.arange(-0.1,0.12,0.02)
+#qplt.contourf(V_atl[0,:,:],levels=vals,cmap='RdBu_r')
+#plt.subplot(2,2,2)
+#qplt.contourf(V_atl[5,:,:],levels=vals,cmap='RdBu_r')
+#plt.subplot(2,2,3)
+#qplt.contourf(V_atl[10,:,:],levels=vals,cmap='RdBu_r')
+#plt.subplot(2,2,4)
+#qplt.contourf(V_atl[15,:,:],levels=vals,cmap='RdBu_r')
+#plt.show()
+#sys.exit(0)
+
+qplt.contourf(Atlantic_cube)
+plt.title('Atlantic')
+plt.show()
+plt.close()
+::::::::::::::
+AMOC_density_from_pg.py
+::::::::::::::
+#NAME
+#    AMOC_density_from_pg
+#PURPOSE 
+#
+#  This program will use a pg file.
+#  It will regrid V and dz onto density coordinates
+#  and will calculate the AMOC/PMOC/IMOC/GMOC
+#
+#  If the input is a file called:
+#    xqbwco#pg000003999c1+.nc
+#  The output will be a file called
+#    xqbwco#pr000003999c1+.nc  (I have used r to stand for rho).
+#
+#
+
+# Import necessary libraries
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import numpy as np
+import matplotlib.pyplot as plt
+import gsw
+from scipy.interpolate import interp1d
+import sys
+
+                        
+
+#============================================================================
+def calculate_density(filename):
+    """
+    reads in temperature and salinity and converts to density (at 2000m)
+    """
+
+    # read in data
+    T_cube = iris.load_cube(filename,'insitu_T')
+    #print(T_cube)
+    S_cube = iris.load_cube(filename,'salinity')
+    S_cube.data = (S_cube.data * 1000.) + 35.0 # convert to psu
+    latitude = T_cube.coord('latitude').points
+    longitude = T_cube.coord('longitude').points
+    depth = T_cube.coord('depth_1').points
+    latmesh,depmesh,lonmesh = np.meshgrid(latitude,depth,longitude)
+
+    # convert to absolute salinity and conservative temperature
+    pressmesh=gsw.p_from_z(depmesh * (-1.0), latmesh)
+    SA = gsw.SA_from_SP(S_cube.data, pressmesh,lonmesh,latmesh)
+    CT = gsw.CT_from_t(SA, T_cube.data, pressmesh)
+
+    # calculate density (rho potential) referenced to 2000m
+    rho_potential = gsw.rho(SA,CT,2000) - 1000.
+    #print(rho_potential.mask)
+    rho_potential = np.where(rho_potential.mask,-99999,rho_potential)
+    
+    rho_potential_cube = T_cube.copy(data=rho_potential)
+    iris.util.mask_cube(rho_potential_cube,T_cube.data.mask,in_place=True)
+    rho_potential_cube.long_name = 'density (calculated from T and S'
+    rho_potential_cube.units=None
+    rho_potential_cube.attributes=None
+
+    return rho_potential_cube
+#==================================================
+def convert_to_vgrid(filename,T_grid_cube):
+    """
+    converts from T_grid_cube to V_grid_cube (only interpolate horizontally)
+    """
+    
+    temporary = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    grid_cube = temporary[0,0,:,:]
+
+    V_grid_cube = T_grid_cube.regrid(grid_cube,iris.analysis.Nearest())
+    iris.util.mask_cube(V_grid_cube,temporary.data.mask,in_place=True)
+   
+    V_grid_cube.long_name = 'density on v-grid'
+
+    #iris.save([T_grid_cube,V_grid_cube],'temporary.nc',fill_value = -99999.)
+
+    return V_grid_cube
+
+#==================================================
+def get_sigma_levels():
+    """
+    get sigma levels. The user can change this
+    """
+
+    sigma_levels_a = np.arange(29.0,34.0,0.5)
+    sigma_levels_b = np.arange(34.0,36.4,0.2)
+    sigma_levels_c = np.arange(36.4,37.0,0.05)
+    sigma_levels_d = np.arange(37.01,37.26,0.01)
+    sigma_levels_e = np.arange(37.26,37.281,0.002)
+    sigma_levels_f = np.arange(37.29,37.4,0.01)
+    sigma_levels_g = np.arange(37.4,37.7,0.05)
+    sigma_levels_h = np.arange(37.7,38.5,0.2)
+
+
+    #sigma_levels_a = np.arange(29.0,36.0,0.25)
+    #sigma_levels_b = np.arange(36.0,36.4,0.1)
+    #sigma_levels_c = np.arange(36.4,37.2,0.02)
+    #sigma_levels_d = np.arange(37.21,37.4,0.01)
+    #sigma_levels_e = np.arange(37.4,37.7,0.02)
+    #sigma_levels_f = np.arange(37.71,38.5,0.1)
+    
+    sigma_levels = np.concatenate((sigma_levels_a,sigma_levels_b,sigma_levels_c,
+                                   sigma_levels_d,sigma_levels_e,sigma_levels_f,
+                                   sigma_levels_g,sigma_levels_h))
+
+    return sigma_levels
+
+#================================================================
+def interpolate_to_rhopot(filename,field,density_V_grid_cube,
+                                             sigma_levels):
+    """
+    this will interpolate the field to the sigma levels
+    """
+    if field == 'V':
+        field_cube = iris.load_cube(filename,
+                                    'TOTAL OCEAN V-VELOCITY      CM S**-1')/100.
+        field_data = field_cube.data
+
+    if field == 'depth':
+        field_cube = iris.load_cube(filename,
+                                    'TOTAL OCEAN V-VELOCITY      CM S**-1')/100.
+        depths=field_cube.coord('depth_1').points
+
+        field_data = np.ma.copy(field_cube.data)
+        
+        for k in range(0,len(depths)):
+            field_data[:,k,:,:]=depths[k]
+
+        field_data.mask = field_cube.data.mask
+            
+          
+    density_V_grid_data = density_V_grid_cube.data
+    lons = field_cube.coord('longitude').points
+    lats = field_cube.coord('latitude').points
+
+    interpolated_variable=np.ma.zeros((len(sigma_levels),len(lats),len(lons)))
+    interpolated_variable[:,:,:]=-99999.
+
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            rho_profile = density_V_grid_data[0,:,j,i]
+            var_profile = field_data[0,:,j,i]
+            if not var_profile.mask[0]:
+                rho_prof_red=[]
+                var_prof_red=[]
+                for k in range(0,20):
+                    if not var_profile.mask[k]:
+                        rho_prof_red.append(rho_profile[k])
+                        var_prof_red.append(var_profile[k])
+                #print('here',i,j)
+                new_var = np.interp(sigma_levels,rho_prof_red,
+                                    var_prof_red,
+                                    left=-99999.,
+                                    right=-99999.)
+                #print(new_var)
+                #print(var_profile)
+                #print(rho_profile)
+                #print(var_profile.mask[0])
+                #sys.exit(0)
+                interpolated_variable[:,j,i]=new_var
+
+    #sys.exit(0)
+    interpolated_variable.mask = np.where(interpolated_variable < -9999.,
+                                          1.0,0.0)
+    # set up a cube of the correct shape
+    interpolated_cube_2d = field_cube[0,0:1,:,:].copy()
+    interpolated_cube_2d.attributes=None
+    interpolated_cube_2d.remove_coord('t')
+    cube_list = CubeList([])
+    for k in range(0,len(sigma_levels)):
+        interpolated_cube_2d.coord('depth_1').points = sigma_levels[k]
+        cube_list.append(interpolated_cube_2d.copy())
+    
+    iris.util.equalise_attributes(cube_list)
+    interpolated_cube=cube_list.concatenate_cube()
+    interpolated_cube.coord('depth_1').rename('sigma')
+    interpolated_cube.coord('sigma').units='kg.m-3'
+
+    # set up the cube we want with the correct data
+    interpol_final_cube = interpolated_cube.copy(data=interpolated_variable)
+    interpol_final_cube.long_name = field + ' on sigma coordinates'
+    interpol_final_cube.units='m'
+  
+    
+    return interpol_final_cube
+
+#============================================================================
+def get_thickness(dep_rho_potential_cube,filename):
+    """
+    gets the thickness of each layer for every point there is a velocity
+    """
+
+    # stuff we need
+    lons=dep_rho_potential_cube.coord('longitude').points
+    lats=dep_rho_potential_cube.coord('latitude').points
+    sigma=dep_rho_potential_cube.coord('sigma').points
+    dep_data = dep_rho_potential_cube.data
+  
+    # first calculate the base of each level from the standard um file - w grid
+    w_cube = iris.load_cube(filename,'VERT.VEL. ON OCEAN HALF LEVELS  CM/S')
+    depths = w_cube.coord('depth').points
+    top_depths = np.zeros(21)
+    for k in range(0,19):
+        top_depths[k+1] = depths[k]
+    top_depths[20]=depths[18]+depths[18]-depths[17]
+  
+    #now get the depth of the ocean
+    v_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    ocean_depth = np.zeros((len(lats),len(lons)))
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            ocean_depth[j,i]=top_depths[20] # for all are found
+            for k in range(19,-1,-1):
+                if v_cube.data.mask[0,k,j,i]:
+                    ocean_depth[j,i]=top_depths[k]
+
+   
+    # loop over all points
+    #   if v is set
+    #      thickness[k] = (depth[k]-depth[k-1]) / 2.0 + (depth[k+1]-depth[k])/2
+    #   if k+1 is not set assume it is at the bottom of the ocean so use
+    #                                                         base_depths
+    #   if k-1 is not set assume it is top of ocean so use 0
+
+    thickness=np.ma.zeros((len(sigma),len(lats),len(lons)))
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            for k in range(1,len(sigma)-1):
+                if dep_data[k,j,i] > -900:
+                    
+                    # get thickness of lower part of gridbox
+                    if dep_data[k+1,j,i] < 0.0 or dep_data.mask[k+1,j,i]:
+                        # to base of ocean
+                        kp1_dz = ocean_depth[j,i] - dep_data[k,j,i]
+                    else:
+                        # halfway to next level
+                        kp1_dz = (dep_data[k+1,j,i] - dep_data[k,j,i])/2.0
+                        
+                    # get thickness of upper part of gridbox
+                    if dep_data[k-1,j,i] < 0.0 or dep_data.mask[k-1,j,i]:
+                        # to top of ocean
+                        km1_dz = dep_data[k,j,i]
+                    else:
+                        # half way to previous level
+                        km1_dz = (dep_data[k,j,i] - dep_data[k-1,j,i])/2.0
+                    
+                    thickness[k,j,i] = kp1_dz + km1_dz
+                    #print(k,j,i,thickness[k,j,i],kp1_dz,km1_dz)
+                    #print(dep_data.mask[k-1,j,i],dep_data[k,j,i])
+                    #sys.exit(0)
+
+    #thickness.mask = dep_rho_potential_cube.data.mask
+    thickness_cube = dep_rho_potential_cube.copy(data=thickness)
+    thickness_cube.long_name = 'thickness (dz)'
+    thickness_cube.units = 'm'
+        
+
+    return thickness_cube
+            
+
+def get_V(filename,thickness_cube):
+    """
+    this is an way of calculating V on density levels
+    which is designed to maintain vdz it will do the following for each i and j
+    
+    1. find the base of each depth on the v grid (called depth_base)
+    2. for each the thickess cube and find the depth of each layer
+       on the sigma grid
+    3. find out where this thickness grid corresponds to on the depth grid
+    4. calculate a weighted average of v
+    """
+
+    # read in V cube from standard file
+    V_orig_cube = iris.load_cube(filename,
+                                    'TOTAL OCEAN V-VELOCITY      CM S**-1')/100.
+    V_data = V_orig_cube.data
+    lats = V_orig_cube.coord('latitude').points
+    lons = V_orig_cube.coord('longitude').points
+
+    V_dens = np.ma.zeros(np.shape(thickness_cube))
+ 
+
+    
+    # first calculate the base of each level from the standard um file - w grid
+    w_cube = iris.load_cube(filename,'VERT.VEL. ON OCEAN HALF LEVELS  CM/S')
+    depths = w_cube.coord('depth').points
+    top_depths = np.zeros(21)
+    for k in range(0,19):
+        top_depths[k+1] = depths[k]
+    top_depths[20]=depths[18]+depths[18]-depths[17]
+
+    # loop over layers to see where sigma corresponds to depths
+    sigma = thickness_cube.coord('sigma').points
+    thickness = thickness_cube.data
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            depmin=0.0 # how much has been accounted for
+                                    # by layers above
+            for k in range(0,len(sigma)):
+                if thickness[k,j,i] > 0.0:
+                    #print(i,j)
+                    # find min and max depth of this layer
+                    depmax=depmin+thickness[k,j,i]
+                    depreq=np.zeros(20)
+                    # find how many metres is in each layer on orig grid
+                    for k2 in range(0,20):
+                        if top_depths[k2] <= depmin <= top_depths[k2+1]:
+                            # top band of sigma layer is in this depth band
+                            # find number of meters it contributes
+                            depreq[k2]=np.min([top_depths[k2+1],depmax])-depmin
+                            #print('case A',depmin,depmax,top_depths[k2],
+                                  #top_depths[k2+1])
+                        elif top_depths[k2] <= depmax <= top_depths[k2+1]:
+                            # bottom band of sigma layer is in this depth band
+                            # find number of meters it contributes
+                            depreq[k2]=depmax - top_depths[k2]
+                            #print('case B')
+                        elif (depmax > top_depths[k2+1] >
+                              top_depths[k2] > depmin):
+                            # our sigma level encompases this whole band
+                            # so depth required from this band is full depth
+                            depreq[k2]=top_depths[k2+1] - top_depths[k2]
+                            #print('case C')
+                    # calculate V_dens as a weighted average of the
+                    # depths which contribute to this layer
+                    vavg=0
+                    for k2 in range(0,20):
+                        if depreq[k2] > 0.1:
+                            #print('j1',k,V_data[0,k2,j,i], depreq[k2])
+                            vavg = vavg + (V_data[0,k2,j,i] * depreq[k2])
+                    vavg=vavg / thickness[k,j,i]
+                    if np.isfinite(vavg):
+                        V_dens[k,j,i]=vavg
+                        #print('j2',k,vavg*100.,thickness[k,j,i])
+                        #print(' ')
+                    else:
+                        print('not finite',i,j,k,vavg,thickness[k,j,i])
+                        for k in range(0,20):
+                            print(k,depreq[k],V_data[0,k,j,i])
+                        sys.exit(0)
+                    
+                   #print('vavg for ',k,vavg)
+                    depmin = depmin + thickness[k,j,i]
+
+                    
+    V_dens = np.ma.where(thickness_cube.data < -9999., -99999., V_dens)
+    V_dens.mask = thickness_cube.data.mask
+    V_dens_cube = thickness_cube.copy(data=V_dens)
+    V_dens_cube.units='m.s-1'
+
+
+    return V_dens_cube
+                         
+
+def get_mask(maskfile):
+    """
+    get the masks for all the basin.  Calculated using make_basin_mask.py
+    get them all on a V-grid
+    """
+
+    mask_cubes = CubeList([])
+    mask_names = []
+    cube_Atlantic = iris.load_cube(maskfile,'Atlantic mask V_grid')
+    mask_cubes.append(cube_Atlantic)
+    mask_names.append('Atlantic')
+    
+    cube_Pacific = iris.load_cube(maskfile,'Pacific mask V_grid')
+    mask_cubes.append(cube_Pacific)
+    mask_names.append('Pacific')
+   
+    cube_Indian = iris.load_cube(maskfile,'Indian mask V_grid')
+    mask_cubes.append(cube_Indian)
+    mask_names.append('Indian')
+   
+    cube_Global = iris.load_cube(maskfile,'Global mask V_grid')
+    mask_cubes.append(cube_Global)
+    mask_names.append('Global')
+
+
+    return mask_cubes,mask_names
+
+
+def get_params(V_rho_potential_cube,Atlmask_cube):
+    """
+    get grid spacings
+    """
+    
+    lats = V_rho_potential_cube.coord('latitude').points
+    coslats= np.cos(lats * 2. * np.pi / 360.)
+    lons=V_rho_potential_cube.coord('longitude').points
+
+    # length of a longitude box at the equator
+    dx=(lons[1]-lons[0]) * 111320.
+
+    return (dx,lats,coslats)
+
+################################################################
+def calc_stream(V_cube,dx,thickness_cube,coslats,mask_name, mask_cube):
+    """
+    calculate the stream function for this basin
+    """
+    
+    # mask the data as appropriate
+    
+    sigma_coord = V_cube.coord('sigma').points
+    vdz_data = np.ma.zeros(np.shape(V_cube.data))
+    for k in range(0,len(sigma_coord)):
+        vdz_data[k,:,:]=(V_cube.data[k,:,:] *
+                         thickness_cube.data[k,:,:] * mask_cube.data)
+
+    #calculate zonal integral of v*dz
+    # (note everything we dont want to use should be masked)
+    #and multiply it by the width of the gridbox (ie dx * cos latitude)
+
+    nz=len(V_cube.coord('sigma').points)
+    ny=len(V_cube.coord('latitude').points)
+    vdz_cube=V_cube.copy(data=vdz_data)
+    vdz_cube.long_name = 'vdz_cube'    
+    vdz_cube.data.mask = np.where(vdz_cube.data < -999,1.0,0.0)
+
+
+    ztotalV=np.sum(vdz_cube.data,axis=2) * dx * coslats
+    ztotalV_cube=(vdz_cube.collapsed('longitude',iris.analysis.SUM)
+                  * dx * coslats)
+
+ 
+    # now calculate vertical integral (this is the streamfunction).
+    # note that if streamfunction is zero it means that at this level
+    # everything that has gone north has also gone south and we have a closed
+    # circuit
+
+    phi_data=np.ma.zeros(np.shape(ztotalV_cube.data))
+    phi_data[0,:]=0.0
+    for k in range(1,nz):
+        for j in range(0,ny):
+            if ztotalV_cube.data.mask[k-1,j]:
+                pass
+            else:
+                phi_data[k,j]=(ztotalV_cube.data[k-1,j]+phi_data[k-1,j]) 
+    phi_data.mask = np.where(ztotalV_cube.data.mask == 1.0, 1.0, 0.0)
+    phi_cube=ztotalV_cube.copy(data=phi_data / 1.0E6)
+    phi_cube.long_name = mask_name + ' Meridional Overturning Circulation'
+    phi_cube.units = 'Sv'
+    
+    # checks - no longer needed
+    # read in the original for plotting
+    #orig_AMOC = iris.load_cube('xqbwco#pk000003999c1+.nc',
+    #                'Meridional Overturning Stream Function (Global)')
+    #orig_AMOC = iris.util.squeeze(orig_AMOC)
+
+    # try calculating in reverse
+    phi_data_rev=np.zeros(np.shape(ztotalV_cube.data))
+    for k in range(nz-1,-1,-1):
+        if k == nz-1:
+            phi_data_rev[k,:]= (-1.0) *  ztotalV_cube.data[k,:]
+        else:
+            phi_data_rev[k,:]=(phi_data_rev[k+1,:] - ztotalV_cube.data[k,:])
+    phi_rev_cube=ztotalV_cube.copy(data=phi_data_rev / 1.0E6)
+    phi_rev_cube.long_name = mask_name + ' Meridional Overturning Circulation (reversed'
+    phi_rev_cube.units = 'Sv'
+  
+
+    #for j,lat in enumerate(lats):
+    #    print(lat,j,phi_data_rev[0,j]/1.0E6)
+        
+    #sys.exit(0)
+    #print('total2',np.sum(ztotalV_cube.data[:,91] / 1.0E6))
+
+    return phi_cube, phi_rev_cube
+                       
+
+#=============================================================================
+
+filename = 'xqbwco#pg000003999c1+.nc'
+fileout = filename[0:8]+'r' + filename[9::]
+
+# 1. calculate density on Temp, Salinity grid
+density_T_grid_cube = calculate_density(filename)
+
+# 2. put density cube on V grid using interpolation (horizontally)
+density_V_grid_cube = convert_to_vgrid(filename,density_T_grid_cube)
+
+# 3. get sigmal levels on which we will interpolate the fields
+
+sigma_levels = get_sigma_levels()
+
+# 3. interpolate depth to rho_potential
+
+dep_rho_potential_cube = interpolate_to_rhopot(filename,'depth',
+                                             density_V_grid_cube,
+                                             sigma_levels)
+print('got depths')
+
+#4. We need to find a dz value (call this thickness)
+thickness_cube = get_thickness(dep_rho_potential_cube,filename)
+print('got thickness')
+output_cubes = CubeList([dep_rho_potential_cube,
+                         thickness_cube])      
+
+#5. Convert velocity on depth levels to velocity on rho levels.  We do this
+#   by finding which depths each rho level encompasses.  We then get the
+#   V values from those depth levels
+
+V_rho_potential_cube = get_V(filename,thickness_cube)
+V_rho_potential_cube.long_name = 'V on density levels'
+output_cubes.append(V_rho_potential_cube)
+print('got V')
+iris.save(output_cubes,fileout,fill_value=-99999.)
+sys.exit(0)
+
+
+#6.  We now have all the fields we need so find the AMOC / PMOC / IMOC / GMOC
+#6a get the parameters we need
+mask_cubes, mask_names = get_mask('masks.nc')
+(dx,lats,coslats) = get_params(V_rho_potential_cube,mask_cubes[0])
+
+#6b. find the overturning circulation for each of the masks
+for i in range(0,len(mask_names)):
+    MOC_cube, MOC_rev_cube = calc_stream(V_rho_potential_cube,dx,
+                           thickness_cube,coslats,mask_names[i],
+                           mask_cubes[i])
+    output_cubes.append(mask_cubes[i])
+    output_cubes.append(MOC_cube)
+    output_cubes.append(MOC_rev_cube)
+
+
+
+iris.save(output_cubes,fileout,fill_value=-99999.)
+
+
+  
+::::::::::::::
+AMOC_density_from_vdz.py
+::::::::::::::
+#NAME
+#    AMOC_density
+#PURPOSE 
+#
+#  This program is based on AMOC_based_on_PJV
+#  however it will use density as the z_coordinate
+#  it will also do the PMOC the GMOC and the IMOC.  It will write them
+#  all out to a file
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_mask(filename,basin):
+    """
+    gets the mask from the Atlantic mask file on a v grid
+    """
+
+    cube = iris.load_cube(filename,basin + ' mask V_grid')
+
+    return cube
+
+
+
+####################################################################
+def get_params(filename,mask_cube):
+    """
+    gets the spacing
+    """
+
+    # thickness
+    thick_cube = iris.load_cube(filename,'thickness (dz)')
+    
+    # get latitude and dx from the v field (also save v)
+    #v_cube = iris.load_cube(filename,'V on sigma coordinates')
+    v_cube = iris.load_cube(filename,'alternative V cube')
+    v_cube = iris.util.squeeze(v_cube)
+    v_cube.data = v_cube.data 
+    lats = v_cube.coord('latitude').points
+    coslats= np.cos(lats * 2. * np.pi / 360.)
+    lons=v_cube.coord('longitude').points
+
+    # length of a longitude box at the equator
+    dx=(lons[1]-lons[0]) * 111320.
+
+    # mask V cube
+    sigma_coord = v_cube.coord('sigma').points
+    for k in range(0,len(sigma_coord)):
+        v_cube.data[k,:,:]=v_cube.data[k,:,:] * mask_cube.data
+        thick_cube.data[k,:,:]=thick_cube.data[k,:,:] * mask_cube.data
+
+    return (dx,thick_cube,lats, coslats, v_cube)
+
+
+def calc_stream(V_cube,dx,thickness_cube,coslats,basin,exptname):
+    """
+    this calculates the streamfunction in the same way that PJV did
+    """
+    #calculate zonal integral m2/s-1 (note everything we dont want to use
+    #                                 should be masked
+    #we multiply it by the width of the gridbox (ie dx * cos latitude)
+
+    nz=len(V_cube.coord('sigma').points)
+    ny=len(V_cube.coord('latitude').points)
+    vdz_cube=V_cube.copy(data=V_cube.data * thickness_cube.data)
+    vdz_cube.long_name = 'vdz_cube'
+
+
+    vdz_cube.data.mask = np.where(vdz_cube.data < -999,1.0,0.0)
+    tot_thick_cube = thickness_cube.collapsed('sigma',iris.analysis.SUM)
+    tot_thick_cube.long_name = 'total thickness'
+    
+    iris.util.promote_aux_coord_to_dim_coord(vdz_cube, 'sigma')
+
+    ztotalV=np.sum(vdz_cube.data,axis=2) * dx * coslats
+    ztotalV_cube=(vdz_cube.collapsed('longitude',iris.analysis.SUM)
+                  * dx * coslats)
+
+    
+    # now calculate vertical integral (this is the streamfunction).
+    # note that if streamfunction is zero it means that at this level
+    # everything that has gone north has also gone south and we have a closed
+    # circuit
+
+    phi_data=np.ma.zeros(np.shape(ztotalV_cube.data))
+    phi_data[0,:]=0.0
+    for k in range(1,nz):
+        for j in range(0,ny):
+            if ztotalV_cube.data.mask[k-1,j]:
+                pass
+            else:
+                phi_data[k,j]=(ztotalV_cube.data[k-1,j]+phi_data[k-1,j])
+                if lats[j] == 17.5:
+                    print('forward',
+                          k,
+                          ztotalV_cube.data[k-1,j]/1.0E6,phi_data[k-1,j] / 1.0E6)
+                   
+    #phi_data.mask = np.where(ztotalV_cube.data.mask == 1.0, 1.0, 0.0)
+    phi_cube=ztotalV_cube.copy(data=phi_data / 1.0E6)
+
+  
+    # try calculating in reverse
+    phi_data_rev=np.zeros(np.shape(ztotalV_cube.data))
+    for k in range(nz-1,-1,-1):
+        if k == nz-1:
+            phi_data_rev[k,:]= (-1.0) *  ztotalV_cube.data[k,:]
+        else:
+            phi_data_rev[k,:]=(phi_data_rev[k+1,:] - ztotalV_cube.data[k,:])
+    phi_rev_cube = phi_cube.copy(data=phi_data_rev/1.0E6)
+    phi_rev_cube.long_name = 'reversed'
+    phi_rev_cube.data = np.ma.where(phi_rev_cube.data > 1E20,-99999.,
+                                    phi_rev_cube.data)
+
+    if basin == 'Atlantic' or basin == 'Pacific':
+        xmin=-30
+    else:
+        xmin=-90
+
+    phi_cube.long_name = 'Density MOC : ' + basin
+    phi_cube.data = np.ma.where(phi_cube.data > 1E20,-99999.,phi_cube.data)
+    iris.save([phi_cube,phi_rev_cube],'temporary.nc',fill_value = -99999.)
+    sys.exit(0)
+   
+#####################################################################
+
+# file where V and dz are stored on density coordinates
+exptname = 'xqbwg'
+startyear=3970
+endyear=4000
+basins = ['Atlantic','Pacific','Global']
+
+filestart = '/home/earjcti/um/'+exptname + '/Vdz/' + exptname + '_vdz_'
+for year in range(startyear,endyear):
+    filename_density = filestart + str(year) +'.nc'
+    for basin in basins:
+
+        # gets the basins over which we calculate
+        basinmask_cube=get_mask('masks.nc',basin) # get mask on V grid
+        #print('got mask')
+     
+        # get other parameters we need
+        (dx,thickness_cube,lats,
+         coslats,V_cube) = get_params(filename_density,basinmask_cube)
+        #print('got other params')
+       
+        # calculate stream function for the basin
+        calc_stream(V_cube,dx,thickness_cube,coslats,basin,exptname)
+        sys.exit(0)
+
+
+plt.subplot(2,2,1)
+vals=np.arange(-0.1,0.12,0.02)
+qplt.contourf(V_atl[0,:,:],levels=vals,cmap='RdBu_r')
+plt.subplot(2,2,2)
+qplt.contourf(V_atl[5,:,:],levels=vals,cmap='RdBu_r')
+plt.subplot(2,2,3)
+qplt.contourf(V_atl[10,:,:],levels=vals,cmap='RdBu_r')
+plt.subplot(2,2,4)
+qplt.contourf(V_atl[15,:,:],levels=vals,cmap='RdBu_r')
+plt.show()
+sys.exit(0)
+
+qplt.contourf(Atlantic_cube)
+plt.title('Atlantic')
+plt.show()
+plt.close()
+::::::::::::::
+AMOC_density.py
+::::::::::::::
+#NAME
+#    AMOC_density
+#PURPOSE 
+#
+#  This program is based on AMOC_based_on_PJV
+#  however it will use density as the z_coordinate
+#  it will also do the PMOC the GMOC and the IMOC
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_mask(filename,basin):
+    """
+    gets the mask from the Atlantic mask file on a v grid
+    """
+
+    cube = iris.load_cube(filename,basin + ' mask V_grid')
+
+    return cube
+
+
+
+####################################################################
+def get_params(filename,mask_cube):
+    """
+    gets the spacing
+    """
+
+    # thickness
+    thick_cube = iris.load_cube(filename,'thickness (dz)')
+    
+    # get latitude and dx from the v field (also save v)
+    #v_cube = iris.load_cube(filename,'V on sigma coordinates')
+    v_cube = iris.load_cube(filename,'alternative V cube')
+    v_cube = iris.util.squeeze(v_cube)
+    v_cube.data = v_cube.data 
+    lats = v_cube.coord('latitude').points
+    coslats= np.cos(lats * 2. * np.pi / 360.)
+    lons=v_cube.coord('longitude').points
+
+    # length of a longitude box at the equator
+    dx=(lons[1]-lons[0]) * 111320.
+
+    # mask V cube
+    sigma_coord = v_cube.coord('sigma').points
+    for k in range(0,len(sigma_coord)):
+        v_cube.data[k,:,:]=v_cube.data[k,:,:] * mask_cube.data
+        thick_cube.data[k,:,:]=thick_cube.data[k,:,:] * mask_cube.data
+
+    return (dx,thick_cube,lats, coslats, v_cube)
+
+
+def calc_stream(V_cube,dx,thickness_cube,coslats,basin,exptname):
+    """
+    this calculates the streamfunction in the same way that PJV did
+    """
+    #calculate zonal integral m2/s-1 (note everything we dont want to use
+    #                                 should be masked
+    #we multiply it by the width of the gridbox (ie dx * cos latitude)
+
+    nz=len(V_cube.coord('sigma').points)
+    ny=len(V_cube.coord('latitude').points)
+    vdz_cube=V_cube.copy(data=V_cube.data * thickness_cube.data)
+    vdz_cube.long_name = 'vdz_cube'
+
+
+    vdz_cube.data.mask = np.where(vdz_cube.data < -999,1.0,0.0)
+    tot_thick_cube = thickness_cube.collapsed('sigma',iris.analysis.SUM)
+    tot_thick_cube.long_name = 'total thickness'
+    
+    iris.save([V_cube,thickness_cube,vdz_cube,tot_thick_cube],'temporary.nc',fill_value = -99999.)
+
+
+    #qplt.contourf(V_cube[:,85,:])
+        
+    #plt.show()
+    #sys.exit(0)
+   
+    iris.util.promote_aux_coord_to_dim_coord(vdz_cube, 'sigma')
+
+    ztotalV=np.sum(vdz_cube.data,axis=2) * dx * coslats
+    ztotalV_cube=(vdz_cube.collapsed('longitude',iris.analysis.SUM)
+                  * dx * coslats)
+
+ 
+    #sys.exit(0)
+    #lats = ztotalV_cube.coord('latitude').points
+    #for j,lat in enumerate(lats):
+    #    print(j,lat)
+    #sys.exit(0)
+    
+    # now calculate vertical integral (this is the streamfunction).
+    # note that if streamfunction is zero it means that at this level
+    # everything that has gone north has also gone south and we have a closed
+    # circuit
+
+    phi_data=np.ma.zeros(np.shape(ztotalV_cube.data))
+    phi_data[0,:]=0.0
+    for k in range(1,nz):
+        for j in range(0,ny):
+            if ztotalV_cube.data.mask[k-1,j]:
+                pass
+            else:
+                phi_data[k,j]=(ztotalV_cube.data[k-1,j]+phi_data[k-1,j]) 
+    phi_data.mask = np.where(ztotalV_cube.data.mask == 1.0, 1.0, 0.0)
+    phi_cube=ztotalV_cube.copy(data=phi_data / 1.0E6)
+
+    for k,sig in enumerate(V_cube.coord('sigma').points):
+        #if sig == 32.5:
+        #    print('Vcube',V_cube[k,85,200:280].data)
+        #    print('vdz',vdz_cube[k,85,200:280].data)
+        #    print('thickness',thickness_cube[k,85,200:280].data)
+        #    print('coslats',coslats[85],dx)
+   
+        print(k,sig,ztotalV_cube.data[k,91]/1.0E6,phi_data[k,91] / 1.0E6,
+              ztotalV_cube.data.mask[k,91])
+    print('total',np.sum(ztotalV_cube.data[:,91] / 1.0E6),
+          np.sum(phi_data[:,91] / 1.0E6))
+
+    
+    
+
+    # read in the original for plotting
+    orig_AMOC = iris.load_cube(exptname+'o#pk000003999c1+.nc',
+                               'Meridional Overturning Stream Function ('+basin+')')
+    orig_AMOC = iris.util.squeeze(orig_AMOC)
+
+    # try calculating in reverse
+    phi_data_rev=np.zeros(np.shape(ztotalV_cube.data))
+    for k in range(nz-1,-1,-1):
+        if k == nz-1:
+            phi_data_rev[k,:]= (-1.0) *  ztotalV_cube.data[k,:]
+        else:
+            phi_data_rev[k,:]=(phi_data_rev[k+1,:] - ztotalV_cube.data[k,:])
+
+    #for j,lat in enumerate(lats):
+    #    print(lat,j,phi_data_rev[0,j]/1.0E6)
+        
+    #sys.exit(0)
+    print('total2',np.sum(ztotalV_cube.data[:,91] / 1.0E6))
+    if basin == 'Atlantic' or basin == 'Pacific':
+        xmin=-30
+    else:
+        xmin=-90
+
+    plt.subplot(2,2,1)
+    vals=np.arange(-20.,22,2.0)
+    #plt.ylim(38,29)
+    zlin=np.arange(0,nz,1)
+    #print(zlin)
+    cs=plt.contourf(lats,zlin,phi_cube.data,levels=vals,extend='both',cmap='RdBu_r')
+    plt.gca().invert_yaxis()
+    plt.gca().set_xlim(xmin,90)
+    labeluse=np.around(ztotalV_cube.coord('sigma').points,2)
+    plt.yticks(zlin[1::10],labeluse[1::10])
+    plt.title('mine')
+    plt.colorbar(cs,orientation='horizontal')
+    
+    plt.subplot(2,2,2)
+    qplt.contourf(orig_AMOC[0:20,:],levels=vals,extend='both',cmap='RdBu_r')
+    plt.gca().set_xlim(xmin,90)
+    plt.title('Pauls')
+    
+    plt.subplot(2,2,3)
+    cs=plt.contourf(lats,zlin,phi_data_rev / 1.0E6,
+                 levels=vals,extend='both',cmap='RdBu_r')
+    plt.gca().invert_yaxis()
+    plt.gca().set_xlim(xmin,90)
+    plt.yticks(zlin[1::10],labeluse[1::10])
+    plt.title('mine reverse')
+    plt.colorbar(cs,orientation='horizontal')
+   
+    
+    plt.subplot(2,2,4)
+    vals=np.arange(-10.,11,1.0)
+    cs=plt.contourf(lats,zlin,ztotalV_cube.data/1.0E6,
+                  levels=vals,extend='both',cmap='RdBu_r')
+    plt.gca().invert_yaxis()
+    plt.gca().set_xlim(xmin,90)
+    plt.yticks(zlin[1::10],labeluse[1::10])
+    plt.title('total V (Sv)')
+    plt.colorbar(cs,orientation='horizontal')
+   
+    #plt.subplot(2,2,4)
+    #qplt.contourf(thickness,extend='both',cmap='RdBu_r')
+    #plt.gca().invert_yaxis()
+    #plt.gca().set_ylim(30,20)
+    #plt.title('V')
+    #plt.subplot(2,2,4) 
+    #vals=np.arange(-0.1,0.11,0.01)
+    #qplt.contourf(phi_cube.copy(data=phi_cube.data - orig_AMOC.data[0:20,:]),levels#=vals,extend='both',cmap='RdBu_r')
+    #plt.title('mine minus pauls')
+
+    plt.savefig(basin+'_'+exptname+'.png')
+    plt.close()
+    #plt.show()
+    sys.exit(0)
+
+#####################################################################
+
+# file where V and dz are stored on density coordinates
+exptname = 'xqbwg'
+filename_density = 'Vdz_'+exptname+'.nc'
+basin='Pacific'
+
+# gets the basins over which we calculate
+Atlmask_cube=get_mask('masks.nc',basin) # get mask on V grid
+
+# get other parameters we need
+(dx,thickness_cube,lats,coslats,V_cube) = get_params(filename_density,
+                                                     Atlmask_cube)
+
+
+# calculate stream function for the basin
+calc_stream(V_cube,dx,thickness_cube,coslats,basin,exptname)
+sys.exit(0)
+
+
+plt.subplot(2,2,1)
+vals=np.arange(-0.1,0.12,0.02)
+qplt.contourf(V_atl[0,:,:],levels=vals,cmap='RdBu_r')
+plt.subplot(2,2,2)
+qplt.contourf(V_atl[5,:,:],levels=vals,cmap='RdBu_r')
+plt.subplot(2,2,3)
+qplt.contourf(V_atl[10,:,:],levels=vals,cmap='RdBu_r')
+plt.subplot(2,2,4)
+qplt.contourf(V_atl[15,:,:],levels=vals,cmap='RdBu_r')
+plt.show()
+sys.exit(0)
+
+qplt.contourf(Atlantic_cube)
+plt.title('Atlantic')
+plt.show()
+plt.close()
+::::::::::::::
+check_vdz.py
+::::::::::::::
+#NAME
+#    correct_vdz
+#PURPOSE 
+#
+# I have written a program to put dz and v onto density coordinates.
+# Here I just want to check that vdz is convserved throughout the depth
+# of the ocean
+
+# Import necessary libraries
+import iris
+import iris.quickplot as qplt
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+def get_sum_vdz_depth(filename):
+    """
+    get sum vdz for each latitude and longitude 
+    returns:  sum_vdz_depth_grid this is a numpy array shape (lats,lons)
+              v_cube (for masking density stuff)
+
+    """
+    # get v
+    v_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    v_cube.data = v_cube.data / 100.
+    v_data = v_cube.data
+
+    # get dz (called thickness)
+    w_cube = iris.load_cube(filename,'VERT.VEL. ON OCEAN HALF LEVELS  CM/S')
+    depths=w_cube.coord('depth').points
+    thickness=np.zeros(20)
+    for k in range(1,19):
+        thickness[k]=depths[k]-depths[k-1]
+    thickness[0]=depths[0]
+    thickness[19]= thickness[18]
+
+    # get vdz
+    vdz_data = np.ma.zeros(np.shape(v_cube[0,0,:,:].data))
+    lons = v_cube.coord('longitude').points
+    lats = v_cube.coord('latitude').points
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            if v_data.mask[0,0,j,i]:
+                vdz_data[j,i] = np.ma.masked
+            else:
+                for k in range(0,20):
+                    if v_data.mask[0,k,j,i]:
+                        break
+                    else:
+                        vdz_data[j,i]=(vdz_data[j,i] +
+                                       (v_data[0,k,j,i] * thickness[k]))
+
+    vdz_cube = v_cube[0,0,:,:].copy(data=vdz_data)
+    vdz_cube.long_name='vdz using depth coords - units m/2 s-1'
+    vdz_cube.units=None
+
+    return vdz_cube, iris.util.squeeze(v_cube)
+
+#==========================================================================
+def get_info_from_sigma_file(filename,v_depth_cube):
+    """
+    reads in the v and the dz from the sigma file (filename)
+    """
+    v_sigma_cube = iris.util.squeeze(iris.load_cube(filename,'alternative V cube'))
+    dz_sigma_cube = iris.util.squeeze(iris.load_cube(filename,'thickness (dz)'))
+
+    v_sigma_cube.coord('longitude').attributes = v_depth_cube.coord('longitude').attributes
+    v_sigma_cube.coord('latitude').attributes = v_depth_cube.coord('latitude').attributes
+    v_sigma_cube.coord('longitude').circular = True
+    v_sigma_cube.coord('longitude').rename('longitude')
+    v_sigma_cube.coord('latitude').rename('latitude')
+    
+    dz_sigma_cube.coord('longitude').attributes = v_depth_cube.coord('longitude').attributes
+    dz_sigma_cube.coord('latitude').attributes = v_depth_cube.coord('latitude').attributes
+    dz_sigma_cube.coord('longitude').circular = True
+    dz_sigma_cube.coord('latitude').rename('latitude')
+
+    
+    return (v_sigma_cube,dz_sigma_cube)
+
+#==========================================================================
+def get_sum_vdz_sigma(v_sigma_cube,dz_cube,v_depth_cube):
+    """
+    calculates sum v dz using v and dz from the sigma grid. 
+    returns vdz_cube on sigma grid which has shape (latitudes,longitudes)
+    """
+
+    v_depth_data = v_depth_cube.data
+    v_sigma_data = v_sigma_cube.data
+    dz_data = dz_cube.data
+    
+    vdz_data = np.ma.zeros(np.shape(v_sigma_cube[0,:,:].data))
+    lons = v_sigma_cube.coord('longitude').points
+    lats = v_sigma_cube.coord('latitude').points
+    sigma_levs = v_sigma_cube.coord('sigma').points
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            if v_depth_data.mask[0,j,i]:
+                vdz_data[j,i] = np.ma.masked
+            else:
+                for k in range(0,len(sigma_levs)):
+                    if not v_sigma_data.mask[k,j,i]:
+                        vdz_data[j,i]=(vdz_data[j,i] +
+                                   (v_sigma_data[k,j,i] * dz_data[k,j,i]))
+
+    vdz_cube = v_sigma_cube[0,:,:].copy(data=vdz_data)
+    vdz_cube.long_name='vdz using sigma coords - units m/2 s-1'
+    vdz_cube.units=None
+
+    
+    return vdz_cube
+                        
+
+#============================================================================
+def adjust_v_sigma(v_sigma_cube, dz_sigma_cube, diff_vdz_cube):
+    """
+    adjust v_sigma_cube as follows
+    1. look for any depths greater than 1000 metres and adjust here
+    """
+
+        
+    lats = diff_vdz_cube.coord('latitude').points
+    lons = diff_vdz_cube.coord('longitude').points
+    diff_data = diff_vdz_cube.data
+    dz_data = dz_sigma_cube.data
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            if not diff_data.mask[j,i]:
+                if np.abs(diff_data[j,i]) > 10.0:
+                    max_depth = np.max(dz_data[:,j,i])
+                    print(i,j,lons[i],lats[j],diff_data[j,i],max_depth)
+    sys.exit(0)
+                   
+
+#=============================================================================
+
+filename = 'xqbwco#pg000003999c1+.nc'
+
+#1. get sum vdz for each lat and lon (sum_vdz_depth_cube shape = (lat,lon))
+(sum_vdz_depth_cube,
+ v_depth_cube) = get_sum_vdz_depth(filename)
+print('depth sum',sum_vdz_depth_cube.data[140,202])
+print('v depth',v_depth_cube.data[:,140,202])
+
+
+#2a. get the v-velocity and thickness as cubes shape (sigma,lat,lon)
+(v_sigma_cube,
+ dz_sigma_cube)    = get_info_from_sigma_file('Vdz.nc',
+                                              v_depth_cube)
+
+
+#2b. get sum vdz on a sigma grid (cube shape (lat, lon)
+sum_vdz_sigma_cube = get_sum_vdz_sigma(v_sigma_cube,dz_sigma_cube,v_depth_cube)
+for k in range(0,93):
+    if dz_sigma_cube.data[k,140,202] > 0.0:
+        print(k,v_sigma_cube.data[k,140,202]*100.,dz_sigma_cube.data[k,140,202],
+              v_sigma_cube.data[k,140,202]*dz_sigma_cube.data[k,140,202])
+#print('sum of depths',np.sum(dz_sigma_cube.data[:,140,202]))
+#print('sigma sum',sum_vdz_sigma_cube.data[140,202])
+
+#sys.exit(0)
+
+#3a. plot difference between sum_vdz on depth_grid and sum_vdz on sigma_grid
+
+
+diff_vdz_cube=sum_vdz_depth_cube.copy(
+                      data= sum_vdz_depth_cube.data- sum_vdz_sigma_cube.data)
+diff_vdz_cube.long_name = 'difference vdz'
+percent_diff_vdz_cube = sum_vdz_depth_cube.copy(
+                      data= (diff_vdz_cube.data / sum_vdz_depth_cube.data)*100.)
+percent_diff_vdz_cube.long_name = 'percent difference'
+
+plt.subplot(221)
+qplt.contourf(sum_vdz_depth_cube,levels=np.arange(-100,110,10),cmap='RdBu_r',
+              extend='both')
+
+plt.subplot(222)
+qplt.contourf(sum_vdz_sigma_cube,levels=np.arange(-100,110,10),cmap='RdBu_r',extend='both')
+
+plt.subplot(223)
+qplt.contourf(diff_vdz_cube,levels=np.arange(-10,11,1),cmap='RdBu_r',extend='both')
+
+plt.subplot(224)
+qplt.contourf(percent_diff_vdz_cube,levels=np.arange(-100,110,10),cmap='RdBu_r',extend='both')
+
+plt.show()
+sys.exit(0)
+
+
+
+
+::::::::::::::
+make_basin_mask.py
+::::::::::::::
+#NAME
+#    make basin mask
+#PURPOSE 
+#
+#  This program will make a basin mask on a T and a v grid
+#
+#
+
+# Import necessary libraries
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import numpy as np
+import matplotlib.pyplot as plt
+import gsw
+from scipy.interpolate import interp1d
+import sys
+
+def get_mask_PJV(filename):
+    """
+    gets the mask based on the basin file and the land sea mask
+    """
+
+    # read the basin file
+
+    f=open(filename,'r')
+    #discard first 3 lines
+    content=f.readline()
+    content=f.readline()
+    content=f.readline()
+
+    Atlantic_mask = np.ma.zeros((144,288))
+    Pacific_mask = np.ma.zeros((144,288))
+    Indian_mask = np.ma.zeros((144,288))
+    Global_mask = np.ma.zeros((144,288))
+  
+
+    for j in range(144,0,-1):
+        content=f.readline()
+        # we have 4 basins - each are split into two divisions with a start
+        # and end point
+        (rowno,
+         bas1_d1_s,bas1_d1_e,bas1_d2_s,bas1_d2_e,
+         bas2_d1_s,bas2_d1_e,bas2_d2_s,bas2_d2_e,
+         bas3_d1_s,bas3_d1_e,bas3_d2_s,bas3_d2_e,
+         bas4_d1_s,bas4_d1_e,bas4_d2_s,bas4_d2_e)=content.split()
+
+        if bas1_d1_s != bas1_d1_e:
+            for i in range(int(bas1_d1_s),int(bas1_d1_e)+1):
+                Indian_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        if bas1_d2_s != bas1_d2_e:
+            for i in range(int(bas1_d2_s),int(bas1_d2_e)+1):
+                Indian_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        if bas2_d1_s != bas2_d1_e:
+            for i in range(int(bas2_d1_s),int(bas2_d1_e)+1):
+                Pacific_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        if bas2_d2_s != bas2_d2_e:
+            for i in range(int(bas2_d2_s),int(bas2_d2_e)+1):
+                Pacific_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        if bas3_d1_s != bas3_d1_e:
+            for i in range(int(bas3_d1_s),int(bas3_d1_e)+1):
+                Atlantic_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        if bas3_d2_s != bas3_d2_e:
+            for i in range(int(bas3_d2_s),int(bas3_d2_e)+1):
+                Atlantic_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        #if j ==26:
+        #    print('here',bas3_d1_s,bas3_d1_e,bas3_d2_s,bas3_d2_e)
+        #    print(Atlantic_mask[26,:])
+        #    sys.exit(0)
+
+        for i in range(int(bas4_d1_s),int(bas4_d1_e)+1):
+            Global_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas4_d2_s),int(bas4_d2_e)+1):
+            Global_mask[int(rowno)-1,np.mod(i-1,288)]=1.0
+
+    f.close
+
+
+    return Atlantic_mask,Pacific_mask,Indian_mask,Global_mask
+
+
+
+def get_mask(T_grid_cube,V_grid_cube,mask_data,basin):
+    """
+    gets the Atlantic mask
+    """
+  
+    # T_grid
+     
+    T_grid_mask_cube = T_grid_cube.copy(data=mask_data)
+    T_grid_mask_cube.data = np.ma.where(T_grid_cube.data.mask,-99999.,
+                                     T_grid_mask_cube.data)
+    T_grid_mask_cube.data.mask = T_grid_cube.data.mask
+    T_grid_mask_cube.long_name = basin + ' mask T_grid'
+
+    # V is on a staggered grid
+    # only mask if all surrounding points are masked
+    #    longitude:
+    #original (longitude goes from 0, 1.25 etc.
+    #vgrid    (longitude goes from 0.625, 1.875 etc.
+
+    #so we will set vgrid_mask(i) as 1 if orig(i) and orig(i+1) are also 1
+
+    #latitude:
+    #original (latitude goes from -89.375, -88.125  etc
+    #vgrid    (latitude goes from -88.75, -87,5 etc
+
+    #so we will set vgrid_mask[j] to 1 if orig[j] and orig[j+1] are also 1
+
+    V_data = V_grid_cube.data
+    ny_v, nx_v = V_data.shape
+    print(ny_v,nx_v)
+    
+    vmaskdata=np.ma.zeros((ny_v,nx_v))
+    print(vmaskdata)
+    print(vmaskdata.shape)
+
+    for j in range(0,ny_v):
+        for i in range(0,nx_v):
+                ip1=np.mod(i+1,nx_v)
+                if (mask_data[j,i] ==1 and mask_data[j+1,i]==1 and
+                    mask_data[j,ip1]==1 and mask_data[j+1,ip1]==1):
+                    vmaskdata[j,i]=1.0
+                else: #mask
+                    vmaskdata[j,i]=0.0
+        
+    V_grid_mask_cube = V_grid_cube.copy(data=vmaskdata)
+    V_grid_mask_cube.data = np.ma.where(V_grid_cube.data.mask,-99999.,
+                                     V_grid_mask_cube.data)
+    V_grid_mask_cube.data.mask = V_grid_cube.data.mask
+    V_grid_mask_cube.long_name = basin + ' mask V_grid'
+  
+    
+    return (T_grid_mask_cube, V_grid_mask_cube)
+
+
+#=============================================================================
+
+filename = 'xqbwco#pg000003999c1+.nc'
+
+T_grid_cube = iris.load_cube(filename,'TEMPERATURE (OCEAN)  DEG.C')
+V_grid_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+
+# get pauls mask
+[Atlantic_mask_data,
+ Pacific_mask_data,
+ Indian_mask_data,
+ Global_mask_data]= get_mask_PJV('basin_hadcm3')
+
+
+(Atlantic_mask_T_cube,
+ Atlantic_mask_V_cube) = get_mask(T_grid_cube[0,0,:,:],
+                                  V_grid_cube[0,0,:,:],Atlantic_mask_data,
+                                  'Atlantic')
+(Pacific_mask_T_cube,
+ Pacific_mask_V_cube)= get_mask(T_grid_cube[0,0,:,:],
+                                V_grid_cube[0,0,:,:],Pacific_mask_data,
+                                'Pacific')
+(Indian_mask_T_cube,
+ Indian_mask_V_cube)= get_mask(T_grid_cube[0,0,:,:],
+                               V_grid_cube[0,0,:,:],Indian_mask_data,
+                               'Indian')
+(Global_mask_T_cube,
+ Global_mask_V_cube)  = get_mask(T_grid_cube[0,0,:,:],
+                                 V_grid_cube[0,0,:,:],Global_mask_data,
+                                 'Global')
+print(Atlantic_mask_T_cube,Atlantic_mask_V_cube)
+print(Global_mask_V_cube)
+
+masks_cubelist = CubeList([Atlantic_mask_T_cube,
+                           Atlantic_mask_V_cube,
+                           Pacific_mask_T_cube,
+                           Pacific_mask_V_cube,
+                           Indian_mask_T_cube,
+                           Indian_mask_V_cube,
+                           Global_mask_T_cube,
+                           Global_mask_V_cube])
+print(masks_cubelist)
+
+iris.save(masks_cubelist,'masks.nc',fill_value = -99999.)
+  
+::::::::::::::
+plot_AMOC_from_pk.py
+::::::::::::::
+#NAME
+#    plot AMOC from pk2
+
+#PURPOSE 
+#
+#  This program will plot AMOC / GMOC / PMOC from PK2
+#
+#  
+# Import necessary libraries
+
+import os
+import numpy as np
+#import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import iris
+from iris.cube import CubeList
+import iris.plot as iplt
+#import gsw
+import sys
+#import pandas as pd
+#from pathlib import Path
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_avg_MOC():
+    """
+    get average meridional overturning circulation
+    """
+
+    filestart = '/home/earjcti/um/' + exptname + '/pk2/' + exptname + 'o#pk'
+    basin_name = {'AMOC':'Atlantic','PMOC':'Pacific','GMOC':'Global'}
+    name = ('Meridional Overturning Stream Function ('
+            + basin_name.get(MOCtype) + ')')
+
+    allcubes = CubeList([])
+    for year in range(startyear,endyear):
+        filename = filestart + str(year).zfill(9) + 'c1+.nc'
+        cube = iris.load_cube(filename, name)
+        cube.coord('time').points=year
+        allcubes.append(cube)
+
+    iris.util.equalise_attributes(allcubes)
+    cubes = allcubes.concatenate_cube()
+
+    avg_cube = cubes.collapsed('time',iris.analysis.MEAN)
+
+    return avg_cube
+
+def do_nice_plot(avg_MOC_cube):
+    """
+    plots the MOC
+    """
+
+
+    if MOCtype == 'AMOC':
+        lat_constraint = iris.Constraint(latitude=lambda lat: lat >= -30)
+        plotcube = avg_MOC_cube.extract(lat_constraint)
+        if exptname == 'xqbwg' or exptname == 'xqbwd':
+            # missing data south of CAS
+            mask = plotcube.coord('latitude').points < 8.0
+            mask_2d = np.broadcast_to(mask, plotcube.shape)
+            plotcube.data = np.ma.masked_where(mask_2d, plotcube.data)
+
+
+    if MOCtype == 'PMOC':
+        cuttoff_lat = -90.0
+        if exptname == 'xqbwg' or exptname == 'xqbwe':
+            cutoff_lat = 7.5
+    
+   
+    # Define custom colormap: blue → white → red
+    cmap = plt.get_cmap('RdBu_r')  # Blue-White-Red
+    norm = mcolors.TwoSlopeNorm(vmin=-30, vcenter=0, vmax=30)
+  
+
+    plt.figure(figsize=(10, 6))
+    vals = np.arange(-30,35,5)
+    contour = iplt.contourf(plotcube,
+                            coords=['latitude', 'depth'], cmap=cmap,
+                            levels=vals)
+
+  
+    # Add colorbar and labels
+    plt.colorbar(contour, label='Stream Function (Sv)')
+    plt.title(period.get(exptname))
+    plt.xlabel('Latitude (degrees)')
+    plt.ylabel('Depth (m)')
+
+    plt.show()
+
+
+#######################################################################
+exptname = 'xqbwd'
+startyear=3900
+endyear=4000
+MOCtype='AMOC' # AMOC PMOC GMOC
+
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
+          'xqbwg':'EP',
+          'xqbwc':'PI'}
+
+avg_MOC_cube = get_avg_MOC()
+print(avg_MOC_cube)
+do_nice_plot(avg_MOC_cube)
+
+################################################
+# plot anomalies
+#cntlname = 'xpsie'
+#cntlstart=startyear
+#cntlend=endyear
+#cntlstart=1400
+#cntlend=1500
+#plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin)
+#plot_Pacific_and_Atlantic(exptname,startyear,endyear,0)  # the last number is the level
+
+sys.exit(0)
+
+::::::::::::::
+plot_density_by_basin.py
+::::::::::::::
+#NAME
+#    plot density by basin
+#PURPOSE 
+#
+#  This program will do two things.
+#  1. It will do a latitude-depth plot of density temperature and salinity
+#     for each basin
+#  2. It will try and optimise the number of density classes so that
+#     we have the same number of gridpoints in each density class
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import iris.plot as iplt
+import gsw
+import sys
+import pandas as pd
+from pathlib import Path
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+#============================================================================
+def calculate_density(filename):
+    """
+    reads in temperature and salinity and converts to density (at 2000m)
+    """
+
+    # read in data
+    T_cube = iris.load_cube(filename,'insitu_T')
+    #print(T_cube)
+    S_cube = iris.load_cube(filename,'salinity')
+    S_cube.data = (S_cube.data * 1000.) + 35.0 # convert to psu
+    S_cube.attributes.pop("valid_min")
+    S_cube.attributes.pop("valid_max")
+    
+    latitude = T_cube.coord('latitude').points
+    longitude = T_cube.coord('longitude').points
+    depth = T_cube.coord('depth_1').points
+    latmesh,depmesh,lonmesh = np.meshgrid(latitude,depth,longitude)
+
+    # convert to absolute salinity and conservative temperature
+    pressmesh=gsw.p_from_z(depmesh * (-1.0), latmesh)
+    SA = gsw.SA_from_SP(S_cube.data, pressmesh,lonmesh,latmesh)
+    CT = gsw.CT_from_t(SA, T_cube.data, pressmesh)
+
+    # calculate density (rho potential) referenced to 2000m
+    rho_potential = gsw.rho(SA,CT,2000) - 1000.
+    #print(rho_potential.mask)
+    rho_potential = np.where(rho_potential.mask,-99999,rho_potential)
+    
+    rho_potential_cube = T_cube.copy(data=rho_potential)
+    iris.util.mask_cube(rho_potential_cube,T_cube.data.mask,in_place=True)
+    rho_potential_cube.long_name = 'density (calculated from T and S'
+    rho_potential_cube.units=None
+    rho_potential_cube.attributes=None
+
+    return rho_potential_cube,T_cube,S_cube
+
+
+
+def get_mask(filename,basin):
+    """
+    gets the mask from the Atlantic mask file on a v grid
+    """
+
+    cube = iris.load_cube(filename,basin + ' mask T_grid')
+
+    return cube
+
+
+
+####################################################################
+def mask_function(cube,mask_cube):
+    """
+    masks the cubes
+    """
+
+    # mask V cube
+    cube=iris.util.squeeze(cube)
+    
+    cubelev=np.copy(cube.data)
+    depth_coord = cube.coord('depth_1').points
+    for k in range(0,len(depth_coord)):
+        cubelev[k,:,:] = np.ma.where(mask_cube.data > 0.5, cube.data[k,:,:],
+                              -99999.)
+
+    returncube = cube.copy(data=cubelev)
+    returncube.data = np.ma.where(returncube.data > 1.0E20,-99999.,
+                                  returncube.data)
+    returncube.data.mask = np.where(returncube.data < -9999,1.0,0.0)
+    #cube.data.mask = np.where(cube.data ==-99999., 1.0,0.0)
+    
+
+    return returncube
+
+
+def basin_avg(cube):
+    """
+    calculates the basin average across the cube
+    """
+
+    cubedata = cube.data
+    #print(cubedata.mask)
+    zonalmean_data = np.ma.mean(cube.data,axis=2)
+    #print(np.shape(cube.data))
+    #print(np.shape(zonalmean_data))
+    basin_avg_cube = cube.collapsed('longitude',iris.analysis.MEAN)
+    basin_avg_cube = basin_avg_cube.copy(data=zonalmean_data)
+    #print(zonalmean_data)
+    #print(basin_avg_cube)
+    #print(basin_avg_cube.data[0,90])
+    #print(zonalmean_data[0,90])
+    #print(cube.data[0,90,:])
+    #print(cube.data.mask[0,90,:])
+    #sys.exit(0)
+
+    return basin_avg_cube
+
+
+
+def quantile_binning(full_data, num_bins,filename):
+    """
+    Copilot wrote this subsection
+    Bins data into quantile-based bins with roughly equal number of points 
+    per bin.
+    
+    Parameters:
+        data (array-like): The input data to bin.
+        num_bins (int): Number of bins to create.
+    
+    Returns:
+        bin_edges (np.ndarray): The edges of the bins.
+        bin_labels (pd.Series): Labels indicating which bin each data point 
+        belongs to.
+    """
+    print(len(full_data.flatten()))
+    data = []
+    for point in full_data.flatten():
+        if point > 0:
+            data.append(point)
+    print(len(data))
+    data = pd.Series(data)
+    
+    # Create quantile-based bins
+    bin_labels = pd.qcut(data, q=num_bins, labels=False, duplicates='drop')
+    
+    # Extract bin edges
+    bin_edges = pd.qcut(data, q=num_bins, duplicates='drop').unique().categories
+
+    #  Calculate bin centres
+    bin_centres = np.array([(interval.left + interval.right) / 2 for interval in bin_edges])
+
+    # write bin centres to a text file
+    f=open(filename, 'w') 
+    for i, centre in enumerate(bin_centres):
+        f.write(f"Bin {i} centre: {centre:.6f}\n")
+    f.close()
+    
+    return bin_edges, bin_labels, bin_centres
+
+
+#####################################################################
+def process_data(filename,basin,year):
+    """
+    processess all the data for each year
+    """
+
+
+    # file where V and dz are stored on density coordinates
+
+    # 1. calculate density on Temp, Salinity grid
+    (density_T_grid_cube,
+     temperature_cube,
+     salinity_cube) = calculate_density(filename)
+
+    # gets the basins over which we calculate
+    mask_cube=get_mask('masks.nc',basin) # get mask on T grid
+
+    density_T_grid_cube = mask_function(density_T_grid_cube,mask_cube)
+    temperature_cube = mask_function(temperature_cube,mask_cube)
+    salinity_cube = mask_function(salinity_cube,mask_cube)
+
+    # calculate stream function for the basin
+    density_basin_avg_cube = basin_avg(density_T_grid_cube)
+    temperature_basin_avg_cube = basin_avg(temperature_cube)
+    salinity_basin_avg_cube = basin_avg(salinity_cube)
+
+
+    # put data into unequally spaced bins if global and we haven't already done this
+
+    filename = exptname + '_sigmas.txt'
+    filepath = Path(filename)
+
+    if basin == 'Global' and not filepath.exists():
+        edges, labels, bin_centres = quantile_binning(density_T_grid_cube.data,
+                                                      90,filename)
+
+        print("Bin edges:")
+        for i, interval in enumerate(edges):
+            print(f"Bin {i}: {interval}")
+
+    # save everything to a file
+
+    fileout = ('/home/earjcti/um/' + exptname +
+               '/basin_diagnostics/' + exptname + '_' +
+               basin + str(year) + '.nc')
+
+    density_basin_avg_cube.long_name='density basin'
+    temperature_basin_avg_cube.long_name='temperature basin'
+    salinity_basin_avg_cube.long_name='salinity basin'
+    iris.save([density_T_grid_cube,
+               density_basin_avg_cube,temperature_basin_avg_cube,
+               salinity_basin_avg_cube],
+               fileout,fill_value = -99999.)
+
+
+###########################################################    
+def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin):
+    """
+    plots the difference in density salinity and temperature between two 
+    experiments
+    """
+
+    exptfile=('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_' +
+                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
+    cntlfile=('/home/earjcti/um/' + cntlname +
+                  '/basin_diagnostics/mean_' + cntlname + '_' +
+                  basin + str(cntlstart) + '_' + str(cntlend-1)+'.nc')
+
+    expt_temp_cube = iris.load_cube(exptfile,'temperature basin')
+    cntl_temp_cube = iris.load_cube(cntlfile,'temperature basin')
+
+    expt_dens_cube = iris.load_cube(exptfile,'density basin')
+    cntl_dens_cube = iris.load_cube(cntlfile,'density basin')
+
+    expt_sal_cube = iris.load_cube(exptfile,'salinity basin')
+    cntl_sal_cube = iris.load_cube(cntlfile,'salinity basin')
+
+    temp_anom = expt_temp_cube - cntl_temp_cube
+    dens_anom = expt_dens_cube - cntl_dens_cube
+    sal_anom = expt_sal_cube - cntl_sal_cube
+
+    vals = np.arange(-2.0,2.5,0.5)
+    if cntlname !='xqbwc':
+        vals = np.arange(-2.0,2.5,0.5)
+    print(vals)
+    cs=iplt.contourf(temp_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.xlabel('Latitude (degrees)')
+    plt.ylabel('Depth (m)')
+    cb=plt.colorbar(cs,orientation='horizontal')
+    cb.set_label('(\u00B0C)')
+    plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname)
+   # plt.show()
+   # sys.exit(0)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-0.3,0.33,0.03)
+    qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meandens_' + exptname + '-' +
+                cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-0.5,0.6,0.1)
+    cs=iplt.contourf(sal_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.xlabel('Latitude (degrees)')
+    plt.ylabel('Depth (m)')
+    cb=plt.colorbar(cs,orientation='horizontal')
+    cb.set_label('psu')
+  
+    plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meansal_' + exptname + '-' +
+                cntlname + '_' + basin + str(startyear) + '_' +
+                str(endyear-1)+'.png')
+    plt.close()
+   
+    
+    sys.exit(0)
+
+
+def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
+    """
+    plots the difference in SST and SSS between the Pacific
+    and the Atlantic for the experiment
+    """
+    Atlfile=('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_Atlantic' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+
+    Atl_temp_cube = iris.load_cube(Atlfile,'temperature basin')
+
+    Atl_dens_cube = iris.load_cube(Atlfile,'density basin')
+
+    Atl_sal_cube = iris.load_cube(Atlfile,'salinity basin')
+
+
+    Pacfile=('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_Pacific' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+
+    Pac_temp_cube = iris.load_cube(Pacfile,'temperature basin')
+
+    Pac_dens_cube = iris.load_cube(Pacfile,'density basin')
+
+    Pac_sal_cube = iris.load_cube(Pacfile,'salinity basin')
+
+    Atlcntl=('/home/earjcti/um/' + cntlname +
+                  '/basin_diagnostics/mean_' + cntlname + '_Atlantic' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+    Paccntl=('/home/earjcti/um/' + cntlname +
+                  '/basin_diagnostics/mean_' + cntlname + '_Pacific' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+    Atlcntl_cube = iris.load_cube(Atlcntl,'temperature basin')
+    Paccntl_cube = iris.load_cube(Paccntl,'temperature basin')
+    Atl_diff_cube = Atl_temp_cube - Atlcntl_cube
+    Pac_diff_cube = Pac_temp_cube - Paccntl_cube
+
+    # plot temperature
+    plt.subplot(221)
+    plt.plot(Atl_temp_cube.coord('latitude').points,Atl_temp_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_temp_cube.coord('latitude').points,Pac_temp_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin temperature for : ' + period.get(exptname,exptname) + ' lev = ' + str(lev))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('degC')
+    plt.axvline(x=10)
+    plt.grid(True)
+  
+    # plot salinity
+    plt.subplot(222)
+    plt.plot(Atl_sal_cube.coord('latitude').points,Atl_sal_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_sal_cube.coord('latitude').points,Pac_sal_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin salinity for : ' + period.get(exptname,exptname))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('psu')
+    plt.axvline(x=10)
+    plt.grid(True)
+
+
+    # plot density
+    plt.subplot(223)
+    plt.plot(Atl_dens_cube.coord('latitude').points,Atl_dens_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_dens_cube.coord('latitude').points,Pac_dens_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin dens for : ' + period.get(exptname,exptname))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('density')
+    plt.axvline(x=10)
+    plt.grid(True)
+    plt.tight_layout()   
+
+    # plot anomaly
+    plt.subplot(224)
+    plt.plot(Atl_diff_cube.coord('latitude').points,Atl_diff_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_diff_cube.coord('latitude').points,Pac_diff_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin anomaly for : ' + period.get(exptname,exptname) + '-' +
+              period.get(cntlname,cntlname))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('degc diff')
+    plt.axvline(x=10)
+    plt.grid(True)
+    plt.tight_layout()   
+
+    plt.show()
+    sys.exit(0)
+    
+    plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname,
+              cmap='RdBu_R')
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-1.0,1.1,0.1)
+    qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meandens_' + exptname + '-' +
+                cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-1.0,1.1,0.1)
+    qplt.contourf(sal_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meansal_' + exptname + '-' +
+                cntlname + '_' + basin + str(startyear) + '_' +
+                str(endyear-1)+'.png')
+    plt.close()
+   
+    
+    sys.exit(0)
+
+
+#######################################################################
+exptname = 'xpsie'
+startyear=1600
+endyear=1700
+basin='Pacific'
+
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
+          'xqbwg':'EP',
+          'xqbwc':'PI'}
+
+
+# get individual years diagnostics for the basin
+
+#for year in range(startyear,endyear):
+#    filestart = '/home/earjcti/um/' + exptname + '/pg/' + exptname 
+#    filename = filestart + 'o#pg00000'+str(year)+'c1+.nc'
+#    process_data(filename,basin,year)
+
+#################################################
+# get the mean dianostics for the basin
+#dens_cubelist = CubeList([])
+#sal_cubelist = CubeList([])
+#temp_cubelist = CubeList([])
+
+#for year in range(startyear,endyear):
+#     filename = ('/home/earjcti/um/' + exptname +
+#                  '/basin_diagnostics/' + exptname + '_' +
+#                  basin + str(year) + '.nc')
+
+#     dens_cubelist.append(iris.load_cube(filename,'density basin'))
+#     temp_cubelist.append(iris.load_cube(filename,'temperature basin'))
+#     sal_cubelist.append(iris.load_cube(filename,'salinity basin'))
+#     sal_cube = iris.load_cube(filename,'salinity basin')
+   
+#iris.util.equalise_attributes(dens_cubelist)
+#iris.util.equalise_attributes(sal_cubelist)
+#iris.util.equalise_attributes(temp_cubelist)
+#dens_cubes = dens_cubelist.merge_cube()
+#sal_cubes = sal_cubelist.merge_cube()
+#temp_cubes = temp_cubelist.merge_cube()
+
+#dens_avg_cube = dens_cubes.collapsed('t',iris.analysis.MEAN)
+#sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
+#temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
+
+#fileout = ('/home/earjcti/um/' + exptname +
+#                  '/basin_diagnostics/mean_' + exptname + '_' +
+#                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
+#iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
+#          fileout,fill_value = -99999.)
+  
+
+################################################
+# plot anomalies
+cntlname = 'xpsid'
+cntlstart=startyear
+cntlend=endyear
+cntlstart=1400
+cntlend=1500
+plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin)
+#plot_Pacific_and_Atlantic(exptname,startyear,endyear,0)  # the last number is the level
+
+sys.exit(0)
+
+::::::::::::::
+py
+::::::::::::::
+::::::::::::::
+regrid_density_coords.py
+::::::::::::::
+#NAME
+#    regrid density coordinates
+#PURPOSE 
+#
+#  This program will regrid a pg file onto density coordinates
+#
+#
+
+# Import necessary libraries
+import iris
+import iris.quickplot as qplt
+from iris.cube import CubeList
+import numpy as np
+import matplotlib.pyplot as plt
+import gsw
+from scipy.interpolate import interp1d
+import sys
+
+                        
+
+#============================================================================
+def calculate_density(filename):
+    """
+    reads in temperature and salinity and converts to density (at 2000m)
+    """
+
+    # read in data
+    T_cube = iris.load_cube(filename,'insitu_T')
+    #print(T_cube)
+    S_cube = iris.load_cube(filename,'salinity')
+    S_cube.data = (S_cube.data * 1000.) + 35.0 # convert to psu
+    latitude = T_cube.coord('latitude').points
+    longitude = T_cube.coord('longitude').points
+    depth = T_cube.coord('depth_1').points
+    latmesh,depmesh,lonmesh = np.meshgrid(latitude,depth,longitude)
+
+    # convert to absolute salinity and conservative temperature
+    pressmesh=gsw.p_from_z(depmesh * (-1.0), latmesh)
+    SA = gsw.SA_from_SP(S_cube.data, pressmesh,lonmesh,latmesh)
+    CT = gsw.CT_from_t(SA, T_cube.data, pressmesh)
+
+    # calculate density (rho potential) referenced to 2000m
+    rho_potential = gsw.rho(SA,CT,2000) - 1000.
+    #print(rho_potential.mask)
+    rho_potential = np.where(rho_potential.mask,-99999,rho_potential)
+    
+    rho_potential_cube = T_cube.copy(data=rho_potential)
+    iris.util.mask_cube(rho_potential_cube,T_cube.data.mask,in_place=True)
+    rho_potential_cube.long_name = 'density (calculated from T and S'
+    rho_potential_cube.units=None
+    rho_potential_cube.attributes=None
+
+    return rho_potential_cube
+#==================================================
+def convert_to_vgrid(filename,T_grid_cube):
+    """
+    converts from T_grid_cube to V_grid_cube (only interpolate horizontally)
+    """
+    
+    temporary = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    grid_cube = temporary[0,0,:,:]
+
+    V_grid_cube = T_grid_cube.regrid(grid_cube,iris.analysis.Nearest())
+    iris.util.mask_cube(V_grid_cube,temporary.data.mask,in_place=True)
+   
+    V_grid_cube.long_name = 'density on v-grid'
+
+    #iris.save([T_grid_cube,V_grid_cube],'temporary.nc',fill_value = -99999.)
+
+    return V_grid_cube
+
+#==================================================
+def get_sigma_levels(exptname):
+    """
+    get sigma levels. The user can change this
+    """
+    sigma_levels=[]
+    try:
+        # Open the file in read mode
+        with open(exptname + '_sigmas.txt', 'r') as file:
+            for line_number, line in enumerate(file, start=1):
+                 # Strip newline characters and whitespace
+                 line = line.strip()
+            
+                 # Split the line by colon
+                 split_line = line.split(':')
+                 value = split_line[1].strip()
+                 file_sigma = float(value)
+                 sigma_levels.append(file_sigma)
+    except FileNotFoundError:
+        print(f"The file '{exptname}'_sigmas.txt was not found.")
+        sys.exit(0)
+    except IOError:
+        print(f"An error occurred while reading the file '{filename}'.")
+        sys.exit(0)
+
+    sigma_array = np.array(sigma_levels)
+   
+    return sigma_array
+
+#================================================================
+def interpolate_to_rhopot(filename,field,density_V_grid_cube,
+                                             sigma_levels):
+    """
+    this will interpolate the field to the sigma levels
+    """
+    if field == 'V':
+        field_cube = iris.load_cube(filename,
+                                    'TOTAL OCEAN V-VELOCITY      CM S**-1')/100.
+        field_data = field_cube.data
+
+    if field == 'depth':
+        field_cube = iris.load_cube(filename,
+                                    'TOTAL OCEAN V-VELOCITY      CM S**-1')/100.
+        depths=field_cube.coord('depth_1').points
+
+        field_data = np.ma.copy(field_cube.data)
+        
+        for k in range(0,len(depths)):
+            field_data[:,k,:,:]=depths[k]
+
+        field_data.mask = field_cube.data.mask
+            
+          
+    density_V_grid_data = density_V_grid_cube.data
+    lons = field_cube.coord('longitude').points
+    lats = field_cube.coord('latitude').points
+
+    interpolated_variable=np.zeros((len(sigma_levels),len(lats),len(lons)))
+    interpolated_variable[:,:,:]=-99999.
+
+
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            rho_profile = density_V_grid_data[0,:,j,i]
+            var_profile = field_data[0,:,j,i]
+            if not var_profile.mask[0]:
+                rho_prof_red=[]
+                var_prof_red=[]
+                for k in range(0,20):
+                    if not var_profile.mask[k]:
+                        rho_prof_red.append(rho_profile[k])
+                        var_prof_red.append(var_profile[k])
+                #print('here',i,j)
+                new_var = np.interp(sigma_levels,rho_prof_red,
+                                    var_prof_red,
+                                    left=-99999.,
+                                    right=-99999.)
+                #print(new_var)
+                #print(var_profile)
+                #print(rho_profile)
+                #print(var_profile.mask[0])
+                #sys.exit(0)
+                interpolated_variable[:,j,i]=new_var
+
+    #sys.exit(0)
+    interpolated_cube_1d = field_cube[0,0:1,:,:].copy()
+    
+    interpolated_cube_1d.attributes=None
+    interpolated_cube_1d.remove_coord('t')
+    cube_list = CubeList([])
+    for k in range(0,len(sigma_levels)):
+        interpolated_cube_1d.coord('depth_1').points = sigma_levels[k]
+        cube_list.append(interpolated_cube_1d.copy())
+
+    
+    iris.util.equalise_attributes(cube_list)
+    interpolated_cube=cube_list.concatenate_cube()
+    interpolated_cube.coord('depth_1').rename('sigma')
+
+    interpol_final_cube = interpolated_cube.copy(data=interpolated_variable)
+    interpol_final_cube.long_name = field + ' on sigma coordinates'
+
+    
+    return interpol_final_cube
+
+#============================================================================
+def get_thickness(dep_rho_potential_cube,v_rho_potential_cube,
+                               filename):
+    """
+    gets the thickness of each layer for every point there is a velocity
+    """
+
+    # stuff we need
+    lons=v_rho_potential_cube.coord('longitude').points
+    lats=v_rho_potential_cube.coord('latitude').points
+    sigma=v_rho_potential_cube.coord('sigma').points
+    v_data = v_rho_potential_cube.data
+    dep_data = dep_rho_potential_cube.data
+  
+    # first calculate the base of each level from the standard um file - w grid
+    w_cube = iris.load_cube(filename,'VERT.VEL. ON OCEAN HALF LEVELS  CM/S')
+    depths = w_cube.coord('depth').points
+    top_depths = np.zeros(21)
+    for k in range(0,19):
+        top_depths[k+1] = depths[k]
+    top_depths[20]=depths[18]+depths[18]-depths[17]
+  
+    #now get the depth of the ocean
+    v_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    ocean_depth = np.zeros((len(lats),len(lons)))
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            ocean_depth[j,i]=top_depths[20] # for all are found
+            for k in range(19,-1,-1):
+                if v_cube.data.mask[0,k,j,i]:
+                    ocean_depth[j,i]=top_depths[k]
+
+   
+    # loop over all points
+    #   if v is set
+    #      thickness[k] = (depth[k]-depth[k-1]) / 2.0 + (depth[k+1]-depth[k])/2
+    #   if k+1 is not set assume it is at the bottom of the ocean so use
+    #                                                         base_depths
+    #   if k-1 is not set assume it is top of ocean so use 0
+
+    thickness=np.zeros((len(sigma),len(lats),len(lons)))
+    for j in range(0,len(lats)):
+        for i in range(0,len(lons)):
+            for k in range(1,len(sigma)-1):
+                if v_data[k,j,i] > -900:
+                    
+                    # get thickness of lower part of gridbox
+                    if dep_data[k+1,j,i] < 0.0:
+                        # to base of ocean
+                        kp1_dz = ocean_depth[j,i] - dep_data[k,j,i]
+                    else:
+                        # halfway to next level
+                        kp1_dz = (dep_data[k+1,j,i] - dep_data[k,j,i])/2.0
+                        
+                    # get thickness of upper part of gridbox
+                    if dep_data[k-1,j,i] < 0.0:
+                        # to top of ocean
+                        km1_dz = dep_data[k,j,i]
+                    else:
+                        # half way to previous level
+                        km1_dz = (dep_data[k,j,i] - dep_data[k-1,j,i])/2.0
+                    
+                    thickness[k,j,i] = kp1_dz + km1_dz
+                    #print(k,j,i,thickness[k,j,i],kp1_dz,km1_dz)
+                    #print(dep_data[k-1,j,i],dep_data[k,j,i])
+
+                    #sys.exit(0)
+
+                    #print('found',sigma[k],lats[j],lons[i],
+                    #          dep_data[k+1,j,i],
+                    #          dep_data[k,j,i],dep_data[k-1,j,i],dz,
+                    #          v_data[k,j,i],v_data[k-1,j,i],v_data[k+1,j,i])
+
+    thickness_cube = dep_rho_potential_cube.copy(data=thickness)
+    thickness_cube.long_name = 'thickness (dz)'
+        
+
+    return thickness_cube
+            
+
+def get_alt_V(filename,thickness_cube,V_orig_density_cube):
+    """
+    this is an alternative way of calculating V on density levels
+    which is designed to maintain vdz it will do the following for each i and j
+    
+    1. find the base of each depth on the v grid (called depth_base)
+    2. for each the thickess cube and find the depth of each layer
+       on the sigma grid
+    3. find out where this thickness grid corresponds to on the depth grid
+    4. calculate a weighted average of v
+    """
+
+    # read in V cube from standard file
+    V_orig_cube = iris.load_cube(filename,
+                                    'TOTAL OCEAN V-VELOCITY      CM S**-1')/100.
+    V_data = V_orig_cube.data
+    lats = V_orig_cube.coord('latitude').points
+    lons = V_orig_cube.coord('longitude').points
+
+    V_alt = np.zeros(np.shape(V_orig_density_cube))
+ 
+
+    
+    # first calculate the base of each level from the standard um file - w grid
+    w_cube = iris.load_cube(filename,'VERT.VEL. ON OCEAN HALF LEVELS  CM/S')
+    depths = w_cube.coord('depth').points
+    top_depths = np.zeros(21)
+    for k in range(0,19):
+        top_depths[k+1] = depths[k]
+    top_depths[20]=depths[18]+depths[18]-depths[17]
+
+    # loop over layers to see where sigma corresponds to depths
+    sigma = thickness_cube.coord('sigma').points
+    thickness = thickness_cube.data
+    #for j in range(0,len(lats)):
+    #    for i in range(0,len(lons)):
+    for j in range(14,15):
+        for i in range(138,139):
+            depmin=0.0 # how much has been accounted for
+                                    # by layers above
+            for k in range(0,len(sigma)):
+                if thickness[k,j,i] > 0.0:
+                    # find min and max depth of this layer
+                    depmax=depmin+thickness[k,j,i]
+                    print(k,thickness[k,j,i],depmin,depmax)
+                    depreq=np.zeros(20)
+                    # find how many metres is in each layer on orig grid
+                    for k2 in range(0,20):
+                        if top_depths[k2] <= depmin <= top_depths[k2+1]:
+                            # top band of sigma layer is in this depth band
+                            # find number of meters it contributes
+                            depreq[k2]=np.min([top_depths[k2+1],depmax])-depmin
+                            print('case A',k2,depmin,depmax,top_depths[k2],
+                                  top_depths[k2+1])
+                        elif top_depths[k2] <= depmax <= top_depths[k2+1]:
+                            # bottom band of sigma layer is in this depth band
+                            # find number of meters it contributes
+                            depreq[k2]=depmax - top_depths[k2]
+                            print('case B',k2,top_depths[k2],depmax,top_depths[k2+1])
+                        elif (depmax > top_depths[k2+1] >
+                              top_depths[k2] > depmin):
+                            # our sigma level encompases this whole band
+                            # so depth required from this band is full depth
+                            depreq[k2]=top_depths[k2+1] - top_depths[k2]
+                            print('case C')
+                    # calculate V_alt as a weighted average of the
+                    # depths which contribute to this layer
+                    vavg=0
+                    for k2 in range(0,20):
+                        if depreq[k2] > 0.1:
+                            #print('j1',k,V_data[0,k2,j,i], depreq[k2])
+                            vavg = vavg + (V_data[0,k2,j,i] * depreq[k2])
+                    vavg=vavg / thickness[k,j,i]
+                    if np.isfinite(vavg):
+                        V_alt[k,j,i]=vavg
+                        #print('j2',k,vavg*100.,thickness[k,j,i])
+                        #print(' ')
+                    else:
+                        print('not finite',i,j,lons[i],lats[j],k,
+                              vavg,thickness[k,j,i])
+                        for k in range(0,20):
+                            print(k,top_depths[k+1],top_depths[k],V_data[0,k,j,i])
+                        sys.exit(0)
+                    
+                   #print('vavg for ',k,vavg)
+                    depmin = depmin + thickness[k,j,i]
+
+    V_alt = np.where(V_orig_density_cube.data < -9999., -99999., V_alt)
+    V_alt_cube = V_orig_density_cube.copy(data=V_alt)
+
+
+    return V_alt_cube
+                         
+
+
+                    
+ 
+#=============================================================================
+
+exptname = 'xqbwd'
+startyear=3971
+endyear=3972
+filestart = '/home/earjcti/um/' + exptname + '/'
+
+for year in range(startyear,endyear):
+    print(year)
+    filename = filestart + 'pg/' + exptname + 'o#pg00000' + str(year) + 'c1+.nc'
+
+    # 1. calculate density on Temp, Salinity grid
+    density_T_grid_cube = calculate_density(filename)
+
+    # 2. put density cube on V grid using interpolation (horizontally)
+    density_V_grid_cube = convert_to_vgrid(filename,density_T_grid_cube)
+
+    # 3. get sigmal levels on which we will interpolate the fields
+    
+    sigma_levels = get_sigma_levels(exptname)
+
+    # 3. interpolate fields to rho_potential (depth and v)
+
+    dep_rho_potential_cube = interpolate_to_rhopot(filename,'depth',
+                                                   density_V_grid_cube,
+                                                   sigma_levels)
+
+    v_rho_potential_cube = interpolate_to_rhopot(filename,'V',
+                                                 density_V_grid_cube,
+                                                 sigma_levels)
+
+    #4. If we have a velocity we want a thickness
+    thickness_cube = get_thickness(dep_rho_potential_cube,v_rho_potential_cube,
+                                   filename)
+
+    #5. Alternative way of interpolating V using thickness
+
+    V_alt_cube = get_alt_V(filename,thickness_cube,v_rho_potential_cube)
+    V_alt_cube.long_name = 'alternative V cube'
+
+    fileout = filestart + 'Vdz/' + exptname + '_vdz_' + str(year) + '.nc'    
+    iris.save([thickness_cube,dep_rho_potential_cube,v_rho_potential_cube,V_alt_cube],fileout,fill_value=-99999.)
+
+
+  

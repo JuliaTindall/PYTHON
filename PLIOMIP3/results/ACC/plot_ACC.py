@@ -1,0 +1,450 @@
+#NAME
+#    plot_ACC
+#PURPOSE 
+# This program calculates Antarctic Circumpolar Current (ACC) transport through
+# a defined Drake Passage section.  
+# It reads annual NetCDF files for both an experiment and control run 
+# It produces a time series of transport for each case and their difference in Sverdrups.  
+# It also creates a polar stereographic map of the 100‑year mean surface zonal velocity.
+#
+#  I am adjusting this to also calculate the heat transport by the ACC
+#
+
+# This program will plot the Antarctic circumpolar current
+# Import necessary libraries
+
+import xarray as xr
+import xesmf as xe # for regridding
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from pathlib import Path
+import cartopy.crs as ccrs
+import sys
+
+# === CONFIG ===
+years='0000039[7-9]'
+expts = ['xqbwg','xqbwd','xqbwe','xqbwg']
+
+uvar = "field703"
+tvar="temp"
+lat_name = "latitude_1"
+lon_name = "longitude_1"
+tlat_name = "latitude"
+tlon_name = "longitude"
+lev_name = "depth_1"
+
+lon0 = -68.0      # section longitude  drakes passage
+lat_min = -90.0
+lat_max = -52.0
+secname = 'Drakes_passage'
+
+lon1 = 20.0      # section longitude  drakes passage
+lat1_min = -90.0
+lat1_max = -30.0
+secname1 = 'Atl_Indian'
+
+lon2 = 145.0      # section longitude  drakes passage
+lat2_min = -90.0
+lat2_max = -40.0
+secname2 = 'Tasman_gate'
+
+
+period = {'xqbwc':'PI', 'xqbwd':'LP','xqbwe':'EP400','xqbwg':'EP',
+           'xqbwi':'LP280','xqbwj':'LP490'}
+
+def recenter_lon(lon):
+    lon = np.where(lon > 180, lon - 360, lon)
+    return lon
+
+def layer_thickness(depth):
+    z = depth.values
+    edges = np.zeros(z.size + 1)
+    edges[1:-1] = 0.5 * (z[1:] + z[:-1])
+    edges[0] = z[0] - (edges[1] - z[0])
+    edges[-1] = z[-1] + (z[-1] - edges[-2])
+    return np.diff(edges)
+
+def section_transport(u, lat, depth, lon, lon0,lat_min,lat_max,t,expt):
+    """
+    Computes the total volume transport across a defined ocean section 
+    using model velocity data.  
+    Integrates zonal velocity over depth and width to return transport in 
+    Sverdrups for each dataset.  
+    """
+
+    # put t on u grid
+    t_regrid = t.interp(latitude=u.latitude_1,longitude=u.longitude_1,
+                        method='nearest')
+    tsq_regrid = t_regrid.squeeze()
+    
+    usq=u.squeeze()
+    usq = usq / 100.  # convert from cm/s to m/s
+
+    tsq=t.squeeze()  # temperature already in celsius
+    # Find nearest longitude
+    lon = recenter_lon(lon)
+    # index of required longitude
+    i = np.argmin(np.abs(lon - lon0))
+
+    # get section we care about (ie between latmin and latmax at lon0)
+    u_sec = usq.isel({lon_name: i}).sel({lat_name: slice(lat_min, lat_max)})
+    t_sec = tsq_regrid.isel({lon_name: i}).sel({lat_name: slice(lat_min, lat_max)})
+
+    dy = np.abs(np.gradient(np.deg2rad(u_sec[lat_name].values))) * 6371000.0
+    dz = layer_thickness(depth)
+
+    term = u_sec * dz[:, None] * dy[None, :]
+    OHTterm = u_sec * t_sec * dz[:, None] * dy[None, :]
+
+    
+    trans = term.sum(dim=(lev_name, lat_name),skipna=True) / 1e6  # Sv
+    OHT_trans = OHTterm.sum(dim=(lev_name,lat_name),skipna=True)
+    density=1025
+    cp=4000
+    OHT_trans = OHT_trans * cp * density / 1.0E15  # convert to Pw
+
+    print(OHTterm * cp * density / 1.0E15)
+    print('trans',OHT_trans.data)
+    
+    plt.figure(figsize=(10, 6))
+    plt.subplot(121)
+    plt.pcolormesh(OHTterm.latitude_1, OHTterm.depth_1,
+                   OHTterm * density * cp / 1.0E15,
+                   shading='auto', cmap='RdBu_r',vmin=-0.15,vmax=0.15)
+    plt.colorbar(label='Heat Transport (PW)',extend='both')  # Adjust label to match your data
+    plt.xlabel('Latitude (°)')
+    plt.ylabel('Depth (m)')
+    plt.title('OHT:' + expt + '_' + str(np.mean(OHT_trans.data)))
+    plt.gca().invert_yaxis()  # Depth increases downward
+
+    plt.subplot(122)
+    plt.pcolormesh(term.latitude_1, term.depth_1,
+                   OHTterm  / 1.0E6,
+                   shading='auto', cmap='RdBu_r',vmin=-50.0,vmax=50.0)
+    plt.colorbar(label='watertransport (Sv)',extend='both')  # Adjust label to match your data
+    plt.xlabel('Latitude (°)')
+    plt.ylabel('Depth (m)')
+    plt.title('waterflux:' + expt + '_' + str(trans.data))
+    plt.gca().invert_yaxis()  # Depth increases downward
+    plt.tight_layout()
+    plt.show()
+
+    sys.exit(0)
+ 
+    return float(trans),float(OHT_trans.data)
+
+
+def section_transport_julia(u, lat, depth, lon, lon0,lat_min,lat_max):
+    """
+    section transports was from ai.  This is mine
+    """
+    usq=u.squeeze()
+    usq = usq / 100.  # convert from cm/s to m/s
+   
+    # Find nearest longitude
+    lon = recenter_lon(lon)
+    # index of required longitude
+    i = np.argmin(np.abs(lon - lon0))
+
+    # get section we care about (ie between latmin and latmax at lon0)
+    u_sec = usq.isel({lon_name: i}).sel({lat_name: slice(lat_min, lat_max)})
+
+    print(u_sec)
+    print(u_sec.coords)
+
+    # have checked dy I think it is correct it is 138993.62metres
+    # for 1.25 deg.  I have checked dz.  I think this is also correct
+    dy = np.abs(np.gradient(np.deg2rad(u_sec[lat_name].values))) * 6371000.0
+    dz = layer_thickness(depth)
+  
+    term = u_sec * dz[:, None] * dy[None, :]
+    print(term)
+    #sys.exit(0)
+    print(term)
+    #print(u_sec.shape)
+    #print(dz.shape)
+    #print(dz[:,None])
+    #print(dy[None,:])
+    #print(dy.shape)
+    #print(u_sec.data[3,10],dz[3,None],dy[None,10])
+    #print('term is',term.data[3,10],term.data[3,10]/1.0E6)
+    #print(term.data/1E6)
+    #print(np.nansum(term.data)/1E6)
+    trans = term.sum(dim=(lev_name, lat_name),skipna=True) / 1e6  # Sv
+    return float(trans)
+
+def integrated_zonal_transport(files, uvar, lev_name, lat_name,
+                                          lon_name):
+    """
+    mean depth integrated zonal transport from u
+    returns trans which is transport
+    """
+
+    acc = None
+    acc_surf = None
+    n = 0
+    for f in files:
+        ds = xr.open_dataset(f)
+        u = ds[uvar] / 100.  # convert to m/s
+        
+        # get section we care about (ie between latmin and latmax)
+        u_sec = u.squeeze().sel({lat_name: slice(-90.0, -30.0)})
+
+        # Depth-integrate u: sum_z u * dz  -> units m^2/s
+        dz = layer_thickness(ds[lev_name])
+        uint = (u_sec * dz[:,None,None]).sum(dim=lev_name)
+        uint_surf = (u_sec[0,:,:] * dz[0,None,None])
+    
+        # Convert to transport through a meridional wall segment by multiplying by dy(lat)
+        dy = np.abs(np.gradient(np.deg2rad(u_sec[lat_name].values))) * 6371000.0
+    
+        trans = (uint * dy[:,None]).rename("zonal_transport_Sv") / 1e6  # Sv
+        trans_surf = (uint_surf * dy[:,None]).rename("zonal_transport_Sv") / 1e6  # Sv
+
+        # Accumulate
+        acc = trans if acc is None else acc + trans
+        acc_surf = trans_surf if acc_surf is None else acc_surf + trans_surf
+        n += 1
+
+    mean_trans = acc / n
+    mean_trans_surf = acc_surf / n
+    
+    lon = mean_trans[lon_name]
+    lon = xr.where(lon > 180, lon - 360, lon) 
+    mean_trans = mean_trans.assign_coords({lon_name: lon}).sortby(lon_name)
+    mean_trans_surf = mean_trans_surf.assign_coords({lon_name: lon}).sortby(lon_name)
+    return mean_trans,mean_trans_surf
+
+
+#####################################################################
+
+
+all_transports_dp = []
+all_transports_ai = []
+all_transports_t = []
+all_transports_depth = []
+all_transports_surface = []
+all_OHT_dp = []
+all_OHT_ai = []
+all_OHT_t = []
+all_OHT_depth = []
+all_OHT_surface = []
+for expt in expts:
+    print(expt)
+    exptdp_transport = []
+    exptai_transport = []
+    exptt_transport = []
+    exptdp_OHT = []
+    exptai_OHT = []
+    exptt_OHT = []
+    allfiles =  sorted(Path('/home/earjcti/um/'+expt+'/pg/').
+                     glob(expt + '*pg'+years+'*.nc'))
+
+    for file in allfiles:
+        ds_file = xr.open_dataset(file)
+        #get transport across drakes passage (timeseries)
+        (trans_dp,
+         OHT_dp) = section_transport(ds_file[uvar], ds_file[lat_name],
+                                     ds_file[lev_name], ds_file[lon_name],
+                                     lon0,lat_min,lat_max,ds_file[tvar],expt)
+        # get transport from Atlantic to Indian
+        (trans_ai,
+         OHT_ai)= section_transport(ds_file[uvar], ds_file[lat_name],
+                                    ds_file[lev_name], ds_file[lon_name],
+                                    lon1,lat1_min,lat1_max,ds_file[tvar],expt)
+        # get transport across tasman gateway
+        (trans_t,
+         OHT_t)= section_transport(ds_file[uvar], ds_file[lat_name],
+                                      ds_file[lev_name], ds_file[lon_name],
+                                      lon2,lat2_min,lat2_max,ds_file[tvar],expt)
+
+        exptdp_transport.append(trans_dp)
+        exptai_transport.append(trans_ai)
+        exptt_transport.append(trans_t)
+        exptdp_OHT.append(OHT_dp)
+        exptai_OHT.append(OHT_ai)
+        exptt_OHT.append(OHT_t)
+        
+    all_transports_dp.append(np.array(exptdp_transport))
+    all_transports_ai.append(np.array(exptai_transport))
+    all_transports_t.append(np.array(exptt_transport))
+    all_OHT_dp.append(np.array(exptdp_OHT))
+    all_OHT_ai.append(np.array(exptai_OHT))
+    all_OHT_t.append(np.array(exptt_OHT))
+
+
+    # get surface and depth integrated transport
+    (depth_transport,
+     surface_transport)= integrated_zonal_transport(allfiles,uvar,
+                                                    lev_name, lat_name,
+                                                    lon_name)
+    all_transports_depth.append(depth_transport)
+    all_transports_surface.append(surface_transport)
+
+
+        
+
+    #print(f"Mean ACC transport ({expt}): {transport.mean():.2f} Sv")
+  
+# === Time series plots ===
+
+# plot all basins on one graph # transport Sv
+for i,expt in enumerate(expts):
+    plt.figure()
+    plt.plot(all_transports_dp[i], label=secname)
+    plt.plot(all_transports_ai[i], label=secname1)
+    plt.plot(all_transports_t[i], label=secname2)
+    plt.xlabel("Year")
+    plt.ylabel("Transport (Sv)")
+    plt.title(f"ACC Transport for {expt}:{period.get(expt,expt)}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"{period.get(expt,expt)}_acc_transport_timeseries.png", dpi=150)
+    plt.close()
+
+# plot all basins on one graph #OHT PW
+for i,expt in enumerate(expts):
+    plt.figure()
+    plt.plot(all_OHT_dp[i], label=secname)
+    plt.plot(all_OHT_ai[i], label=secname1)
+    plt.plot(all_OHT_t[i], label=secname2)
+    plt.xlabel("Year")
+    plt.ylabel("OHT (PW)")
+    plt.title(f"ACC OHT for {expt}:{period.get(expt,expt)}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"{period.get(expt,expt)}_acc_OHT_timeseries.png", dpi=150)
+    plt.close()
+
+
+# drakes passage
+plt.figure()
+
+for i,expt in enumerate(expts):
+
+    if period.get(expt,expt) == 'PI':
+        plt.plot(all_transports_dp[i], label=expt + '-' + period.get(expt,expt))
+#plt.plot(diff, label="Xqbwd - xqbwc", ls="--")
+plt.xlabel("Year")
+plt.ylabel("Transport (Sv)")
+plt.title("ACC Transport at " + secname)
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(secname + "_acc_transport_timeseries.png", dpi=150)
+plt.close()
+
+# atlantic--> indian passage
+plt.figure()
+
+for i,expt in enumerate(expts):
+    if period.get(expt,expt) == 'PI':
+        plt.plot(all_transports_ai[i], label=expt + '-' + period.get(expt,expt))
+plt.xlabel("Year")
+plt.ylabel("Transport (Sv)")
+plt.title("ACC Transport at " + secname1)
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(secname1 + "_acc_transport_timeseries.png", dpi=150)
+plt.close()
+
+# tasman
+plt.figure()
+
+for i,expt in enumerate(expts):
+    if period.get(expt,expt) == 'PI':
+        plt.plot(all_transports_t[i], label=expt + '-' + period.get(expt,expt))
+plt.xlabel("Year")
+plt.ylabel("Transport (Sv)")
+plt.title("ACC Transport at " + secname2)
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(secname2 + "_acc_transport_timeseries.png", dpi=150)
+plt.close()
+
+
+
+
+#==================================
+# plot depth integrated field
+plt.figure(figsize=(8, 8))
+dep_trans = all_transports_depth[0]
+lon2d, lat2d = np.meshgrid(recenter_lon(dep_trans[lon_name].values),
+                           dep_trans[lat_name].values)
+
+
+# set up for colorbar
+vals = [-200, -100, -50, -25, -10, -5, -2, 0, 2, 5, 10, 25, 50, 100, 200]
+#vals = [val/100 for val in vals]
+cmap_base = plt.get_cmap('RdBu_r', len(vals) - 1) 
+colors = [cmap_base(i) for i in range(cmap_base.N)]
+mid_index = vals.index(0) - 1  # bin just below zero
+colors[mid_index] = (1, 1, 1, 1)  # pure white RGBA
+colors[mid_index+1] = (1, 1, 1, 1)  # pure white RGBA
+cmap = mcolors.ListedColormap(colors)
+norm = mcolors.BoundaryNorm(boundaries=vals, ncolors=cmap.N)
+
+
+for i,expt in enumerate(expts):
+    dep_trans = all_transports_depth[i]
+    ax = plt.subplot(221+i,projection=ccrs.SouthPolarStereo())
+    cf = ax.pcolormesh(lon2d, lat2d, dep_trans.values,
+                   transform=ccrs.PlateCarree(), cmap=cmap,norm=norm)
+    ax.coastlines()
+    ax.set_extent([-180, 180, -90, -30], ccrs.PlateCarree())
+    plt.colorbar(cf, orientation="horizontal", label=f"Sv")
+    plt.title(expt + '-' + period.get(expt,expt))
+
+    if i == 0.0:
+        ax.plot([lon0,lon0], [lat_min,lat_max], transform=ccrs.PlateCarree(),
+                color='black', linewidth=2,linestyle='-')
+        ax.plot([lon1,lon1], [lat1_min,lat1_max], transform=ccrs.PlateCarree(),
+                color='black', linewidth=2,linestyle='-')
+        ax.plot([lon2,lon2], [lat2_min,lat2_max], transform=ccrs.PlateCarree(),
+                color='black', linewidth=2,linestyle='-')
+
+                             
+fileout = "depth_integrated_zonal_transport_"+years + "*.png"
+plt.savefig(fileout)
+plt.close()
+
+
+
+#==================================
+# plot surface integrated field
+plt.figure(figsize=(8, 12))
+
+# set up for colorbar
+#vals = [-200, -100, -50, -25, -10, -5, -2, 0, 2, 5, 10, 25, 50, 100, 200]
+#vals = [val/100 for val in vals]
+vals = np.arange(-0.5,0.55,0.05)
+
+cmap_base = plt.get_cmap('RdBu_r', len(vals) - 1) 
+colors = [cmap_base(i) for i in range(cmap_base.N)]
+#mid_index = vals.index(0.0) - 1  # bin just below zero
+#colors[mid_index] = (1, 1, 1, 1)  # pure white RGBA
+#colors[mid_index+1] = (1, 1, 1, 1)  # pure white RGBA
+cmap = mcolors.ListedColormap(colors)
+norm = mcolors.BoundaryNorm(boundaries=vals, ncolors=cmap.N)
+
+for i,expt in enumerate(expts):
+    dep_trans = all_transports_surface[i]
+    ax = plt.subplot(221+i,projection=ccrs.SouthPolarStereo())
+    cf = ax.pcolormesh(lon2d, lat2d, dep_trans.values,
+                   transform=ccrs.PlateCarree(), cmap=cmap,norm=norm)
+    ax.coastlines()
+    ax.set_extent([-180, 180, -90, -30], ccrs.PlateCarree())
+    plt.colorbar(cf, orientation="horizontal", label=f"Sv")
+    plt.title(expt + '-' + period.get(expt,expt))
+
+
+
+fileout = "top_layer_zonal_transport_"+years + "*.png"
+plt.savefig(fileout)
+plt.close()
+

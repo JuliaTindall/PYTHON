@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created January 2021 by Julia
+
+This program will create the input files for biome4 for each 'regridded' model or the multimodel meann
+
+This was altered in November 2021 to do BIOME4 for a HadCM3 sensitivity study
+
+"""
+
+import numpy as np
+import iris
+import iris.quickplot as qplt
+import matplotlib.pyplot as plt
+#import netCDF4
+#import cf_units as unit
+#import cftime
+#import nc_time_axis
+import sys
+import warnings
+warnings.filterwarnings("ignore")
+
+
+def get_cube_avg(expt, fieldname, units, fieldname_req,century, varname):
+    """
+    loads in renames and reformats that cube
+    """
+
+    monthnames = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December']
+    
+
+    cubes = iris.cube.CubeList([])
+
+    for month in monthnames:
+        month_cube = iris.load_cube(FILESTART + expt + '/' + expt 
+                                    + '_Monthly_Average_'
+                                    + month + '_a@pd_'+ fieldname + '.nc')
+        cubes.append(month_cube)
+      
+    iris.util.equalise_attributes(cubes)
+    iris.util.unify_time_units(cubes)
+    cube = cubes.concatenate_cube()
+
+    # setup missing data attribute
+    cube.attributes["missing_value"] = -9999.
+    cube.rename(fieldname_req)
+ 
+    # get rid of superflous dimensions
+    outcube = iris.util.squeeze(cube)
+
+    # regrid
+    outcube_r = outcube.regrid(GRID_CUBE,iris.analysis.Linear())
+
+    # change time coordinate to months
+    outcube_r.coord('time').attributes = None
+    outcube_r.coord('time').units = None
+    outcube_r.coord('time').points = np.arange(1,13,1)
+    try:
+        outcube_r.coord('time').rename('t')
+    except:
+        pass
+    outcube_r.var_name = varname
+
+    return outcube_r
+
+
+def get_anom(field, plio_cube, pi_cube):
+    """
+    gets the standard data from biome 4 and regrids it onto our grid
+    """
+    print('j0',plio_cube.data[0,90,12],pi_cube.data[0,90,12])
+
+    filename = ('/home/earjcti/biome4/inputdata.nc')
+    cube = iris.load_cube(filename, field)
+
+    if (field == 'monthly mean temperature'
+    or field == 'mean monthly percent of possible sunshine'):
+     # divide by 10 because it was in the wrong units in the original file
+        cube = cube / 10.
+
+    biomecube = cube.regrid(GRID_CUBE, iris.analysis.Linear())
+    iris.util.squeeze(biomecube)
+    sq_plio = iris.util.squeeze(plio_cube)
+    sq_pi = iris.util.squeeze(pi_cube)
+    biomecube_data = biomecube.data
+
+    anomdata = sq_plio.data - sq_pi.data + biomecube_data
+    print('j1',np.shape(anomdata),anomdata[0,90,12],sq_plio.data[0,90,12],
+          sq_pi.data[0,90,12],biomecube_data[0,90,12])
+    #print(biomecube_data[0,90,:])
+    if field[0:4] != 'soil':
+        anom_data = np.ma.masked_array(anomdata, biomecube.data.mask) 
+    else:
+        cubes = iris.load(filename)
+        print(cubes)
+        cubetemp = iris.load_cube(filename, 
+                                  'annual absolute mimimum temperature')
+        biomecube2 = cubetemp.regrid(GRID_CUBE, iris.analysis.Nearest())
+        biomearr3 = np.zeros((2,) +  np.shape(biomecube2.data))
+        biomearr3[0, :, :] = biomecube2.data.mask
+        biomearr3[1, :, :] = biomecube2.data.mask
+        anom_datat = np.where(biomecube_data >= 0, anomdata, sq_plio.data)
+        anom_data = np.ma.masked_array(anom_datat, biomearr3)          
+    
+
+    
+    if (field == 'monthly total precipitation'
+        or field ==  'mean monthly percent of possible sunshine'):
+        anom_data = np.ma.where(anom_data > 0, anom_data, 0.0)
+    if (field ==  'mean monthly percent of possible sunshine'):
+        anom_data = np.ma.where(anom_data < 100, anom_data, 100.0)
+   
+    mpwp_anomcube = sq_plio.copy(data=anom_data)
+    
+    return mpwp_anomcube
+
+    
+
+def get_temp_precip():
+    """
+    get temperature and precipitation data in correct units
+    plio_cube is from pliocene data
+    anom_cube is model_plio - model_pi + observed_pi
+    """
+    allcubes_plio = iris.cube.CubeList([])
+    allcubes_anom = iris.cube.CubeList([])
+
+
+    cube = get_cube_avg(EXPTNAME, 'Temperature', 'degC', 
+                           'monthly mean temperature','p','temp')
+
+    cube.data = cube.data - 273.15 # convert to celcius
+    
+    
+    # extract the annual mean temperature and the JJA temperature
+    print('juliacube',cube, EXPTNAME)
+    annual_mean_temp_cube = cube.collapsed('t', iris.analysis.MEAN)
+    annual_mean_temp_cube.rename('annual mean temperature')
+
+    #extract jja
+    jja_cube = cube.extract(iris.Constraint(t=lambda cell: 6 <=  cell.point <=8))
+    jja_cube.rename('June July Aug temperature')
+  
+    jja_avg_cube = jja_cube.collapsed('t',iris.analysis.MEAN)
+    jja_avg_cube.rename('average JJA temperature') 
+   
+    cubelist = [annual_mean_temp_cube, jja_avg_cube, jja_cube]
+    iris.save(cubelist,'/home/earjcti/umdata/'+ EXPTNAME + '/biome4/_meanT.nc')
+
+    
+  
+    
+    allcubes_plio.append(cube)
+
+    # get the preindustrial temperature
+    pi_cube = get_cube_avg(PI_EXPT, 'Temperature', 'degC', 
+                           'monthly mean temperature','p','temp')
+    pi_cube.data = pi_cube.data - 273.15
+    print(PI_EXPT,EXPTNAME)
+    print('aj0',cube.data[0,90,12],pi_cube.data[0,90,12])
+
+    anom_cube = get_anom('monthly mean temperature', cube, pi_cube)
+    allcubes_anom.append(anom_cube)
+  
+    # get minimum temperature from the pliocene and the anomaly method
+    print(cube)
+    mintemp = cube.collapsed('t', iris.analysis.MIN)
+    mintemp.long_name = 'annual absolute minimum temperature'
+    mintemp.short_name = 'tmin'
+    mintemp.units = 'degC'
+    mintemp.remove_coord('t')
+    #mintemp.remove_coord('surface')
+
+    mintemp_anom = anom_cube.collapsed('t', iris.analysis.MIN)
+    mintemp_anom.long_name = 'annual absolute minimum temperature'
+    mintemp_anom.short_name = 'tmin'
+    mintemp_anom.units = 'degC'
+    mintemp_anom.remove_coord('t')
+    #mintemp_anom.remove_coord('surface')
+   
+
+
+    # precipitation
+    cube = get_cube_avg(EXPTNAME,'TotalPrecipitationRate', 'mm',
+                         'monthly total precipitation','p','precip')
+    # convert to mm/month multiply by (30) * 24. * 60. * 60.
+    cube.data = cube.data *  30. * 24. * 60. * 60.
+    allcubes_plio.append(cube)
+
+    pi_cube = get_cube_avg(PI_EXPT,'TotalPrecipitationRate', 'mm',
+                           'monthly total precipitation','p','precip')
+    pi_cube.data = pi_cube.data *  30. * 24. * 60. * 60.
+
+    anom_cube = get_anom('monthly total precipitation', cube, pi_cube)
+    allcubes_anom.append(anom_cube)
+
+       
+    return allcubes_plio, mintemp, allcubes_anom, mintemp_anom
+    
+def get_sunshine():
+    """
+    gets mean monthly percent of possible sunshine.  Steve P and James did
+    this by:
+    1. get pd total cloud (this is field30)
+    2. multiplies this by -1 to get negative total cloud
+    3. adds 1 to get total sun.
+    4. multiplies by 100 to get percentage
+    """
+
+    # mPWP
+    cube_mPWP = get_cube_avg(EXPTNAME, 'TotalCloud',
+                             'percent', 
+                             'mean monthly percent of possible sunshine','p',
+                             None)
+    cube_mPWP.attributes["name"] = 'sun'
+    cube_mPWP.long_name = 'cloud amount (inverse)'
+    cube_mPWP.rename('sun')
+    cube_mPWP.data = (1.0 - cube_mPWP.data) * 100.
+    print(cube_mPWP.data)
+    #sys.exit(0)
+
+    # PI
+    cube_PI = get_cube_avg(PI_EXPT, 'TotalCloud',
+                           'percent', 
+                           'mean monthly percent of possible sunshine','p',
+                            None)
+    cube_PI.data = (1.0 - cube_PI.data) * 100.
+    cube_PI.attributes["name"] = 'cld'
+    cube_PI.long_name = 'cloud amount (inverse)'  
+    cube_PI.attributes["name"] = 'cld'  
+
+    # find anomaly from observations
+    cube_anom = get_anom('mean monthly percent of possible sunshine',
+                         cube_mPWP, cube_PI)
+    
+  
+    return cube_mPWP, cube_anom
+  
+    
+
+def get_soils():
+    """
+    gets the soils for input to biome4
+    """
+
+    def process_soils(filename):
+        """
+        processes each file for the soils
+        """
+
+        cube = iris.load_cube(filename)
+        cube.attributes["missing_value"] = -9999
+
+        # temporarily change sea points to average because we
+        # will be adding a lsm later
+
+        cube_data = cube.data
+        avg_data = np.mean(cube_data)
+        newcube_data = np.where(cube_data.mask, avg_data, cube_data)
+        cube_full = cube.copy(data = newcube_data)
+        cube_regrid = cube_full.regrid(GRID_CUBE, iris.analysis.Linear())
+
+        return cube_regrid
+
+    
+    # get mPWP
+
+    file_soils_mPWP = ('/home/earjcti/BIOME4-main/files/' + 
+                       'PRISM3_soil_alternative_whc.nc')
+    soil_whc_cube_mPWP = process_soils(file_soils_mPWP)
+
+    file_perc_mPWP = ('/home/earjcti/BIOME4-main/files/' + 
+                      'PRISM3_soil_alternative_perc.nc')
+    soil_perc_cube_mPWP = process_soils(file_perc_mPWP)
+  
+
+
+    # get PI
+
+    file_soils_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+                       'MODERN_soil_alternative_whc.nc')
+    soil_whc_cube_PI = process_soils(file_soils_mPWP)
+
+    file_perc_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+                      'MODERN_soil_alternative_perc.nc')
+    soil_perc_cube_PI = process_soils(file_perc_mPWP)
+  
+    # get anomaly
+
+  
+    whc_anom_cube = get_anom('soil water holding capacity',
+                         soil_whc_cube_mPWP, soil_whc_cube_PI)
+    
+    perc_anom_cube = get_anom('soil water percolation index',
+                         soil_perc_cube_mPWP, soil_perc_cube_PI)
+
+ 
+    return (soil_whc_cube_mPWP, soil_perc_cube_mPWP, 
+            whc_anom_cube, perc_anom_cube)
+
+def apply_lsm(cubelist):
+    """
+    apply a lsm to the cubes
+    """
+
+# NOTE THE MASK IS NOT ON THE SAME GRID AS THE DATA
+
+    masked_cubelist = iris.cube.CubeList([])
+    lsm = '/home/earjcti/BIOME4-main/files/Plio_enh_LSM_v1.0.nc'
+    lsmcube_temp = iris.load_cube(lsm)
+
+    lsmcube = lsmcube_temp.regrid(GRID_CUBE, iris.analysis.Linear())
+
+    
+    for cube in cubelist:
+        print(np.shape(cube.data),np.shape(lsmcube.data))
+        newcube_data = np.ma.where(lsmcube.data == 0, -9999, cube.data)
+        newcube = cube.copy(data = newcube_data)
+        masked_cubelist.append(newcube)
+        print(newcube.data)
+            
+   
+    return masked_cubelist
+
+
+def main():
+    """
+    driver for program to get biome4 intput field
+    """
+
+    print('GETTING TEMP AND PRECIP')
+    (allcubes_plio, abs_min_cube_plio,
+     allcubes_anom, abs_min_cube_anom) = get_temp_precip()
+
+    print('GETTING SUNSHINE')
+    suncube_plio, suncube_anom = get_sunshine()
+    allcubes_plio.append(suncube_plio)
+    allcubes_anom.append(suncube_anom)
+
+    print('GETTING SOIL')
+    (soil_whc_plio, soil_perc_plio,
+     soil_whc_anom, soil_perc_anom)= get_soils()
+
+    allcubes_plio.append(soil_whc_plio)
+    allcubes_plio.append(soil_perc_plio)
+    allcubes_anom.append(soil_whc_anom)
+    allcubes_anom.append(soil_perc_anom)
+
+    #allcubes_plio.append(abs_min_cube_plio)
+    #allcubes_anom.append(abs_min_cube_anom)
+                                  # following SPickering this is monthly
+                                  # mean minimum not absolute minimum
+                                  # best to run in anomaly mode.
+#    allcubes_land_plio = apply_lsm(allcubes_plio)
+  
+    print('saving',OUTFILE)
+    allcubes_plio_land = apply_lsm(allcubes_plio)
+    for cube in allcubes_plio_land:
+        cube.coord('longitude').rename('lon')
+        cube.coord('latitude').rename('lat')
+    iris.save(allcubes_plio_land,OUTFILE + 'absolute.nc', 
+              netcdf_format="NETCDF3_CLASSIC", fill_value = -9999)  
+
+
+    print('saved absolute')
+    allcubes_land_anom = apply_lsm(allcubes_anom)
+    for cube in allcubes_land_anom:
+        cube.coord('longitude').rename('lon')
+        cube.coord('latitude').rename('lat')
+        print(cube.coord('lon').var_name)
+        #sys.exit(0)
+        #print(cube.coord('lat'))
+        #print(cube.coord('t'))
+        print(cube.var_name,cube.long_name)
+
+        
+    iris.save(allcubes_land_anom,OUTFILE + 'anomaly.nc', 
+              netcdf_format="NETCDF3_CLASSIC", fill_value = -9999)  
+    print('saved anomaly')
+    
+ 
+
+#####################################################################
+
+
+FILESTART = '/home/earjcti/umdata/'
+EXPTNAME = 'xlotj'
+PI_EXPT = 'xisfa'
+OUTFILE = FILESTART + EXPTNAME + '/biome4/inputdata_' + EXPTNAME + '_' + PI_EXPT + '_'
+GRID_CUBE = iris.load_cube('one_lev_one_deg_v2.nc')
+
+
+main()

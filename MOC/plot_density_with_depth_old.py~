@@ -1,0 +1,56 @@
+# 
+# plots density poleward of 60S with depth.  We need to already have produced
+# basin_diagnostics/mean_xpsid_Pacific1400_1499.nc using program
+# plot_density_by_basin.py
+#
+
+
+
+import xarray as xr
+import numpy as np
+import matplotlib.pyplot as plt
+
+# --- Load the NetCDF file ---
+filestart = ('/home/earjcti/um/xpsid/basin_diagnostics/mean_xpsid_Pacific')
+
+filename1 = filestart + '1400_1499.nc'
+filename2 = filestart.replace('xpsid','xpsie') + '1400_1499.nc'
+filename3 = filestart.replace('xpsid','xpsie') + '1600_1699.nc'
+             
+filenames = [filename1,filename2,filename3]
+legends = ['LP_1400','EP400_1400','EP400_1600']
+
+
+plt.figure(figsize=(6, 5))
+   
+for i,file_path in enumerate(filenames):
+    ds = xr.open_dataset(file_path)
+
+    density = ds['insitu_T_0']   # short name field for density
+                                 #(not a great name)  
+    lat = ds['latitude']        
+    depth = ds['depth_1']         
+
+    # --- Select latitudes south of 60S ---
+    south_mask = lat <= -60
+    density_south = density.sel(latitude=south_mask)
+    lat_south = lat.sel(latitude=south_mask)
+
+    # --- Compute weights based on cos(latitude) ---
+    weights = np.cos(np.deg2rad(lat_south))
+
+    # --- Apply weights and average over latitude ---
+    # xarray's weighted method handles broadcasting
+    density_weighted = density_south.weighted(weights).mean(dim='latitude')
+
+    # --- Plot density vs depth ---
+    plt.plot(density_weighted, depth,label=legends[i])
+    
+plt.gca().invert_yaxis()  # Depth increases downward
+plt.xlabel('Density (kg/m³)', fontsize=14)
+plt.ylabel('Depth (m)', fontsize=14)
+plt.title('Area-Weighted Density South of 60°S', fontsize=16)
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()

@@ -1,0 +1,320 @@
+#NAME
+#    AMOC_based_on_PJV
+#PURPOSE 
+#
+#  This program will try and reproduce Pauls AMOC plot but written by me and
+#  in python
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_mask(filename):
+    """
+    gets the mask based on the basin file and the land sea mask
+    """
+
+    # read the basin file
+
+    filename = 'basin_hadcm3'
+    f=open(filename,'r')
+    #discard first 3 lines
+    content=f.readline()
+    content=f.readline()
+    content=f.readline()
+
+    Atlantic_mask = np.ma.zeros((20,144,288))
+    Pacific_mask = np.ma.zeros((20,144,288))
+    Indian_mask = np.ma.zeros((20,144,288))
+    Global_mask = np.ma.zeros((20,144,288))
+  
+
+    for j in range(144,0,-1):
+        content=f.readline()
+        # we have 4 basins - each are split into two divisions with a start
+        # and end point
+        (rowno,
+         bas1_d1_s,bas1_d1_e,bas1_d2_s,bas1_d2_e,
+         bas2_d1_s,bas2_d1_e,bas2_d2_s,bas2_d2_e,
+         bas3_d1_s,bas3_d1_e,bas3_d2_s,bas3_d2_e,
+         bas4_d1_s,bas4_d1_e,bas4_d2_s,bas4_d2_e)=content.split()
+        
+        for i in range(int(bas1_d1_s),int(bas1_d1_e)+1):
+            Indian_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas1_d2_s),int(bas1_d2_e)+1):
+            Indian_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        for i in range(int(bas2_d1_s),int(bas2_d1_e)+1):
+            Pacific_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas2_d2_s),int(bas2_d2_e)+1):
+            Pacific_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+
+        for i in range(int(bas3_d1_s),int(bas3_d1_e)+1):
+            Atlantic_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas3_d2_s),int(bas3_d2_e)+1):
+            Atlantic_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+    
+        for i in range(int(bas4_d1_s),int(bas4_d1_e)+1):
+            Global_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+        for i in range(int(bas4_d2_s),int(bas4_d2_e)+1):
+            Global_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+
+    f.close
+
+    # get LSM from temperature:
+
+
+    # put the data on a land sea mask
+    cube_full = iris.load_cube('xqbwgo#pg000003999c1+.nc',
+                           'TEMPERATURE (OCEAN)  DEG.C')
+    cube = cube_full[0,:,:,:]
+    cube_data = cube.data
+   
+    Atlantic_mask.mask = cube.data.mask
+    Atlantic_cube = cube.copy(data=Atlantic_mask)
+    #plt.subplot(2,2,1)
+    #qplt.contourf(Atlantic_cube[0,:,:])
+    #plt.subplot(2,2,2)
+    #qplt.contourf(Atlantic_cube[15,:,:])
+    #plt.subplot(2,2,3)
+    #qplt.contourf(Atlantic_cube[18,:,:])
+    #plt.subplot(2,2,4)
+    #qplt.contourf(Atlantic_cube[19,:,:])
+    #plt.show()
+    #sys.exit(0)
+   
+    #Pacific_mask.mask = cube.data.mask
+    Pacific_cube = cube.copy(data=Pacific_mask)
+    #qplt.contourf(Pacific_cube)
+    #plt.title('Pacific')
+    #plt.savefig('Pacific_mask.png')
+    #plt.close()
+
+    Indian_mask.mask = cube.data.mask
+    Indian_cube = cube.copy(data=Indian_mask)
+    #qplt.contourf(Indian_cube)
+    #plt.title('Indian')
+    #plt.savefig('Indian_mask.png')
+
+
+
+    return Atlantic_cube
+
+
+
+####################################################################
+def get_params(filename):
+    """
+    gets the spacing
+    """
+
+    # thickness
+    cube = iris.load_cube(filename,'W')
+    depths=np.copy(cube.coord('depth').points)
+    depths2=np.zeros(21) # depths used to calculate thickness
+    ndepths = len(depths)
+    thickness=np.zeros(20)
+    
+    for k in range(ndepths,0,-1):
+        depths2[k]=depths[k-1]
+    depths2[0]=0.0
+    depths2[20]=depths2[19]+(depths2[19]-depths2[18])
+
+    for k in range(0,20):
+        thickness[k]=depths2[k+1]-depths2[k]
+
+    # get latitude and dx from the v field (also save v)
+    v_cube = iris.load_cube(filename,'TOTAL OCEAN V-VELOCITY      CM S**-1')
+    v_cube = iris.util.squeeze(v_cube)
+    v_cube.data = v_cube.data / 100.  # convert to m/2
+    lats = v_cube.coord('latitude').points
+    coslats= np.cos(lats * 2. * np.pi / 360.)
+    lons=v_cube.coord('longitude').points
+
+    # length of a longitude box at the equator
+    dx=(lons[1]-lons[0]) * 111320.
+ 
+
+
+    return (dx,thickness,lats, coslats, v_cube)
+
+###################################################
+def V_grid_mask(orig_cube,vgrid_cube):
+    """
+    put mask onto a v_grid 
+    v is staggered in longitude compared to temperature.
+    we will only use the mask if all surrounding points are masked
+
+    longitude:
+    original (longitude goes from 0, 1.25 etc.
+    vgrid    (longitude goes from 0.625, 1.875 etc.
+
+    so we will set vgrid_mask(i) as 1 if orig(i) and orig(i+1) are also 1
+
+    latitude:
+    original (latitude goes from -89.375, -88.125  etc
+    vgrid    (latitude goes from -88.75, -87,5 etc
+
+    so we will set vgrid_mask[j] to 1 if orig[j] and orig[j+1] are also 1
+    
+    """
+    lon_orig=orig_cube.coord('longitude').points
+    nlonorig=len(lon_orig)
+    lon_vgrid=vgrid_cube.coord('longitude').points
+    nlonv=len(lon_vgrid)
+    lat_orig=orig_cube.coord('latitude').points
+    nlatorig=len(lat_orig)
+    lat_vgrid=vgrid_cube.coord('latitude').points
+    nlatv=len(lat_vgrid)
+
+    origdata=orig_cube.data
+    vmaskdata=np.ma.masked_array(np.zeros(np.shape(v_cube.data)),
+                                 mask=np.zeros(np.shape(v_cube.data)))
+
+    for k in range(0,20):
+        for j in range(0,nlatv):
+            for i in range(0,nlonv):
+                ip1=np.mod(i+1,nlonorig)
+                if (origdata[k,j,i] ==1 and origdata[k,j+1,i]==1 and
+                    origdata[k,j,ip1]==1 and origdata[k,j+1,ip1]==1):
+                    vmaskdata[k,j,i]=1.0
+                else: #mask
+                    vmaskdata.mask[k,j,i]=1.0
+
+    vmaskcube = vgrid_cube.copy(data=vmaskdata)
+                
+    
+    return vmaskcube
+
+def calc_stream(V_cube,dx,dz,coslats):
+    """
+    this calculates the streamfunction in the same way that PJV did
+    """
+    #calculate zonal integral m2/s-1 (note everything we dont want to use
+    #                                 should be masked
+    #we multiply it by the width of the gridbox (ie dx * cos latitude)
+     
+    ztotalV=np.sum(V_cube.data,axis=2) * dx * coslats
+    ztotalV_cube=(V_cube.collapsed('longitude',iris.analysis.SUM)
+                  * dx * coslats)
+
+    vdz_cube = ztotalV_cube.copy()
+    for k in range(0,20):
+        vdz_cube.data[k,:]=vdz_cube.data[k,:] * dz[k]
+        
+    
+    # now calculate vertical integral (this is the streamfunction).
+    # note that if streamfunction is zero it means that at this level
+    # everything that has gone north has also gone south and we have a closed
+    # circuit
+
+    phi_data=np.ma.zeros(np.shape(vdz_cube.data))
+    phi_data[0,:]=0.0
+    for k in range(1,20):
+        phi_data[k,:]=(vdz_cube.data[k-1,:]+phi_data[k-1,:]) 
+    phi_data.mask = np.where(vdz_cube.data.mask == 1.0, 1.0, 0.0)
+    phi_cube=vdz_cube.copy(data=phi_data / 1.0E6)
+
+    # read in the original for plotting
+    orig_AMOC = iris.load_cube('xqbwgo#pk000003999c1+.nc',
+                    'Meridional Overturning Stream Function (Atlantic)')
+    orig_AMOC = iris.util.squeeze(orig_AMOC)
+
+    # try calculating in reverse
+    phi_data_rev=np.ma.zeros(np.shape(vdz_cube.data))
+    for k in range(19,0,-1):
+        if k == 19:
+            phi_data_rev[k,:]= (-1.0) *  vdz_cube.data[k,:]
+            #print(k,phi_data_rev[k,55])
+        else:
+            phi_data_rev[k,:]=(phi_data_rev[k+1,:] - vdz_cube.data[k,:])
+            #print('55',k,phi_data_rev[k,55],phi_data[k+1,55],vdz_cube.data[k,55])
+            #sys.exit(0)
+    phi_cube_rev = vdz_cube.copy(data=phi_data_rev / 1.0E6)
+
+
+    #for j,lat in enumerate(vdz_cube.coord('latitude').points):
+    #    if lat == -20.0:
+    #        for k,dep in enumerate(vdz_cube.coord('depth_1').points):
+    #            print(dep,vdz_cube[k,j].data/1.0E6,phi_data_rev[k,j]/1.0E6)
+    #        print('sum=',j,np.sum(vdz_cube.data[:,j])/1.0E6)
+        
+#    sys.exit(0)
+    plt.figure(figsize=(10,10))
+    plt.subplot(3,2,1)
+    vals=np.arange(-20.,22.,2.)
+    qplt.contourf(phi_cube,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('mine')
+    plt.subplot(3,2,2)
+    qplt.contourf(orig_AMOC[0:20,:],levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('Pauls')
+    plt.subplot(3,2,3) 
+    vals=np.arange(-20.,22.,2.)
+    qplt.contourf(phi_cube_rev,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('mine reversed')
+    plt.subplot(3,2,4) 
+    vals=np.arange(-20.,22.,2.)
+    qplt.contourf(phi_cube_rev - phi_cube,levels=vals,extend='both',cmap='RdBu_r')
+    plt.subplot(3,2,5) 
+    vals=np.arange(-10.,12.,1.)
+    qplt.contourf(vdz_cube / 1.0E6,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title('mine reversed - orig')
+    plt.show()
+    sys.exit(0)
+    plt.savefig('AMOC_diff.png')
+
+    #plt.show()
+    plt.close()
+
+#####################################################################
+
+# gets the basins over which we calculate
+filename = 'xqbwgo#pg000003999c1+.nc'
+Atlantic_cube=get_mask(filename)
+
+# get other parameters we need
+(dx,dz,lats,coslats,v_cube) = get_params(filename)
+
+# put masks onto a V-grid
+Atlmask_cube = V_grid_mask(Atlantic_cube,v_cube)
+
+# show V in the Atlantic mask
+V_atl = Atlmask_cube * v_cube # this is on grid 20 * 144 * 288
+
+# calculate stream function for the basin
+calc_stream(V_atl,dx,dz,coslats)
+#sys.exit(0)
+
+
+#plt.subplot(2,2,1)
+#vals=np.arange(-0.1,0.12,0.02)
+#qplt.contourf(V_atl[0,:,:],levels=vals,cmap='RdBu_r')
+#plt.subplot(2,2,2)
+#qplt.contourf(V_atl[5,:,:],levels=vals,cmap='RdBu_r')
+#plt.subplot(2,2,3)
+#qplt.contourf(V_atl[10,:,:],levels=vals,cmap='RdBu_r')
+#plt.subplot(2,2,4)
+#qplt.contourf(V_atl[15,:,:],levels=vals,cmap='RdBu_r')
+#plt.show()
+#sys.exit(0)
+
+qplt.contourf(Atlantic_cube)
+plt.title('Atlantic')
+plt.show()
+plt.close()

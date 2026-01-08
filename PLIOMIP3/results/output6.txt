@@ -1,0 +1,28 @@
+nohup: ignoring input
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001991c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001992c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001993c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001994c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001995c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001996c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001997c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001998c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000001999c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002000c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002001c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002002c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002003c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002004c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002005c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002006c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002007c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002008c1+.nc
+/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002009c1+.nc
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/plot_MOC.py", line 778, in <module>
+    retdata=plot_avg_moc(EXPTNAME,'#',1991,2799,'c1',basin) # extra is '#' or letter
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/plot_MOC.py", line 143, in plot_avg_moc
+    f=Dataset(datasetname)
+  File "src/netCDF4/_netCDF4.pyx", line 2307, in netCDF4._netCDF4.Dataset.__init__
+  File "src/netCDF4/_netCDF4.pyx", line 1925, in netCDF4._netCDF4._ensure_nc_success
+FileNotFoundError: [Errno 2] No such file or directory: b'/nfs/hera1/earjcti/um/xpsik/pk2/xpsiko#pk000002009c1+.nc'

@@ -1,0 +1,211 @@
+#python program
+#
+# this program will plot the diagnostics associated with ocean heat transport
+#
+# will do
+# 1. mean OHT over a given number of years
+# 1a.mean d/dy of ocean heat transport.  (ie heat in vs heat out at latitude)
+# 2 timeseries of OHT for a given latitude 
+
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import numpy as np
+import sys
+
+#exptnames = ['xpsic','xpsid','xpsig','xpsie']
+exptnames = ['xqbwg','xqbwj']
+meanreq='y'
+timeseries_req='n'
+latreq=-20.0
+yearstart=3900
+yearend=4000
+basin='global'  # basin must be global / atlantic / pacific
+
+
+
+# Function to read data from a netcdf file
+def get_data(filestart,yearstart,yearend):
+    """
+    this will read the data from a netcdf files according to yearstart,yearend
+    note that the netcdf files will be in chunks of 1000 years
+    I am assume that the date in the file corresponds to the calendar year
+    """
+
+    allcubes = CubeList([])
+    if yearstart < 1000:
+        cube = iris.load_cube(filestart + '_12_1000.nc',
+                              'Ocean heat transport ('+basin+')')
+        allcubes.append(cube)
+    if yearstart < 2000 and yearend > 1000:
+        try:
+            cube = iris.load_cube(filestart + '_1000_2000Tref_is_zero.nc',
+                                  'Ocean heat transport ('+basin+')')
+        except:
+            cube = iris.load_cube(filestart + '_1000_2000.nc',
+                                  'Ocean heat transport ('+basin+')')
+
+        allcubes.append(cube)
+    if yearstart < 3000 and yearend > 2000:
+        cube = iris.load_cube(filestart + '_2000_3000.nc',
+                              'Ocean heat transport (+basin+)')
+        allcubes.append(cube)
+
+    if yearstart== 3900 and yearend == 4000:
+        cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
+                              'Ocean heat transport ('+basin+')')
+        allcubes.append(cube)
+
+
+    fullcube = allcubes.concatenate_cube()
+    print(fullcube.coord('t').points)
+    time_constraint = iris.Constraint(t=lambda
+                      cell: yearstart <= cell.point.year <= yearend)
+
+    # Apply the constraint
+    timecube = fullcube.extract(time_constraint)
+   
+    return timecube
+
+# Function to compute running mean**
+def running_mean(cube):
+
+    # Extract data and time coordinate
+    data = cube.data
+    time_coord = cube.coord('t')
+    
+    # Apply a 30-year running mean using convolution
+    window = 30
+    weights = np.ones(window) / window
+    smoothed_data = np.convolve(data, weights, mode='valid')
+
+    # Trim the time coordinate to match the smoothed data
+    smoothed_time_points = time_coord.points[window - 1:]
+    smoothed_time_units = time_coord.units
+    smoothed_time = iris.coords.DimCoord(smoothed_time_points, standard_name='time', units=smoothed_time_units)
+
+    # Create a new cube with the smoothed data
+    smoothed_cube = iris.cube.Cube(smoothed_data, dim_coords_and_dims=[(smoothed_time, 0)])
+
+    return smoothed_cube
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwg':'EP','xqbwj':'LP490'}
+
+
+#plot data from all the files
+allexpts_cubes = CubeList([])
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/OHT_' + expt
+
+    expt_cube =get_data(filestart,yearstart,yearend)
+    allexpts_cubes.append(expt_cube)
+
+if meanreq == 'y':
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))  # 1 row, 2 columns
+    for i,cube in enumerate(allexpts_cubes):
+        mean_cube = cube.collapsed('t', iris.analysis.MEAN)
+
+        # Extract latitude and data values
+        latitudes = mean_cube.coord('latitude').points
+        values = mean_cube.data
+
+        # get d/dy of data (for plotting later) along with the middle latitude
+        # mask out between -10 and 10 as the flow changes direction here
+        # we want here from equator - towards pole
+        #  (ie (i-1)-i in NH, i-(i-1) in SH
+        # the ddy is not helpful.  I have removed the plot
+        ddy_latitudes = (latitudes[:-1] + latitudes[1:]) / 2
+        value_differences = values[1:] - values[:-1]
+        #mask = (ddy_latitudes > -10) & (ddy_latitudes < 10)
+        #value_differences[mask] = np.nan
+        value_differences[ddy_latitudes > 0] *= -1.0  # multiply by -1.0 where d/dy> 0
+
+       
+        # Plot latitude vs mean value
+        ax.plot(latitudes, values, label=period.get(exptnames[i]),linewidth=2)
+        #ax[1].plot(ddy_latitudes, value_differences,
+        #             label=period.get(exptnames[i]))
+        
+    ax.set_xlabel('Latitude',fontsize=16)
+    ax.set_ylabel('OHT (PW)',fontsize=16)
+    plt.tick_params(axis='both',which='major',labelsize=16)
+
+    #ax[1].set_title('OHT diff from equ - to pole.  If this is > 0 this latitude warms')
+
+    ax.axhline(y=0, color='black', linewidth=2)
+    #ax[1].axhline(y=0, color='black', linewidth=2)
+    ax.legend(fontsize=14)
+    #ax[1].legend()
+    ax.set_ylim(-1.5,1.6)
+    #ax[1].set_ylim(-0.1,0.1)
+    #ax.set_xlim(-30,90)
+    ax.grid(True)
+
+    if basin =='atlantic':  # basin must be global / atlantic / pacific
+        ax.set_title('a) Atlantic Ocean Heat Transport',fontsize=16)
+        ax.set_xlim(-30,90)
+    if basin =='pacific':  # basin must be global / atlantic / pacific
+        ax.set_title('b) Pacific Ocean Heat Transport',fontsize=16)
+        ax.set_xlim(-30,90)
+    if basin =='global':  # basin must be global / atlantic / pacific
+        ax.set_title('c) Global Ocean Heat Transport',fontsize=16)
+       
+
+    plt.tight_layout() 
+    #plt.show()
+    #sys.exit()
+    plt.savefig('OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '.png')
+    plt.close()
+    sys.exit(0)
+
+cubes_for_meaning = CubeList([])
+if timeseries_req=='y':
+    plt.figure(figsize=(8, 5))
+    for i,cube in enumerate(allexpts_cubes):
+        # extract the latitude of interest
+        lat_constraint = iris.Constraint(latitude=latreq)
+
+        # Apply the constraint
+        timeseriescube = cube.extract(lat_constraint)
+        cubes_for_meaning.append(timeseriescube)
+        time_coord = cube.coord('t')
+        dates = time_coord.units.num2date(time_coord.points)
+        years = [date.year for date in dates]
+
+        values = timeseriescube.data
+
+        plt.plot(years, values, label=period.get(exptnames[i]))
+        
+    plt.xlabel('year')
+    plt.ylabel('OHT (PW)')
+    plt.title(basin+' ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
+    plt.legend()
+    plt.grid(True)
+#    plt.close()
+
+    # do a 30 year mean
+
+    plt.figure(figsize=(8, 5))
+    for i,cube in enumerate(cubes_for_meaning):
+        running_mean_cube = running_mean(cube)
+        print(running_mean_cube)
+        time_coord = running_mean_cube.coord('time')
+        dates = time_coord.units.num2date(time_coord.points)
+        years = [date.year for date in dates]
+
+        values = running_mean_cube.data
+
+        plt.plot(years, values, label=period.get(exptnames[i]))
+    plt.xlabel('year')
+    plt.ylabel('OHT (PW)')
+    plt.title(basin + 'ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
+    plt.legend()
+    plt.grid(True)
+
+    plt.show()
+    plt.close()
+    plt.savefig('OHT/'+basin+'OHT_accross_' + str(latreq) + 'png')
+    sys.exit(0)

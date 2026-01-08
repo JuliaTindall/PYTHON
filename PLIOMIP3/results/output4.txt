@@ -1,0 +1,16 @@
+nohup: ignoring input
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+got expt_cube
+got cntl cube
+about to plot
+Traceback (most recent call last):
+  File "/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/SAT_warming.py", line 139, in <module>
+    qplt.contourf(diff_cube,levels=vals,extend='both',cmap='RdBu_r')
+NameError: name 'vals' is not defined. Did you mean: 'vars'?

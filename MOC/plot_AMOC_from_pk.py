@@ -1,0 +1,136 @@
+#NAME
+#    plot AMOC from pk2
+
+#PURPOSE 
+#
+#  This program will plot AMOC / GMOC / PMOC from PK2
+#
+#  
+# Import necessary libraries
+
+import os
+import numpy as np
+#import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import iris
+from iris.cube import CubeList
+import iris.plot as iplt
+#import gsw
+import sys
+#import pandas as pd
+#from pathlib import Path
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+
+
+def get_avg_MOC():
+    """
+    get average meridional overturning circulation
+    """
+
+    filestart = '/home/earjcti/um/' + exptname + '/pk2/' + exptname + 'o#pk'
+    basin_name = {'AMOC':'Atlantic','PMOC':'Pacific','GMOC':'Global'}
+    name = ('Meridional Overturning Stream Function ('
+            + basin_name.get(MOCtype) + ')')
+
+    allcubes = CubeList([])
+    for year in range(startyear,endyear):
+        filename = filestart + str(year).zfill(9) + 'c1+.nc'
+        cube = iris.load_cube(filename, name)
+        cube.coord('time').points=year
+        allcubes.append(cube)
+
+    iris.util.equalise_attributes(allcubes)
+    cubes = allcubes.concatenate_cube()
+
+    avg_cube = cubes.collapsed('time',iris.analysis.MEAN)
+   
+    return avg_cube
+
+def do_nice_plot(avg_MOC_cube):
+    """
+    plots the MOC
+    """  
+
+    if MOCtype == 'AMOC':
+        lat_constraint = iris.Constraint(latitude=lambda lat: lat >= -30)
+        plotcube = avg_MOC_cube.extract(lat_constraint)
+        if exptname == 'xqbwg' or exptname == 'xqbwe':
+            # missing data south of CAS
+            mask = plotcube.coord('latitude').points < 8.0
+            mask_2d = np.broadcast_to(mask, plotcube.shape)
+            plotcube.data = np.ma.masked_where(mask_2d, plotcube.data)
+
+    print('AMOC max value = ' +  str(np.max(plotcube.data)))
+
+
+    if MOCtype == 'PMOC':
+        cuttoff_lat = -90.0
+        if exptname == 'xqbwg' or exptname == 'xqbwe':
+            cutoff_lat = 7.5
+
+    if MOCtype == 'GMOC' or MOCtype == 'PMOC':
+        plotcube = avg_MOC_cube.copy()
+
+   
+    # Define custom colormap: blue → white → red
+    cmap = plt.get_cmap('RdBu_r')  # Blue-White-Red
+    norm = mcolors.TwoSlopeNorm(vmin=-30, vcenter=0, vmax=30)
+  
+   
+    
+    fig=plt.figure(figsize=(10, 6))
+    vals = np.arange(-25,30,5)
+    contour = iplt.contourf(plotcube,
+                            coords=['latitude', 'depth'], cmap=cmap,
+                            levels=vals,extend='both')
+
+  
+    # Add colorbar and labels
+    cbar=plt.colorbar(contour)
+    cbar.set_label('Sv',fontsize=16)
+    cbar.ax.tick_params(labelsize=16)
+    plt.title(period.get(exptname) + 'max' + str(np.max(plotcube.data)) + 'Sv' )
+    plt.xlabel('Latitude (degrees)',fontsize=16)
+    plt.ylabel('Depth (m)',fontsize=16)
+    plt.tick_params(axis='both',which='major',labelsize=16)
+
+    plt.savefig('/home/earjcti/um/' + exptname + '/MOC/struct_' + MOCtype +
+                '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
+                '.png')
+
+
+#######################################################################
+exptname = 'xqbwd'
+startyear=3900
+endyear=4000
+MOCtype='AMOC' # AMOC PMOC GMOC
+
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
+          'xqbwg':'EP',
+          'xqbwc':'PI'}
+
+avg_MOC_cube = get_avg_MOC()
+print(avg_MOC_cube)
+do_nice_plot(avg_MOC_cube)
+
+################################################
+# plot anomalies
+#cntlname = 'xpsie'
+#cntlstart=startyear
+#cntlend=endyear
+#cntlstart=1400
+#cntlend=1500
+#plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin)
+#plot_Pacific_and_Atlantic(exptname,startyear,endyear,0)  # the last number is the level
+
+sys.exit(0)
+
