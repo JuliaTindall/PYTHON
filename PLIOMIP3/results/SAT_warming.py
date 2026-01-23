@@ -70,7 +70,7 @@ def get_avg(jobid, startyear):
     count=0.
 
     # get template map
-    cube = iris.load_cube('/nfs/hera1/earjcti/um/'+jobid+'/pcpd/' + 
+    cube = iris.load_cube(FILESTART + 'um/'+jobid+'/pcpd/' + 
                           jobid+'a#pd' + str(startyear).zfill(9) + 'dc+.nc',
                           longfield.get(field))
 
@@ -78,7 +78,7 @@ def get_avg(jobid, startyear):
       
     for year in range(startyear, startyear+NYEARS):
         
-        files = ('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+        files = (FILESTART+'um/' + jobid + '/pcpd/' + 
                  jobid + 'a#pd' + str(year).zfill(9) + '??+.nc')
         print(files)
         f=MFDataset(files)
@@ -99,7 +99,7 @@ def get_avg(jobid, startyear):
 # MAIN PROGRAM STARTS HERE
 
 
-
+FILESTART = '/uolstore/Research/a/hera1/earjcti/'
 LINUX_WIN='l'
 NYEARS = 100
 SEASON = 'ann'
@@ -107,12 +107,12 @@ SEASON = 'ann'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPTS = ['xqbwn','xqbwo']  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPTS = ['xqbwn']  # xpsic PI,  xpsij-lp490  xpsik - lp560
 EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwd'  # xpsic pi, xpsid lp400
+CNTL = 'xqbwo'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 field='temp'
@@ -154,8 +154,8 @@ for EXPT in EXPTS:
     plt.gca().coastlines()
       
     print('about to write to file')
-    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field + '_' + str(EXPT_STARTYEAR) + '_' + str(EXPT_STARTYEAR+NYEARS) +  '.eps')
-    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field + '_' + str(EXPT_STARTYEAR) + '_' + str(EXPT_STARTYEAR+NYEARS) +  '.png')
+    plt.savefig(FILESTART + 'um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field + '_' + str(EXPT_STARTYEAR) + '_' + str(EXPT_STARTYEAR+NYEARS) +  '.eps')
+    plt.savefig(FILESTART + 'um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field + '_' + str(EXPT_STARTYEAR) + '_' + str(EXPT_STARTYEAR+NYEARS) +  '.png')
     plt.close()
 #  except:
 #    print('failed on',EXPT)

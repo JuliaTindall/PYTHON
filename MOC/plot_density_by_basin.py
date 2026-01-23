@@ -215,7 +215,7 @@ def process_data(filename,basin,year):
 
     # save everything to a file
 
-    fileout = ('/home/earjcti/um/' + exptname +
+    fileout = (FILEINIT + 'um/' + exptname +
                '/basin_diagnostics/' + exptname + '_' +
                basin + str(year) + '.nc')
 
@@ -235,10 +235,10 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin):
     experiments
     """
 
-    exptfile=('/home/earjcti/um/' + exptname +
+    exptfile=(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/mean_' + exptname + '_' +
                   basin + str(startyear) + '_' + str(endyear-1)+'.nc')
-    cntlfile=('/home/earjcti/um/' + cntlname +
+    cntlfile=(FILEINIT + 'um/' + cntlname +
                   '/basin_diagnostics/mean_' + cntlname + '_' +
                   basin + str(cntlstart) + '_' + str(cntlend-1)+'.nc')
 
@@ -257,15 +257,17 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin):
 
     vals = np.arange(-2.0,2.5,0.5)
     if cntlname !='xqbwc':
-        vals = np.arange(-2.0,2.2,0.2)
+        vals = np.arange(-2.0,2.25,0.25)
+        vals2 = [-1.5,-1.0,-0.5,0,0.5,1.0,1.5]
     print(vals)
     cs=iplt.contourf(temp_anom,levels=vals,extend='both',cmap='RdBu_r')
+    iplt.contour(temp_anom,levels=vals2)
     plt.xlabel('Latitude (degrees)')
     plt.ylabel('Depth (m)')
     cb=plt.colorbar(cs,orientation='horizontal')
     cb.set_label('(\u00B0C)')
     plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname)
-    plt.savefig('/home/earjcti/um/' + exptname +
+    plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+'.png')
     plt.close()
@@ -273,7 +275,7 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin):
     vals = np.arange(-0.3,0.33,0.03)
     qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
     plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
-    plt.savefig('/home/earjcti/um/' + exptname +
+    plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meandens_' + exptname + '-' +
                 cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+'.png')
@@ -287,7 +289,7 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin):
     cb.set_label('psu')
   
     plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
-    plt.savefig('/home/earjcti/um/' + exptname +
+    plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meansal_' + exptname + '-' +
                 cntlname + '_' + basin + str(startyear) + '_' +
                 str(endyear-1)+'.png')
@@ -302,7 +304,7 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
     plots the difference in SST and SSS between the Pacific
     and the Atlantic for the experiment
     """
-    Atlfile=('/home/earjcti/um/' + exptname +
+    Atlfile=(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/mean_' + exptname + '_Atlantic' +
                   str(startyear) + '_' + str(endyear-1)+'.nc')
 
@@ -313,7 +315,7 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
     Atl_sal_cube = iris.load_cube(Atlfile,'salinity basin')
 
 
-    Pacfile=('/home/earjcti/um/' + exptname +
+    Pacfile=(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/mean_' + exptname + '_Pacific' +
                   str(startyear) + '_' + str(endyear-1)+'.nc')
 
@@ -323,10 +325,10 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 
     Pac_sal_cube = iris.load_cube(Pacfile,'salinity basin')
 
-    Atlcntl=('/home/earjcti/um/' + cntlname +
+    Atlcntl=(FILEINIT + 'um/' + cntlname +
                   '/basin_diagnostics/mean_' + cntlname + '_Atlantic' +
                   str(startyear) + '_' + str(endyear-1)+'.nc')
-    Paccntl=('/home/earjcti/um/' + cntlname +
+    Paccntl=(FILEINIT + 'um/' + cntlname +
                   '/basin_diagnostics/mean_' + cntlname + '_Pacific' +
                   str(startyear) + '_' + str(endyear-1)+'.nc')
     Atlcntl_cube = iris.load_cube(Atlcntl,'temperature basin')
@@ -395,7 +397,7 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
     
     plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname,
               cmap='RdBu_R')
-    plt.savefig('/home/earjcti/um/' + exptname +
+    plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+'.png')
     plt.close()
@@ -403,7 +405,7 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
     vals = np.arange(-1.0,1.1,0.1)
     qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
     plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
-    plt.savefig('/home/earjcti/um/' + exptname +
+    plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meandens_' + exptname + '-' +
                 cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+'.png')
@@ -412,7 +414,7 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
     vals = np.arange(-1.0,1.1,0.1)
     qplt.contourf(sal_anom,levels=vals,extend='both',cmap='RdBu_r')
     plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
-    plt.savefig('/home/earjcti/um/' + exptname +
+    plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meansal_' + exptname + '-' +
                 cntlname + '_' + basin + str(startyear) + '_' +
                 str(endyear-1)+'.png')
@@ -423,20 +425,22 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 
 
 #######################################################################
-exptname = 'xqbwg'
+exptname = 'xqbwp'
 startyear=3900
 endyear=4000
-basin='Pacific'
+basin='Atlantic'
+FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
           'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
           'xqbwg':'EP',
-          'xqbwc':'PI'}
+          'xqbwc':'PI','xqbwn':'LP_warm_NH_JJA','xqbwo':'LP_warm_SH_DJF',
+          'xqbwp':'EP_warm_NH_JJA','xqbwq':'EP_warm_SH_DJF'}
 
 
 # get individual years diagnostics for the basin
 #for year in range(startyear,endyear):
-#    filestart = '/home/earjcti/um/' + exptname + '/pg/' + exptname 
+#    filestart = FILEINIT + 'um/' + exptname + '/pg/' + exptname 
 #    filename = filestart + 'o#pg00000'+str(year)+'c1+.nc'
 #    process_data(filename,basin,year)
 
@@ -447,7 +451,7 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
 #temp_cubelist = CubeList([])
 
 #for year in range(startyear,endyear):
-#     filename = ('/home/earjcti/um/' + exptname +
+#     filename = (FILEINIT + 'um/' + exptname +
 #                  '/basin_diagnostics/' + exptname + '_' +
 #                  basin + str(year) + '.nc')#
 
@@ -467,7 +471,7 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
 #sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
 #temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
 
-#fileout = ('/home/earjcti/um/' + exptname +
+#fileout = (FILEINIT + 'um/' + exptname +
 #                  '/basin_diagnostics/mean_' + exptname + '_' +
 #                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
 #iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
@@ -477,7 +481,7 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
 ################################################
 # plot anomalies
 
-cntlname = 'xqbwj'
+cntlname = 'xqbwq'
 cntlstart=startyear
 cntlend=endyear
 #cntlstart=1400
