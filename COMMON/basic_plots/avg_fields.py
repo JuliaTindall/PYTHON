@@ -96,7 +96,7 @@ class main():
             #fileloc = '/'+ fileletter.get(field) +'/'
             fileloc = '/pd/'
         
-        filestart = ('/nfs/hera1/earjcti/um/' + EXPT + fileloc 
+        filestart = (FILEINIT + fileloc 
                      + EXPT[0:5] + atm_ocn_ind.get(field)
                      + modelsep.get(MODELTYPE))
         
@@ -114,11 +114,11 @@ class main():
                 filenumber = str(year).zfill(9)
             if MODELTYPE == 'C': # hadcm3
                 if year >=  1000:
-                    cent = np.str(year)[0:2]
-                    year2 = np.str(year)[2:4]
+                    cent = str(year)[0:2]
+                    year2 = str(year)[2:4]
                 else:
-                    cent = np.str(year)[0:1]
-                    year2 = np.str(year)[1:3]
+                    cent = str(year)[0:1]
+                    year2 = str(year)[1:3]
                 print(cent)
                 filenumber = centuaryind.get(cent) + year2
                 print(filenumber)
@@ -253,10 +253,12 @@ class main():
 
 MODELTYPE = 'Ca' # n=HadGEM, C=HadCM3, Ca=HadCM3_alternate (long filenames)
                  #F=Famous
-EXPT = 'xpsir'
-STARTYEAR = 500
-NYEARS=100
+EXPT = 'xqicc'
+STARTYEAR = 3900
+NYEARS=24
 AVG_SEAS = 'ann' # ann, djf, jja
+
+FILEINIT = '/home/earjcti/um/' + EXPT + '/'
 
 if AVG_SEAS == 'ann':
     NMONTHS = 12
@@ -282,14 +284,14 @@ for i, field in enumerate(FIELDS):
     meancube, stdevcube = obj.main_get_field()
 
     print('trying to write mean')
-    outfile = ('/nfs/hera1/earjcti/um/' + EXPT + '/average/' + EXPT + 
-           '_' + field + '_' + AVG_SEAS +'_mean_' + np.str(STARTYEAR) 
-               + '_' + np.str(STARTYEAR + NYEARS) + '.nc')
+    outfile = (FILEINIT + '/average/' + EXPT + 
+           '_' + field + '_' + AVG_SEAS +'_mean_' + str(STARTYEAR) 
+               + '_' + str(STARTYEAR + NYEARS) + '.nc')
     iris.save(meancube, outfile, netcdf_format='NETCDF3_CLASSIC',fill_value=1.0E20)
 
-    outfile = ('/nfs/hera1/earjcti/um/' + EXPT + '/stdev/' + EXPT + 
-           '_' + field + '_' + AVG_SEAS + '_stdev_'  + np.str(STARTYEAR) 
-               + '_' + np.str(STARTYEAR + NYEARS)  + '.nc')
+    outfile = (FILEINIT + '/stdev/' + EXPT + 
+           '_' + field + '_' + AVG_SEAS + '_stdev_'  + str(STARTYEAR) 
+               + '_' + str(STARTYEAR + NYEARS)  + '.nc')
     iris.save(stdevcube, outfile, netcdf_format='NETCDF3_CLASSIC',fill_value=1.0E20)
        
 

@@ -109,11 +109,12 @@ class main():
             startfname = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\"
             startout = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\"
         else:
-            startout = "/nfs/hera1/earjcti/um/"
+            #startout = "/nfs/hera1/earjcti/um/"
+            startout = "/home/earjcti/um/"
             if EXPT_TYPE == 'S':
                 startfname = "/nfs/hera3/palaeo_share/PlioMIP2/processed/"
             else:
-                startfname = "/nfs/hera1/earjcti/um/"
+                startfname = startout
             
         longfield = {'temp1.5' : 'TEMPERATURE AT 1.5M',
                      'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
@@ -161,12 +162,12 @@ class main():
         else:
             self.meanfile = (startfname + EXPT + '/average/' + EXPT + 
                          '_' + field + '_' + SEASON + '_mean_' + 
-                         np.str(EXPT_STARTYEAR) + '_' +  
-                         np.str(EXPT_STARTYEAR + NYEARS) + '.nc')
+                         str(EXPT_STARTYEAR) + '_' +  
+                         str(EXPT_STARTYEAR + NYEARS) + '.nc')
             self.stdevfile = (startfname + EXPT + '/stdev/' + EXPT + 
                           '_' + field + '_' + SEASON + '_stdev_' +
-                          np.str(EXPT_STARTYEAR) + '_' +  
-                          np.str(EXPT_STARTYEAR + NYEARS) + '.nc')
+                          str(EXPT_STARTYEAR) + '_' +  
+                          str(EXPT_STARTYEAR + NYEARS) + '.nc')
         print(self.meanfile)
        
         
@@ -188,20 +189,20 @@ class main():
         else:
             self.meanbench = (startfname + CNTL + '/average/' + CNTL + 
                               '_' + field + '_' + SEASON +'_mean_' +
-                               np.str(CNTL_STARTYEAR) + '_' +  
-                               np.str(CNTL_STARTYEAR + NYEARS) + '.nc')
+                               str(CNTL_STARTYEAR) + '_' +  
+                               str(CNTL_STARTYEAR + NYEARS) + '.nc')
             self.sdbench = (startfname + CNTL + '/stdev/' + CNTL + 
                             '_' + field + '_' + SEASON +'_stdev_' +
-                            np.str(CNTL_STARTYEAR) + '_' +  
-                            np.str(CNTL_STARTYEAR + NYEARS) + '.nc')
+                            str(CNTL_STARTYEAR) + '_' +  
+                            str(CNTL_STARTYEAR + NYEARS) + '.nc')
                            
             
         self.fieldname = longfield.get(field)
         self.outstart = (startout + EXPT + '/benchmarking/' + EXPT + 
-                         '_' + np.str(EXPT_STARTYEAR) + '_' +  
-                         np.str(EXPT_STARTYEAR + NYEARS) + 
-                         '_' + CNTL + '_' + np.str(CNTL_STARTYEAR) + 
-                         '_' +  np.str(CNTL_STARTYEAR + NYEARS) + '_' +
+                         '_' + str(EXPT_STARTYEAR) + '_' +  
+                         str(EXPT_STARTYEAR + NYEARS) + 
+                         '_' + CNTL + '_' + str(CNTL_STARTYEAR) + 
+                         '_' +  str(CNTL_STARTYEAR + NYEARS) + '_' +
                          field  + '_' + SEASON)
         self.field = field
         
@@ -428,26 +429,27 @@ class main():
 
 
 LINUX_WIN='l'
-NYEARS = 30
+NYEARS = 24
 SEASON = 'ann'
 
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPT = 'xpsir'
-EXPT_STARTYEAR = 70
+EXPT = 'xqicc'
+EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
-EXPT_TYPE = 'A'#  A = average file like I made using 
+EXPT_TYPE = 'L'#  A = average file like I made using 
                #      program COMMON/basic_plots_avg_fields.py
                # B = Bristol file like Paul made
                # S = average file like Steve made
-
+               # L= long filename '#'
+               
 # data from good experiment
-CNTL_TYPE = 'A' # A = average file like I made
+CNTL_TYPE = 'L' # A = average file like I made
                # B = Bristol file like Paul made
                  # S = like file steve made
-CNTL = 'xpsif'
-CNTL_STARTYEAR = 70
+CNTL = 'xqbwc'
+CNTL_STARTYEAR = 3900
 #CNTL = 'Eoi400_2450-2499'
 #CNTL = 'tcfze'
 #CNTL_STARTYEAR = 0

@@ -163,9 +163,10 @@ ax1.plot(years,dens_surf,label='surface density')
 ax1.plot(years,dens_0_100,label='0-100m')
 ax1.plot(years,dens_0_200,label='0-200m')
 ax1.plot(years,dens_0_1000,label='0-1000m')
-ax1.plot(years,dens_1000_3000,label='1000-3000m')
+#ax1.plot(years,dens_1000_3000,label='1000-3000m')
 
 ax1.set_ylim(35.5,37.0)
+#ax1.set_xlim(1400,2000)
 ax1.set_xlabel("Year")
 ax1.set_ylabel("density")
 ax1.set_title("density at different levels: " + exptname)
@@ -179,14 +180,14 @@ ax2.plot(years,[b-a for b,a in zip(dens_0_200,dens_0_100)],
          label='anom 0-200m - 0-100')
 ax2.plot(years,[b-a for b,a in zip(dens_0_1000,dens_0_200)],
          label='anom 0-1000 - 0-200m')
-ax2.plot(years,[b-a for b,a in zip(dens_1000_3000,dens_0_1000)],
-         label='anom 1000-3000 - 0-1000m')
+#ax2.plot(years,[b-a for b,a in zip(dens_1000_3000,dens_0_1000)],
+#         label='anom 1000-3000 - 0-1000m')
 
 ax2.set_xlabel("Year")
 ax2.set_ylabel("density")
-ax2.set_title("1000-3000m density minus density at different levels: " + exptname)
+ax2.set_title("density anomalies at different levels: " + exptname)
 ax2.set_ylim(0.,0.4)
-#ax2.set_xlim(500,750)
+#ax2.set_xlim(1400,2000)
 ax2.grid(True, alpha=0.3)
 ax2.legend(loc='lower left')  # adjust ncols if many lines
 
