@@ -117,6 +117,9 @@ exptname='xpsig'
 startyear=12  # can't start before year 12 because we aren't outputting d18o
 endyear=1999
 
+
+#
+# this file comes from (spinup_and_timeseries/density_gradients.py
 filename=('/home/earjcti/um/'+ exptname + '/basin_diagnostics/'
           + exptname + '_Pacific_density' + str(startyear) + '_' +
           str(endyear) + '_' + str(latstart) + '.txt')
