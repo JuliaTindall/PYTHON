@@ -425,10 +425,10 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 
 
 #######################################################################
-exptname = 'xqbwp'
-startyear=3900
-endyear=4000
-basin='Atlantic'
+exptname = 'xpsid'
+startyear=2000
+endyear=3000
+basin='Pacific'
 FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
@@ -439,10 +439,10 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
 
 
 # get individual years diagnostics for the basin
-#for year in range(startyear,endyear):
-#    filestart = FILEINIT + 'um/' + exptname + '/pg/' + exptname 
-#    filename = filestart + 'o#pg00000'+str(year)+'c1+.nc'
-#    process_data(filename,basin,year)
+for year in range(startyear,endyear):
+    filestart = FILEINIT + 'um/' + exptname + '/pg/' + exptname 
+    filename = filestart + 'o#pg00000'+str(year)+'c1+.nc'
+    process_data(filename,basin,year)
 
 #################################################
 # get the mean dianostics for the basin
@@ -477,7 +477,7 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
 #iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
 #          fileout,fill_value = -99999.)
    
-#sys.exit(0)
+sys.exit(0)
 ################################################
 # plot anomalies
 
