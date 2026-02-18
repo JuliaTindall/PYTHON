@@ -1,0 +1,379 @@
+#python program
+#
+# this program will plot a timeseries of the density at different levels and
+# the gradients between them
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+def run_mean(y):
+    window = 30
+    # convolution with a uniform window
+    y_smooth = np.convolve(y, np.ones(window)/window, mode='valid')
+    # put into an array the same size as y
+    left = window //2
+    right = window -1 -left
+
+    yout = np.full_like(y,np.nan,dtype=float)
+    yout[left:len(y)-right]=y_smooth
+ 
+    return yout
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+    y5_valsa = run_mean(y5_vals)
+    y25_valsa= run_mean(y25_vals)
+    y47_valsa= run_mean(y47_vals)
+    y203_valsa= run_mean(y203_vals)
+    y447_valsa= run_mean(y447_vals)
+    y666_valsa= run_mean(y666_vals)
+    y995_valsa= run_mean(y995_vals)
+    y1500_valsa= run_mean(y1500_vals)
+    
+    
+                
+    return (x_vals, y5_valsa, y25_valsa, y47_valsa,
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa)
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
+          'xpsie':'EP400','xpsig':'EP'}
+
+
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+
+#plot data from all the files
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y25)
+    axes[0,1].set_title("25m")
+
+    axes[0,2].plot(x, y47)
+    axes[0,2].set_title("47m")
+    
+    axes[1,0].plot(x, y203)
+    axes[1,0].set_title("203m")
+
+    axes[1,1].plot(x, y447)
+    axes[1,1].set_title("447m")
+
+    axes[1,2].plot(x, y666)
+    axes[1,2].set_title("666m")
+    
+    axes[2,0].plot(x, y995)
+    axes[2,0].set_title("995m")
+
+    axes[2,1].plot(x, y1500)
+    axes[2,1].set_title("1500m")
+
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 203m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y203-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("203m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y203-y25)
+    axes[0,1].set_title("203m-25m")
+
+    axes[0,2].plot(x, y203-y47)
+    axes[0,2].set_title("203m -47m")
+    
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_203m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 447m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y447-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("447m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y447-y25)
+    axes[0,1].set_title("447m-25m")
+
+    axes[0,2].plot(x, y447-y47)
+    axes[0,2].set_title("447m -47m")
+
+    axes[1,0].plot(x, y447-y203)
+    axes[1,0].set_title("447m -203m")
+   
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_447m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 666m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y666-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("666m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y666-y25)
+    axes[0,1].set_title("666m-25m")
+
+    axes[0,2].plot(x, y666-y47)
+    axes[0,2].set_title("666m -47m")
+
+    axes[1,0].plot(x, y666-y203)
+    axes[1,0].set_title("666m -203m")
+
+    axes[1,1].plot(x, y666-y447)
+    axes[1,1].set_title("666m -447m")
+ 
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_666m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 995m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y995-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("995m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y995-y25)
+    axes[0,1].set_title("995m-25m")
+
+    axes[0,2].plot(x, y995-y47)
+    axes[0,2].set_title("995m -47m")
+
+    axes[1,0].plot(x, y995-y203)
+    axes[1,0].set_title("995m -203m")
+
+    axes[1,1].plot(x, y995-y447)
+    axes[1,1].set_title("995m -447m")
+
+    axes[1,2].plot(x, y995-y666)
+    axes[1,2].set_title("995m -666m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_995m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 1500m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y1500-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("1500m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y1500-y25)
+    axes[0,1].set_title("1500m-25m")
+
+    axes[0,2].plot(x, y1500-y47)
+    axes[0,2].set_title("1500m -47m")
+
+    axes[1,0].plot(x, y1500-y203)
+    axes[1,0].set_title("1500m -203m")
+
+    axes[1,1].plot(x, y1500-y447)
+    axes[1,1].set_title("1500m -447m")
+
+    axes[1,2].plot(x, y1500-y666)
+    axes[1,2].set_title("1500m -666m")
+
+    axes[2,0].plot(x, y1500-y995)
+    axes[2,0].set_title("1500m -995m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_1500m_diff'+lat+'.eps')
+plt.close()
+

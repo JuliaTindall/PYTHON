@@ -117,7 +117,7 @@ plt.ylabel('million km$^2$',fontsize=16)
 #plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
 plt.legend(fontsize=20)
-#plt.xlim(1000,2000)
+plt.xlim(0,3000)
 plt.grid(True)
 # remove x axis
 ax = plt.gca()
@@ -128,6 +128,7 @@ ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
 
 # Remove x label if present
 ax.set_xlabel(None)
+
 
 MARGINS = dict(left=0.14, right=0.98, bottom=0.16, top=0.96)  # tweak to suit labels
 plt.subplots_adjust(**MARGINS)
