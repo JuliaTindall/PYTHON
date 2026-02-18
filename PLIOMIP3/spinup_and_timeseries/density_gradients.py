@@ -40,16 +40,16 @@ import sys
 import subprocess
 import matplotlib.ticker as mticker
 
-exptname='xpsie'
+exptname='xpsid'
 startyear=12
-endyear=1999
+endyear=2999
 filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
-latmax=-65
+latmax=-70
 single_levs = 'y'  # y write out on levels
                    # n write out bands of levels
 
 
-
+ 
 def get_density_band(year):
     """
     gets the density at each of the bands
@@ -158,37 +158,23 @@ def get_density_level(year):
                                                  weights=weights)
 
     surf_data = dens_levels_cube[0].data
-    print(dens_levels_cube)
-    print(dens_levels_cube.coord('depth').points)
-    sys.exit(0)
-
+    #print(dens_levels_cube)
+    #print(dens_levels_cube.coord('depth_1').points)
+   
     # extract cube by levels
-    cube_100 = dens_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<100))
-    cube_200 = dens_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<200))
-    cube_1000 = dens_levels_cube.extract(
-        iris.Constraint(depth_1=lambda d:d<1000))
-    cube_1000_3000 = dens_levels_cube[13:16]
-    
-    
-    thickness = np.diff(depth.bounds,axis=1).squeeze()
-    
-    avg_100=cube_100.collapsed('depth_1',iris.analysis.MEAN,
-                               weights=thickness[0:len(cube_100.data)])
-    avg_200=cube_200.collapsed('depth_1',iris.analysis.MEAN,
-                               weights=thickness[0:len(cube_200.data)])
-    avg_1000=cube_1000.collapsed('depth_1',iris.analysis.MEAN,
-                               weights=thickness[0:len(cube_1000.data)])
-    avg_1000_3000=cube_1000_3000.collapsed('depth_1',iris.analysis.MEAN,
-                               weights=thickness[13:16])
-    
-    data_100=avg_100.data
-    data_200=avg_200.data
-    data_1000=avg_1000.data
-    data_1000_3000=avg_1000_3000.data
+ 
+    data_5= (dens_levels_cube.extract(iris.Constraint(depth_1=5.0))).data
+    data_25= (dens_levels_cube.extract(iris.Constraint(depth_1=25.0))).data
+    data_47= (dens_levels_cube.extract(iris.Constraint(depth_1=47.85))).data
+    data_203= (dens_levels_cube.extract(iris.Constraint(depth_1=203.7))).data
+    data_447= (dens_levels_cube.extract(iris.Constraint(depth_1=447.05))).data
+    data_666= (dens_levels_cube.extract(iris.Constraint(depth_1=666.3))).data
+    data_995= (dens_levels_cube.extract(iris.Constraint(depth_1=995.55))).data
+    data_1500=( dens_levels_cube.extract(iris.Constraint(depth_1=1500.85))).data
+
     
   
-    return (surf_data,data_100,data_200,data_1000,data_1000_3000)
-
+    return (data_5,data_25,data_47,data_203,data_447,data_666,data_995,data_1500)
 
 
 
@@ -214,40 +200,40 @@ if single_levs == 'n': # we will get density bands
         all_1000.append(data_1000)
         all_1000_3000.append(data_1000_3000)
 
-        # Write to a text file
-        fileout = (filestart+'/basin_diagnostics/'+exptname+'_Pacific_density'+
-                   str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'+exptname+'_Pacific_density'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
  
-        with open(fileout, "w") as f:
-            string = ("Year, dens_surf,dens_0_100,dens_0_200," +
-                      "dens_0_1000,dens_1000_3000\n") 
-            f.write(string)
+    with open(fileout, "w") as f:
+        string = ("Year, dens_surf,dens_0_100,dens_0_200," +
+                  "dens_0_1000,dens_1000_3000\n") 
+        f.write(string)
 
-            for y, a, b, c, d, e in zip(all_years, all_surf, all_100,all_200,all_1000,all_1000_3000):
-                f.write(f"{y}, {a}, {b},{c},{d},{e}\n")
+        for y, a, b, c, d, e in zip(all_years, all_surf, all_100,all_200,all_1000,all_1000_3000):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}\n")
 
 
-        #plot
+    #plot
         
-        plt.figure(figsize=(8, 5))
-        plt.plot(all_years, all_surf, label='surface')
-        plt.plot(all_years, all_100, label='0-100')
-        plt.plot(all_years, all_200, label='0-200')
-        plt.plot(all_years, all_1000, label='0-1000')
-        plt.plot(all_years, all_1000_3000, label='1000-3000')
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_surf, label='surface')
+    plt.plot(all_years, all_100, label='0-100')
+    plt.plot(all_years, all_200, label='0-200')
+    plt.plot(all_years, all_1000, label='0-1000')
+    plt.plot(all_years, all_1000_3000, label='1000-3000')
 
-        # Add labels and title
-        plt.xlabel('Year')
-        plt.ylim(35.9,36.9)
-        plt.ylabel('density')
-        plt.legend()
-        plt.title('Year vs density')
+    # Add labels and title
+    plt.xlabel('Year')
+    plt.ylim(35.9,36.9)
+    plt.ylabel('density')
+    plt.legend()
+    plt.title('Year vs density')
 
-        # Optional: Add grid
-        plt.grid(True)
+    # Optional: Add grid
+    plt.grid(True)
 
-        # Show the plot
-        plt.show()
+    # Show the plot
+    plt.show()
 
 
 
@@ -277,43 +263,44 @@ if single_levs == 'y': # we will get density on a range of levels
         all_995m.append(d995)
         all_1500m.append(d1500)
        
-        # Write to a text file
-        fileout = (filestart+'/basin_diagnostics/'
-                   +exptname+'_Pacific_density_levs'+
-                   str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'
+               +exptname+'_Pacific_density_levs'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
  
-        with open(fileout, "w") as f:
-            string = ("Year, 5m, 25m, 47m 203m, 447m, 666m, 995m, 1500m\n") 
-            f.write(string)
+    with open(fileout, "w") as f:
+        string = ("Year, 5m, 25m, 47m 203m, 447m, 666m, 995m, 1500m\n") 
+        f.write(string)
+        print('here',string)
+        for y, a, b, c, d, e, g, h, i in zip(all_years, all_5m,
+                                             all_25m,all_47m,
+                                             all_203m,all_447m,
+                                             all_666m,all_995m,all_1500m):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}, {g}, {h}, {i}\n")
 
-            for y, a, b, c, d, e, f, g, h in zip(all_years, all_5m,
-                                                 all_25m,all_47m,
-                                                 all_203m,all_447m,
-                                                 all_666m,all_995m,all_1500m):
-                f.write(f"{y}, {a}, {b},{c},{d},{e}, {f}, {g}, {h}\n")
 
-
-        #plot
-        
-        plt.figure(figsize=(8, 5))
-        plt.plot(all_years, all_surf, label='surface')
-        plt.plot(all_years, all_100, label='0-100')
-        plt.plot(all_years, all_200, label='0-200')
-        plt.plot(all_years, all_1000, label='0-1000')
-        plt.plot(all_years, all_1000_3000, label='1000-3000')
-
-        # Add labels and title
-        plt.xlabel('Year')
-        plt.ylim(35.9,36.9)
-        plt.ylabel('density')
-        plt.legend()
-        plt.title('Year vs density')
-
-        # Optional: Add grid
-        plt.grid(True)
-
-        # Show the plot
-        plt.show()
+    #plot
+    print(all_666m)
+    print(all_995m)
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_5m, label='5m')
+    plt.plot(all_years, all_47m, label='47m')
+    plt.plot(all_years, all_447m, label='447m')
+    plt.plot(all_years, all_666m, label='666m')
+    plt.plot(all_years, all_995m, label='995m')
+    
+    # Add labels and title
+    plt.xlabel('Year')
+    plt.ylim(36,37)
+    plt.ylabel('density')
+    plt.legend()
+    plt.title('Year vs density')
+    
+    # Optional: Add grid
+    plt.grid(True)
+    
+    # Show the plot
+    plt.show()
 
 
 ####
