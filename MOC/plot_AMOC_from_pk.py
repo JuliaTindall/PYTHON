@@ -108,7 +108,7 @@ def do_nice_plot(avg_MOC_cube):
 
 
 #######################################################################
-exptname = 'xqbwd'
+exptname = 'xqbwc'
 startyear=3900
 endyear=4000
 MOCtype='AMOC' # AMOC PMOC GMOC
