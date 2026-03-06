@@ -1,6 +1,6 @@
 #python program
 #
-# this program will plot the timeseries of the density difference between 666m and 204m.  The file used was created by:  spinup/and/timeseries/density_gradients.py
+# this program will plot the timeseries of the temperature difference between 203m and 5m.  The file used was created by:  spinup/and/timeseries/density_gradients.py
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,7 +50,7 @@ def read_data(filename):
                 print(f"Skipping invalid line in {filename}: {line.strip()}")
 
 
-    ydiff=np.array(y666_vals) - np.array(y203_vals)
+    ydiff=np.array(y203_vals) - np.array(y5_vals)
     
     
                 
@@ -71,14 +71,14 @@ plt.figure(figsize=(12, 4))
 
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     x, y = read_data(filename)
-    window=1
+    window=30
     y_mean=running_mean(y,window)
     x_mean=x[window-1:]
 
@@ -88,13 +88,13 @@ for expt in exptnames:
                  linewidth=3,linestyle='--')
     else:
         plt.plot(x_mean, y_mean, label=period.get(expt) )
-    plt.title('density 666m-density 203m')
+    plt.title('temperature 203m-temperature 5m')
 
 plt.xlabel('year',fontsize=16)
-plt.ylabel('kg/m$^3$',fontsize=16)
+plt.ylabel('$^o$C',fontsize=16)
 plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
-plt.xlim(900,1000)
+plt.xlim(0,3000)
 #plt.legend(fontsize=14)
 plt.grid(True)
 
@@ -110,5 +110,5 @@ MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit la
 plt.subplots_adjust(**MARGINS)
 
 # Save the plot to a file
-plt.savefig('dens_diff_666_203_30yr.png')
+plt.savefig('temp_diff_203_5_30yr.png')
 print("Plot saved to 'combined_plot.png'.")

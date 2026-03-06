@@ -1,6 +1,6 @@
 #python program
 #
-# this program will plot the timeseries of the density difference between 666m and 204m.  The file used was created by:  spinup/and/timeseries/density_gradients.py
+# this program will plot the timeseries of the salinity difference between 666m and 204m.  The file used was created by:  spinup/and/timeseries/salinity_gradients.py
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -71,7 +71,7 @@ plt.figure(figsize=(12, 4))
 
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -88,10 +88,10 @@ for expt in exptnames:
                  linewidth=3,linestyle='--')
     else:
         plt.plot(x_mean, y_mean, label=period.get(expt) )
-    plt.title('density 666m-density 203m')
+    plt.title('salinity 666m-salinity 203m')
 
 plt.xlabel('year',fontsize=16)
-plt.ylabel('kg/m$^3$',fontsize=16)
+plt.ylabel('psu',fontsize=16)
 plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
 plt.xlim(900,1000)
@@ -110,5 +110,5 @@ MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit la
 plt.subplots_adjust(**MARGINS)
 
 # Save the plot to a file
-plt.savefig('dens_diff_666_203_30yr.png')
+plt.savefig('salinity_diff_666_203_30yr.png')
 print("Plot saved to 'combined_plot.png'.")
