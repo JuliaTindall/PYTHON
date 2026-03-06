@@ -44,7 +44,7 @@ exptname='xpsid'
 startyear=12
 endyear=2999
 filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
-latmax=-70
+latmax=-65
 single_levs = 'y'  # y write out on levels
                    # n write out bands of levels
 
@@ -291,7 +291,7 @@ if single_levs == 'y': # we will get temperature on a range of levels
     
     # Add labels and title
     plt.xlabel('Year')
-    plt.ylim(36,37)
+    #plt.ylim(36,37)
     plt.ylabel('temperature')
     plt.legend()
     plt.title('Year vs temperature')
