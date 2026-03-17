@@ -1,6 +1,6 @@
 #python program
 #
-# this program will plot a timeseries of the density at different levels and
+# this program will plot a timeseries of the salinity at different levels and
 # the gradients between them
 
 import matplotlib.pyplot as plt
@@ -89,7 +89,7 @@ legend_handles=[]
 #plot data from all the files
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -131,15 +131,12 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for i in range(axes.shape[0]):
-    for j in range(axes.shape[1]):
-        axes[i, j].set_xlim(1500, 2000)
 for ax in axes.flat[:-1]:
     ax.grid(True)
     ax.axvline(x=1803,color='red',linestyle='--')
-
+    ax.set_xlim(1500,2000)
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_'+lat+'.eps')
+plt.savefig('salinity_plots/salinity_alllevs_'+lat+'.eps')
 plt.close()
 
 
@@ -150,7 +147,7 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -183,7 +180,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_203m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/salinity_alllevs_203m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -194,7 +191,7 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -230,7 +227,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_447m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/salinity_alllevs_447m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -241,7 +238,7 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -280,7 +277,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_666m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/salinity_alllevs_666m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -291,7 +288,7 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -333,7 +330,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_995m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/salinity_alllevs_995m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -344,7 +341,7 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_salinity_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
@@ -389,6 +386,6 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_1500m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/salinity_alllevs_1500m_diff'+lat+'.eps')
 plt.close()
 

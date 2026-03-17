@@ -1,6 +1,6 @@
 #python program
 #
-# this program will plot a timeseries of the density at different levels and
+# this program will plot a timeseries of the temperature at different levels and
 # the gradients between them
 
 import matplotlib.pyplot as plt
@@ -25,8 +25,60 @@ def run_mean(y):
  
     return yout
 
+def roll_linear_trend(ts,years,expt,threshold):
+    window=100
+
+    # ts   = your data array
+
+    trends = np.full(len(ts), np.nan)   # will store the rolling slopes
+
+    for i in range(len(ts) - window):
+        y = ts[i:i+window]
+        
+        x = np.arange(window)  # 0..9
+        # linear fit: slope only
+        slope, intercept = np.polyfit(x, y, 1)
+        trends[i + window//2] = slope  # center the window
+        #if slope > 0.006:
+        #    print(i,years[i],slope)
+        
+    # threshold will be passed but will be calculated here from xpsid
+    if expt == 'xpsig':
+        # the threshold for xpsie will be xpsid + 10%
+        threshold  = (trends[500:2501].max()) *  1.1
+        print(expt,'threshold - julia',threshold)
+
+    if expt == 'xpsie':
+        #plt.close()
+        #plt.figure()
+        #plt.plot(years,trends)
+        #plt.plot([0,3000],[threshold,threshold])
+        #plt.show()
+        #sys.exit(0)
+        # find first index where slope > threshold 
+        idx = np.where(trends > threshold)[0]
+        print(len(idx))
+
+        if len(idx) == 0:
+            print(expt, ": No positive trend found.")
+        else:
+            start_index = idx[0]
+            start_year = years[start_index]
+            print(expt, ": Trend exceeds threshold around:", start_year)
+            #for val in range(start_index,start_index-100,-1):
+            #    print(val,trends[val],years[val])
+            #    if val < 0:
+            #        print('found first negative')
+            #        break
+
+
+                             
+            
+
+    return threshold
+
 # Function to read data from a file, skipping the first line
-def read_data(filename):
+def read_data_nothreshold(filename):
     print(filename)
     x_vals = []
     y5_vals = []
@@ -65,11 +117,58 @@ def read_data(filename):
     y666_valsa= run_mean(y666_vals)
     y995_valsa= run_mean(y995_vals)
     y1500_valsa= run_mean(y1500_vals)
-    
-    
+
                 
     return (x_vals, y5_valsa, y25_valsa, y47_valsa,
             y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa)
+
+
+def read_data(filename,expt,threshold):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+    y5_valsa = run_mean(y5_vals)
+    y25_valsa= run_mean(y25_vals)
+    y47_valsa= run_mean(y47_vals)
+    y203_valsa= run_mean(y203_vals)
+    y447_valsa= run_mean(y447_vals)
+    y666_valsa= run_mean(y666_vals)
+    y995_valsa= run_mean(y995_vals)
+    y1500_valsa= run_mean(y1500_vals)
+
+    if expt == 'xpsig' or expt == 'xpsie':
+        threshold=roll_linear_trend(y5_valsa,x_vals,expt,threshold)
+    print('j2',expt,threshold)
+                
+    return (x_vals, y5_valsa, y25_valsa, y47_valsa,
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa,threshold)
 
 # Function to compute running mean**
 def running_mean(data, window_size):
@@ -88,15 +187,19 @@ legend_handles=[]
 
 #plot data from all the files
 for expt in exptnames:
+    if expt == 'xpsid' or expt == 'xpsig':
+        threshold = 0.0
+        
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500)  = read_data(filename)
+     y447 ,y666, y995,y1500,threshold)  = read_data(filename,expt,threshold)
+    print(expt,threshold)
 
     # Plot the data
     line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
@@ -131,15 +234,14 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for i in range(axes.shape[0]):
-    for j in range(axes.shape[1]):
-        axes[i, j].set_xlim(1500, 2000)
+
 for ax in axes.flat[:-1]:
     ax.grid(True)
     ax.axvline(x=1803,color='red',linestyle='--')
+    ax.set_xlim(1500, 2000)
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_'+lat+'.eps')
+plt.savefig('temperature_plots/temperature_alllevs_'+lat+'.eps')
 plt.close()
 
 
@@ -150,14 +252,14 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500)  = read_data(filename)
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
 
     # Plot the data
     line=axes[0,0].plot(x, y203-y5,label=expt + ': ' + period.get(expt))[0]
@@ -183,7 +285,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_203m_diff'+lat+'.eps')
+plt.savefig('temperature_plots/temperature_alllevs_203m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -194,14 +296,14 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500)  = read_data(filename)
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
 
     # Plot the data
     line=axes[0,0].plot(x, y447-y5,label=expt + ': ' + period.get(expt))[0]
@@ -230,7 +332,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_447m_diff'+lat+'.eps')
+plt.savefig('temperature_plots/temperature_alllevs_447m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -241,14 +343,14 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500)  = read_data(filename)
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
 
     # Plot the data
     line=axes[0,0].plot(x, y666-y5,label=expt + ': ' + period.get(expt))[0]
@@ -280,7 +382,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_666m_diff'+lat+'.eps')
+plt.savefig('temperature_plots/temperature_alllevs_666m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -291,14 +393,14 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500)  = read_data(filename)
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
 
     # Plot the data
     line=axes[0,0].plot(x, y995-y5,label=expt + ': ' + period.get(expt))[0]
@@ -333,7 +435,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_995m_diff'+lat+'.eps')
+plt.savefig('temperature_plots/temperature_alllevs_995m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -344,14 +446,14 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
-                 '_Pacific_density_levs')
+                 '_Pacific_temperature_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500)  = read_data(filename)
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
 
     # Plot the data
     line=axes[0,0].plot(x, y1500-y5,label=expt + ': ' + period.get(expt))[0]
@@ -387,8 +489,7 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 for ax in axes.flat[:-1]:
     ax.grid(True)
     ax.axvline(x=1803,color='red',linestyle='--')
-
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_1500m_diff'+lat+'.eps')
+plt.savefig('temperature_plots/temperature_alllevs_1500m_diff'+lat+'.eps')
 plt.close()
 
