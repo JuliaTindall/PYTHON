@@ -95,6 +95,8 @@ plt.ylabel('$^o$C',fontsize=16)
 plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
 plt.xlim(0,3000)
+plt.axvline(x=1803,color='red',linestyle='--')
+
 #plt.legend(fontsize=14)
 plt.grid(True)
 

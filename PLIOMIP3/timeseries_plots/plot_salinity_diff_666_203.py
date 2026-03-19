@@ -78,7 +78,7 @@ for expt in exptnames:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     x, y = read_data(filename)
-    window=1
+    window=30
     y_mean=running_mean(y,window)
     x_mean=x[window-1:]
 
@@ -94,7 +94,8 @@ plt.xlabel('year',fontsize=16)
 plt.ylabel('psu',fontsize=16)
 plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
-plt.xlim(900,1000)
+plt.axvline(x=1803,color='red',linestyle='--')
+#plt.xlim(900,1000)
 #plt.legend(fontsize=14)
 plt.grid(True)
 

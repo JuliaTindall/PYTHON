@@ -11,7 +11,7 @@ import sys
 
 # --- File setup ---
 
-field='Temperature'  #density, Temperature, salinity
+field='salinity'  #density, Temperature, salinity
 fieldname = {'density':'insitu_T_0','Temperature':'insitu_T_1'}             
 linestyles = {'LP':'--','EP':'dashdot'}
 
@@ -21,13 +21,13 @@ filestart = '/home/earjcti/um/'+expt+'/basin_diagnostics/mean_'+expt+'_Pacific'
 filename1 = filestart + '1400_1499.nc'
 filename2 = filestart.replace('xpsid', 'xpsie') + '1400_1499.nc'
 filename3 = filestart.replace('xpsid', 'xpsie') + '1600_1699.nc'
-#filename4 = filestart.replace('xpsid', 'xpsie') + '2000_2099.nc'
+filename4 = filestart.replace('xpsid', 'xqbwe') + '3970_3999.nc'
 filename5 = filestart.replace('xpsid', 'xpsig') + '1400_1499.nc'
 
-#filenames = [filename1, filename2, filename3,filename4,filename5]
-filenames = [filename1, filename2, filename3,filename5]
+filenames = [filename1, filename2, filename3,filename4,filename5]
+#filenames = [filename1, filename2, filename3,filename5]
 #filenames = [filename1]
-legends   = ['LP', 'EP400:1400', 'EP400:1600','EP']
+legends   = ['LP', 'EP400:1400', 'EP400:1600','EP400_3900','EP']
 #legends = [expt]
 depth_name = 'depth_1'
 lat_name   = 'latitude'
@@ -48,7 +48,7 @@ for i, file_path in enumerate(filenames):
 
     # Select latitudes south of 60S
     valmin=-90  # should be None
-    valmax=-60  # should be -60
+    valmax=-70  # should be -60
     #density_south = density.sel(latitude= slice(None,-60))
     density_south = density.sel(latitude= slice(valmin,valmax))
     #print(density_south[depth_name].values)
@@ -75,13 +75,11 @@ for i, file_path in enumerate(filenames):
     for ax, (dmin, dmax) in zip(axes, ranges):
         dcoord = dens_w[depth_name]
         mask   = (dcoord >= dmin) & (dcoord <= dmax)
-        dens_band  = dens_w.where(mask, drop=True)
-        depth_band = dcoord.where(mask, drop=True)
-
+     
         if i==0 and abs_anom_ind == 'anom':
             pass
         else:
-            ax.plot(dens_band.values, depth_band.values, label=legends[i], linewidth=2,linestyle=linestyles.get(legends[i],None))
+            ax.plot(dens_w.values, dcoord.values, label=legends[i], linewidth=2,linestyle=linestyles.get(legends[i],None))
         
             #ax.set_title(f'{dmin}-{dmax} m', fontsize=12)
             ax.tick_params(axis='both',which='major',labelsize=14)

@@ -96,6 +96,7 @@ plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
 plt.xlim(0,3000)
 #plt.legend(fontsize=14)
+plt.axvline(x=1803,color='red',linestyle='--')
 plt.grid(True)
 
 # Hide bottom spine and all x ticks/labels
