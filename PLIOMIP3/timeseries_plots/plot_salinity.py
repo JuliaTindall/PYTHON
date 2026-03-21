@@ -132,6 +132,7 @@ ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
 
 # Remove x label if present
 ax.set_xlabel(None)
+plt.axvline(x=1803,color='red',linestyle='--')
 
 MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
 plt.subplots_adjust(**MARGINS)

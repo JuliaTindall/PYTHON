@@ -270,7 +270,7 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
     sal_anom = expt_sal_cube - cntl_sal_cube
 
     if region == 'SH':   # extract southwards of 40deg and upwards of 2000m
-        constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -40)
+        constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
         constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
         
         int1 = temp_anom.extract(constraint1)
@@ -287,35 +287,71 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
         vals = np.arange(-2.0,2.25,0.25)
         vals2 = [-1.5,-1.0,-0.5,0,0.5,1.0,1.5]
     print(vals)
-    cs=iplt.contourf(temp_anom,levels=vals/2.0,extend='both',cmap='RdBu_r')
+
+    # plot temperature anomaly
+    
+    figure = plt.figure(figsize=[7.0,8.0])
+    ax = figure.add_subplot(1,1,1)
+    cs=iplt.contourf(temp_anom,levels=vals,extend='both',cmap='RdBu_r')
     #iplt.contour(temp_anom,levels=vals2)
-    plt.xlabel('Latitude (degrees)')
-    plt.ylabel('Depth (m)')
-    cb=plt.colorbar(cs,orientation='horizontal')
-    cb.set_label('(\u00B0C)')
-    plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname)
+    plt.xlabel('Latitude (degrees)',fontsize=14)
+    plt.ylabel('Depth (m)',fontsize=14)
+    ax.tick_params(labelsize=14)
+    
+    cb=plt.colorbar(cs,orientation='vertical')
+    cb.ax.set_xlabel('\u00B0C',fontsize=16)
+    cb.ax.tick_params(labelsize=14)
+    cb.ax.xaxis.set_label_position('bottom')
+    cb.ax.xaxis.labelpad=25
+  
+    plt.title('f) ' + basin + ' Temperature anomaly: '+ period.get(exptname) + '-'+ period.get(cntlname),fontsize=16)
     plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+region+'.png')
     plt.close()
 
-    vals = np.arange(-0.3,0.33,0.03)
-    qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
-    plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
+
+    # plot density anomaly
+    vals = np.arange(-0.1,0.11,0.01)
+    figure = plt.figure(figsize=[7.0,8.0])
+    ax = figure.add_subplot(1,1,1)
+    cs=iplt.contourf(dens_anom,levels=vals-0.1,extend='both',cmap='RdBu_r')
+    plt.xlabel('Latitude (degrees)',fontsize=14)
+    plt.ylabel('Depth (m)',fontsize=14)
+    ax.tick_params(labelsize=14)
+    
+    cb=plt.colorbar(cs,orientation='vertical')
+    cb.ax.set_xlabel('kg m$^{-3}$',fontsize=16)
+    cb.ax.tick_params(labelsize=14)
+    cb.ax.xaxis.set_label_position('bottom')
+    cb.ax.xaxis.labelpad=25
+  
+    
+    plt.title('d) ' + basin + ' Density anomaly: '+ period.get(exptname) + '-'+ period.get(cntlname),fontsize=16)
     plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meandens_' + exptname + '-' +
                 cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+region+'.png')
     plt.close()
 
-    vals = np.arange(-0.5,0.55,0.05)
+    vals = np.arange(-0.2,0.22,0.02)
+    
+    figure = plt.figure(figsize=[7.0,8.0])
+    ax = figure.add_subplot(1,1,1)
     cs=iplt.contourf(sal_anom,levels=vals,extend='both',cmap='RdBu_r')
-    plt.xlabel('Latitude (degrees)')
-    plt.ylabel('Depth (m)')
-    cb=plt.colorbar(cs,orientation='horizontal')
-    cb.set_label('psu')
+    #iplt.contour(temp_anom,levels=vals2)
+    plt.xlabel('Latitude (degrees)',fontsize=14)
+    plt.ylabel('Depth (m)',fontsize=14)
+    ax.tick_params(labelsize=14)
+    
+    cb=plt.colorbar(cs,orientation='vertical')
+    cb.ax.set_xlabel('psu',fontsize=16)
+    cb.ax.tick_params(labelsize=14)
+    cb.ax.xaxis.set_label_position('bottom')
+    cb.ax.xaxis.labelpad=25
   
-    plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
+    plt.title('e) ' + basin + ' Salinity anomaly: '+ period.get(exptname) + '-'+ period.get(cntlname),fontsize=16)
+  
     plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meansal_' + exptname + '-' +
                 cntlname + '_' + basin + str(startyear) + '_' +

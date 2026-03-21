@@ -56,7 +56,8 @@ for expt in exptnames:
     plt.subplot(211)
     plt.plot(year, y, label=expt + ': ' + period.get(expt,expt) )
     plt.title(which_to_plot + ' Flux throught CAS')
-
+    print(expt,': mean: ' + str(float(sum(y[1400:1600]) / len(y[1400:1600]))))
+  
 plt.xlabel('year')
 plt.ylabel(ylab)
 plt.legend()

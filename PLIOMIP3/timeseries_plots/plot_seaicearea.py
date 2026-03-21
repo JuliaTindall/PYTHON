@@ -119,6 +119,8 @@ plt.yticks(fontsize=16)
 plt.legend(fontsize=20)
 plt.xlim(0,3000)
 plt.grid(True)
+plt.axvline(x=1803,color='red',linestyle='--')
+
 # remove x axis
 ax = plt.gca()
 

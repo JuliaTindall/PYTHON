@@ -26,7 +26,7 @@ def run_mean(y):
     return yout
 
 def roll_linear_trend(ts,years,expt,threshold):
-    window=100
+    window=50
 
     # ts   = your data array
 
@@ -38,7 +38,8 @@ def roll_linear_trend(ts,years,expt,threshold):
         x = np.arange(window)  # 0..9
         # linear fit: slope only
         slope, intercept = np.polyfit(x, y, 1)
-        trends[i + window//2] = slope  # center the window
+        trends[i + window//2] = slope *100.  # center the window and
+                                             # convert to centuary
         #if slope > 0.006:
         #    print(i,years[i],slope)
         
@@ -49,12 +50,6 @@ def roll_linear_trend(ts,years,expt,threshold):
         print(expt,'threshold - julia',threshold)
 
     if expt == 'xpsie':
-        #plt.close()
-        #plt.figure()
-        #plt.plot(years,trends)
-        #plt.plot([0,3000],[threshold,threshold])
-        #plt.show()
-        #sys.exit(0)
         # find first index where slope > threshold 
         idx = np.where(trends > threshold)[0]
         print(len(idx))
@@ -72,8 +67,26 @@ def roll_linear_trend(ts,years,expt,threshold):
             #        break
 
 
+    # plot the rolling linear trend
+    plt.close()
+    plt.figure(figsize=[8,4])
+    plt.plot(years,trends)
+    plt.plot([0,3000],[threshold,threshold],linestyle='dashed')
+    plt.plot([0,3000],[0,0],color='black')
+    plt.xlabel('year',fontsize=14)
+    plt.ylabel('trend (degC / century)',fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.xticks(fontsize=14)
+    plt.xlim(0,3000)
+    plt.ylim(-0.7,1.70)
+    plt.title(period.get(expt),fontsize=16)
+    MARGINS = dict(left=0.15, right=0.95, bottom=0.16, top=0.9)  # tweak to suit labels
+    plt.subplots_adjust(**MARGINS)
+    plt.savefig('temperature_roll_linear_trend_' + expt + '.png')
+
                              
-            
+    #threshold=0.726  # this is the threshold calculated as
+                             # xpsig * 1.1 
 
     return threshold
 
@@ -163,9 +176,7 @@ def read_data(filename,expt,threshold):
     y995_valsa= run_mean(y995_vals)
     y1500_valsa= run_mean(y1500_vals)
 
-    if expt == 'xpsig' or expt == 'xpsie':
-        threshold=roll_linear_trend(y5_valsa,x_vals,expt,threshold)
-    print('j2',expt,threshold)
+    threshold=roll_linear_trend(y5_valsa,x_vals,expt,threshold)
                 
     return (x_vals, y5_valsa, y25_valsa, y47_valsa,
             y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa,threshold)
@@ -185,10 +196,13 @@ ax_legend=axes[2,2]
 ax_legend.axis('off')
 legend_handles=[]
 
+for_paper_list = []
 #plot data from all the files
 for expt in exptnames:
     if expt == 'xpsid' or expt == 'xpsig':
-        threshold = 0.0
+        #threshold=0.726 # this is the threshold calculated as xpsig * 1.1
+        threshold=1.186
+
         
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
                  '_Pacific_temperature_levs')
@@ -200,6 +214,7 @@ for expt in exptnames:
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500,threshold)  = read_data(filename,expt,threshold)
     print(expt,threshold)
+    for_paper_list.append(y5)
 
     # Plot the data
     line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
@@ -234,6 +249,23 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
+plt.close()
+
+# do plots for paper.  This is temperature at 5m
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+
+for i,expt in enumerate(exptnames):
+    ax.plot(x,for_paper_list[i],label=expt)
+ax.legend(frameon=True,fontsize=14)
+plt.xlabel('year',fontsize=16)
+plt.ylabel('degC',fontsize=16)
+plt.yticks(fontsize=16)
+plt.xticks(fontsize=16)
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+plt.savefig('temperature_timeseries_5m.png')
+
+
 
 for ax in axes.flat[:-1]:
     ax.grid(True)
@@ -492,4 +524,5 @@ for ax in axes.flat[:-1]:
 plt.tight_layout()
 plt.savefig('temperature_plots/temperature_alllevs_1500m_diff'+lat+'.eps')
 plt.close()
+
 
