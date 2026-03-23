@@ -70,11 +70,10 @@ def calculate_density(filename):
     print(' ')
     print(' ')
     rho_potential = gsw.rho(SA,CT,2000) - 1000.
-    for i in range(0,18):
-        print('rhopot',rho_potential[0,i,20,50],CT[0,i,20,50],SA[0,i,20,50])
+    #for i in range(0,18):
+    #    print('rhopot',rho_potential[0,i,20,50],CT[0,i,20,50],SA[0,i,20,50])
     #print(rho_potential.mask)
     rho_potential = np.where(rho_potential.mask,-99999,rho_potential)
-    sys.exit(0)
     
     rho_potential_cube = T_cube.copy(data=rho_potential)
     iris.util.mask_cube(rho_potential_cube,T_cube.data.mask,in_place=True)
@@ -248,6 +247,7 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
     plots the difference in density salinity and temperature between two 
     experiments
     """
+    print('in plot anomaly')
 
     exptfile=(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/mean_' + exptname + '_' +
@@ -282,10 +282,10 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
         int1 = sal_anom.extract(constraint1)
         sal_anom = int1.extract(constraint2)
       
-    vals = np.arange(-2.0,2.5,0.5)
     if cntlname !='xqbwc':
         vals = np.arange(-2.0,2.25,0.25)
         vals2 = [-1.5,-1.0,-0.5,0,0.5,1.0,1.5]
+    vals = np.arange(-0.5,0.55,0.05)
     print(vals)
 
     # plot temperature anomaly
@@ -308,14 +308,15 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
     plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+region+'.png')
+    #plt.show()
     plt.close()
-
+   
 
     # plot density anomaly
     vals = np.arange(-0.1,0.11,0.01)
     figure = plt.figure(figsize=[7.0,8.0])
     ax = figure.add_subplot(1,1,1)
-    cs=iplt.contourf(dens_anom,levels=vals-0.1,extend='both',cmap='RdBu_r')
+    cs=iplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
     plt.xlabel('Latitude (degrees)',fontsize=14)
     plt.ylabel('Depth (m)',fontsize=14)
     ax.tick_params(labelsize=14)
@@ -357,10 +358,9 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
                 cntlname + '_' + basin + str(startyear) + '_' +
                 str(endyear-1)+region+'.png')
     plt.close()
-   
     
-    sys.exit(0)
-
+    
+    
 
 def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
     """
@@ -489,11 +489,12 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 
 #######################################################################
 exptname = 'xpsig'
-startyear=1400
-endyear=1500
+startyear=2
+endyear=52
 basin='Pacific'
-#FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
-FILEINIT = '/home/earjcti/'
+anom_only = 'y'
+FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
+#FILEINIT = '/home/earjcti/'
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
           'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
@@ -501,58 +502,59 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
           'xqbwc':'PI','xqbwn':'LP_warm_NH_JJA','xqbwo':'LP_warm_SH_DJF',
           'xqbwp':'EP_warm_NH_JJA','xqbwq':'EP_warm_SH_DJF'}
 
+if anom_only == 'n':
 
-# get individual years diagnostics for the basin
-#for year in range(startyear,endyear):
-#    filestart = FILEINIT + 'um/' + exptname + '/pg/' + exptname 
-#    filename = filestart + 'o#pg00000'+str(year)+'c1+.nc'
-#    process_data(filename,basin,year)
+    # get individual years diagnostics for the basin
+    for year in range(startyear,endyear):
+        filestart = FILEINIT + 'um/' + exptname + '/pg/' + exptname 
+        filename = filestart + 'o#pg00000'+str(year).zfill(4)+'c1+.nc'
+        process_data(filename,basin,year)
 
-#################################################
-# get the mean dianostics for the basin
-#dens_cubelist = CubeList([])
-#sal_cubelist = CubeList([])
-#temp_cubelist = CubeList([])
+    #################################################
+    # get the mean dianostics for the basin
+    dens_cubelist = CubeList([])
+    sal_cubelist = CubeList([])
+    temp_cubelist = CubeList([])
 
-#for year in range(startyear,endyear):
-#     filename = (FILEINIT + 'um/' + exptname +
-#                  '/basin_diagnostics/' + exptname + '_' +
-#                  basin + str(year) + '.nc')#
+    for year in range(startyear,endyear):
+        filename = (FILEINIT + 'um/' + exptname +
+                  '/basin_diagnostics/' + exptname + '_' +
+                  basin + str(year) + '.nc')#
 
-#     dens_cubelist.append(iris.load_cube(filename,'density basin'))
-#     temp_cubelist.append(iris.load_cube(filename,'temperature basin'))
-#     sal_cubelist.append(iris.load_cube(filename,'salinity basin'))
-#     sal_cube = iris.load_cube(filename,'salinity basin')
+        dens_cubelist.append(iris.load_cube(filename,'density basin'))
+        temp_cubelist.append(iris.load_cube(filename,'temperature basin'))
+        sal_cubelist.append(iris.load_cube(filename,'salinity basin'))
+        sal_cube = iris.load_cube(filename,'salinity basin')
    
-#iris.util.equalise_attributes(dens_cubelist)
-#iris.util.equalise_attributes(sal_cubelist)
-#iris.util.equalise_attributes(temp_cubelist)
-#dens_cubes = dens_cubelist.merge_cube()
-#sal_cubes = sal_cubelist.merge_cube()
-#temp_cubes = temp_cubelist.merge_cube()
+    iris.util.equalise_attributes(dens_cubelist)
+    iris.util.equalise_attributes(sal_cubelist)
+    iris.util.equalise_attributes(temp_cubelist)
+    dens_cubes = dens_cubelist.merge_cube()
+    sal_cubes = sal_cubelist.merge_cube()
+    temp_cubes = temp_cubelist.merge_cube()
 
-#dens_avg_cube = dens_cubes.collapsed('t',iris.analysis.MEAN)
-#sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
-#temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
+    dens_avg_cube = dens_cubes.collapsed('t',iris.analysis.MEAN)
+    sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
+    temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
 
-#fileout = (FILEINIT + 'um/' + exptname +
-#                  '/basin_diagnostics/mean_' + exptname + '_' +
-#                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
-#iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
-#          fileout,fill_value = -99999.)
+    fileout = (FILEINIT + 'um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_' +
+                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
+    iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
+          fileout,fill_value = -99999.)
    
-#sys.exit(0)
 ################################################
 # plot anomalies
 
 cntlname = 'xpsid'
 cntlstart=startyear
 cntlend=endyear
-cntlstart=1400
-cntlend=1500
+#cntlstart=1400
+#cntlend=1500
 region_ind='SH' # 'SH' - SH, '' - globe
+print('about to get anomalies')
 plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,region_ind)
 #plot_Pacific_and_Atlantic(exptname,startyear,endyear,0)  # the last number is the level
-
+print('written anomaly file')
 sys.exit(0)
 
