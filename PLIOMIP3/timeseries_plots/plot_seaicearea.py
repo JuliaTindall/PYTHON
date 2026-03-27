@@ -36,9 +36,9 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
 #plot data from all the files
 for expt in exptnames:
     if expt == 'xpsij':
-        filename = 'seaice_area_' + expt + '_SH_1991_2999.tex'
+        filename = 'seaice_tex/seaice_area_' + expt + '_SH_1991_2999.tex'
     else:
-        filename = 'seaice_area_' + expt + '_SH_12_2999.tex'
+        filename = 'seaice_tex/seaice_area_' + expt + '_SH_2_100.tex'
   
     x, y = read_data(filename)
 
@@ -56,9 +56,9 @@ plt.grid(True)
 #do a 30 year running mean
 for expt in exptnames:
     if expt == 'xpsij':
-        filename = 'seaice_area_' + expt + '_SH_1991_2999.tex'
+        filename = 'seaice_tex/seaice_area_' + expt + '_SH_1991_2999.tex'
     else:
-        filename = 'seaice_area_' + expt + '_SH_12_2999.tex'
+        filename = 'seaice_tex/seaice_area_' + expt + '_SH_2_100.tex'
   
     x, y = read_data(filename)
     window=30
@@ -86,7 +86,7 @@ plt.tight_layout()
 
 
 # Save the plot to a file
-plt.savefig('sea-ice.png')
+plt.savefig('sea-ice_2_100.png')
 plt.close()
 
 # now do a 30 year running mean on its own for the paper
@@ -95,9 +95,9 @@ plt.figure(figsize=(12, 4))
 
 for expt in exptnames:
     if expt == 'xpsij':
-        filename = 'seaice_area_' + expt + '_SH_1991_2999.tex'
+        filename = 'seaice_tex/seaice_area_' + expt + '_SH_1991_2999.tex'
     else:
-        filename = 'seaice_area_' + expt + '_SH_12_2999.tex'
+        filename = 'seaice_tex/seaice_area_' + expt + '_SH_2_100.tex'
   
     x, y = read_data(filename)
     window=30
@@ -137,4 +137,4 @@ plt.subplots_adjust(**MARGINS)
 
 
 # Save the plot to a file
-plt.savefig('sea-ice_30yr.png')
+plt.savefig('sea-ice_30yr_2_100.png')

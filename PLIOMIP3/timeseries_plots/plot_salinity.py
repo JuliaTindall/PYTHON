@@ -40,16 +40,16 @@ for expt in exptnames:
     filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
    
     if expt == 'xpsij':
-        filename = filestart + '_60.0S-90S_1991_2999.tex'
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
     else:
-        filename = filestart + '_60.0S-90S_12_2999.tex'
-  
+        filename = filestart + '_70.0S-90S_2_100.tex'
+   
     x, y = read_data(filename)
 
     # Plot the data
     plt.subplot(211)
     plt.plot(x, y, label=period.get(expt) )
-    plt.title('SSS 60S-90S')
+    plt.title('SSS 70S-90S')
 
 plt.xlabel('year')
 plt.ylabel('psu')
@@ -61,9 +61,9 @@ plt.grid(True)
 for expt in exptnames:
     filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
     if expt == 'xpsij':
-        filename = filestart + '_60.0S-90S_1991_2999.tex'
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
     else:
-        filename = filestart + '_60.0S-90S_12_2999.tex'
+        filename = filestart + '_70.0S-90S_2_100.tex'
   
     x, y = read_data(filename)
     window=30
@@ -77,7 +77,7 @@ for expt in exptnames:
                  linewidth=3,linestyle='--')
     else:
         plt.plot(x_mean, y_mean, label=period.get(expt) )
-    plt.title('SSS 60S-90S (30 year running mean)')
+    plt.title('SSS 70S-90S (30 year running mean)')
 
 plt.xlabel('year',fontsize=14)
 plt.ylabel('psu',fontsize=14)
@@ -89,7 +89,7 @@ plt.grid(True)
 plt.tight_layout()
 
 # Save the plot to a file
-plt.savefig('salinity.png')
+plt.savefig('salinity_2_100_70.png')
 print("Plot saved to 'combined_plot.png'.")
 plt.close()
 
@@ -100,9 +100,9 @@ plt.figure(figsize=(12, 4))
 for expt in exptnames:
     filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
     if expt == 'xpsij':
-        filename = filestart + '_60.0S-90S_1991_2999.tex'
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
     else:
-        filename = filestart + '_60.0S-90S_12_2999.tex'
+        filename = filestart + '_70.0S-90S_2_100.tex'
   
     x, y = read_data(filename)
     window=30
@@ -115,7 +115,7 @@ for expt in exptnames:
                  linewidth=3,linestyle='--')
     else:
         plt.plot(x_mean, y_mean, label=period.get(expt) )
-    plt.title('SSS 60S-90S (30 year running mean)')
+    plt.title('SSS 70S-90S (30 year running mean)')
 
 #plt.xlabel('year',fontsize=16)
 plt.ylabel('psu',fontsize=16)
@@ -138,5 +138,5 @@ MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit la
 plt.subplots_adjust(**MARGINS)
 
 # Save the plot to a file
-plt.savefig('salinity_30yr.png')
+plt.savefig('salinity_30yr_2_100_70.png')
 print("Plot saved to 'combined_plot.png'.")

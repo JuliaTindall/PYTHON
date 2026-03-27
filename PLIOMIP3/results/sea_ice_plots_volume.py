@@ -66,9 +66,9 @@ def plot_seaice(hemisphere,cube,month,lsm_cube):
     plots the sea ice for the experiment for either the NH or the southern
     hemisphere
     """
-    outstart = filestart + 'um/' + expt + '/avgplots/seaice/'
+    outstart = filestart + 'um/' + expt + '/avgplots/seaice/depth_'
     
-    levels=np.arange(0.0, 1.01, 0.01)
+    levels=np.arange(0.0, 6.5, 0.5)
     if hemisphere == 'NH':
         lat_lims=[60,90]
     if hemisphere == 'SH':
@@ -90,8 +90,10 @@ def plot_seaice(hemisphere,cube,month,lsm_cube):
                                              ncolors=len(levels)-1,
                                              clip=False))
     cbar = plt.colorbar(axplot,  orientation= 'vertical')
-    cbar.set_label('Ice Fraction')   
-    cbar.set_ticks([0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0])  
+    cbar.set_label('Depth')
+    tickvals = np.arange(0,100,10)
+    #cbar.set_ticks(tickvals)
+    #cbar.set_ticks([0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]*100.)  
     plt.title(month+': ' + name.get(expt))
     iplt.contour(lsm_cube, levels=[-2,0.5,2],
                   colors='black', linewidths=0.1)
@@ -108,7 +110,7 @@ def plot_seaice_anom(hemisphere,cubeexpt,cubecntl,month,lsm_cube):
     plots the sea ice for the experiment for either the NH or the southern
     hemisphere
     """
-    outstart = filestart + 'um/' + expt + '/avgplots/seaice/'
+    outstart = filestart + 'um/' + expt + '/avgplots/seaice/depth_'
 
     print('in anomaly',outstart)
     #levels=np.arange(0.0, 1.01, 0.01)
@@ -146,32 +148,32 @@ def plot_seaice_anom(hemisphere,cubeexpt,cubecntl,month,lsm_cube):
     plt.close()
 
 
-def calc_SH_cice_area(title,cube):
+def calc_SH_cice_volume(title,cube):
     """
-    calculates the area of SH sea ice in 'cube'
+    calculates the volume of SH sea ice in 'cube'
     """
 
     # extract SH only and replace land with NAN
     SH_constraint = iris.Constraint(latitude = lambda cell: cell  < 0)
     SH_cube = cube.extract(SH_constraint)
     
-    # get area weights (if land put grid areas to zero)
+    # get volume weights (if land put grid volumes to zero)
     SH_cube.coord('longitude').guess_bounds()
     SH_cube.coord('latitude').guess_bounds()
-    grid_areas = iris.analysis.cartography.area_weights(SH_cube)
+    grid_volumes = iris.analysis.cartography.area_weights(SH_cube)
     for j in range(0,72):
         for i in range(0,288):
             if SH_cube.data[j,i] < 0.0:
                 SH_cube.data[j,i]=0.0
 
-    # calculate total sea ice area and print out
-    seaicearea = SH_cube.collapsed(['latitude','longitude'],
-                                   iris.analysis.SUM,weights=grid_areas)
-    # divide by 1E6 to convert from m2 to km2 and another 1E6 to convert to
-    # million km2
-    print(title,seaicearea.data / 1E12)
+    # calculate total sea ice volume and print out
+    seaicevolume = SH_cube.collapsed(['latitude','longitude'],
+                                   iris.analysis.SUM,weights=grid_volumes)
+    # divide by 1E9 to convert from m3 to km3
+    
+    print(title,seaicevolume.data / 1E6)
  
-    return seaicearea.data / 1E12
+    return seaicevolume.data / 1E12
 
 #################
 # MAIN PROGRAM
@@ -189,8 +191,8 @@ name = {'xqbwc':'PI',
 expt='xpsig'
 cntl='xpsie'
 
-MP_cube = iris.load_cube(filestart + 'um/'+expt+'/database_averages/'+expt+'_Monthly_Average_#pf_SeaIceConc_2_50.nc', 'SeaIceConc')
-PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Monthly_Average_#pf_SeaIceConc_2_50.nc', 'SeaIceConc')
+MP_cube = iris.load_cube(filestart + 'um/'+expt+'/database_averages/'+expt+'_Monthly_Average_#pf_SeaIceDepth_2_50.nc', 'SeaIceDepth')
+PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Monthly_Average_#pf_SeaIceDepth_2_50.nc', 'SeaIceDepth')
 #anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
 #                           'NearSurfaceTemperatureplio - pi')
 
@@ -225,9 +227,9 @@ annPI_cube = iris.util.squeeze(PI_cube.collapsed('time',iris.analysis.MEAN))
 #plot_seaice('NH',annMP_cube,'Annual',lsm_plio_cube)
 
 # plot SH sea ice for all months
-#plot_seaice('SH',febMP_cube,'February',lsm_plio_cube)
-#plot_seaice('SH',sepMP_cube,'September',lsm_plio_cube)
-#plot_seaice('SH',annMP_cube,'Annual',lsm_plio_cube)
+plot_seaice('SH',febMP_cube,'February',lsm_plio_cube)
+plot_seaice('SH',sepMP_cube,'September',lsm_plio_cube)
+plot_seaice('SH',annMP_cube,'Annual',lsm_plio_cube)
 
 
 # plot NH sea ice anomaly for all months
@@ -235,23 +237,24 @@ annPI_cube = iris.util.squeeze(PI_cube.collapsed('time',iris.analysis.MEAN))
 #plot_seaice_anom('NH',sepMP_cube,sepPI_cube,'September',lsm_both_cube)
 #plot_seaice_anom('NH',annMP_cube,annPI_cube,'Annual',lsm_both_cube)
 
-#plot_seaice_anom('SH',febMP_cube,febPI_cube,'February',lsm_both_cube)
-#plot_seaice_anom('SH',sepMP_cube,sepPI_cube,'September',lsm_both_cube)
-#plot_seaice_anom('SH',annMP_cube,annPI_cube,'Annual',lsm_both_cube)
+plot_seaice_anom('SH',febMP_cube,febPI_cube,'February',lsm_both_cube)
+plot_seaice_anom('SH',sepMP_cube,sepPI_cube,'September',lsm_both_cube)
+plot_seaice_anom('SH',annMP_cube,annPI_cube,'Annual',lsm_both_cube)
 
-# calculate area of SH sea ice
-ciceareamp = calc_SH_cice_area('Feb ' + expt,febMP_cube)
-ciceareapi = calc_SH_cice_area('Feb ' + cntl,febPI_cube)
-print('anomaly feb',ciceareamp - ciceareapi)
+
+# calculate volume of SH sea ice
+cicevolumemp = calc_SH_cice_volume('Feb ' + expt,febMP_cube)
+cicevolumepi = calc_SH_cice_volume('Feb ' + cntl,febPI_cube)
+print('volume anomaly feb',cicevolumemp - cicevolumepi)
 print(' ')
     
-ciceareamp=calc_SH_cice_area('Sep ' + expt,sepMP_cube)
-ciceareapi=calc_SH_cice_area('Sep ' + cntl,sepPI_cube)
-print('anomaly sep',ciceareamp - ciceareapi)
+cicevolumemp=calc_SH_cice_volume('Sep ' + expt,sepMP_cube)
+cicevolumepi=calc_SH_cice_volume('Sep ' + cntl,sepPI_cube)
+print('volume anomaly sep',cicevolumemp - cicevolumepi)
 print(' ')
     
 
-ciceareamp=calc_SH_cice_area('Ann ' + expt,annMP_cube)
-ciceareapi=calc_SH_cice_area('Ann ' + cntl,annPI_cube)
-print('anomaly ann',ciceareamp - ciceareapi)
+cicevolumemp=calc_SH_cice_volume('Ann ' + expt,annMP_cube)
+cicevolumepi=calc_SH_cice_volume('Ann ' + cntl,annPI_cube)
+print('volume anomaly ann',cicevolumemp - cicevolumepi)
 print(' ')
