@@ -27,7 +27,7 @@ def get_avg(year):
     """
  
     yearuse = str(year).zfill(9)
-    filename=('/nfs/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
               + yearuse + 'c1+.nc')
     cube = iris.load_cube(filename,'AICE : ICE CONCENTRATION')
     cube.coord('latitude').guess_bounds()
@@ -72,23 +72,23 @@ def plotdrifts(seaicearea, hemisphere,startyear,endyear):
     plt.xlabel('year')
 
 
-    fileout=('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.eps') 
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.eps') 
     print('savingfig',fileout)
     plt.savefig(fileout, bbox_inches='tight')  
 
-    fileout=('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.png') 
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.png') 
     print('savingfig',fileout)
     plt.savefig(fileout, bbox_inches='tight')  
     
     plt.close()
 
 
-    fileout=('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.tex') 
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.tex') 
     f= open(fileout,'w')
     f.write("year,    seaicearea " + hemisphere + "\n")
     for year in range(startyear,endyear):
-        string = (np.str(year) + ','+ 
-                  np.str(np.round(seaicearea[year-startyear],2)) + '\n')
+        string = (str(year) + ','+ 
+                  str(np.round(seaicearea[year-startyear],2)) + '\n')
         f.write(string)
     f.close()
 
@@ -127,9 +127,9 @@ figureno=0
 
 incl_18o='n'
 HadCM3='y'
-exptname='xpsic'
-startyear=12  # can't start before year 12 because we aren't outputting d18o
-endyear=2999
+exptname='xpsig'
+startyear=2  # can't start before year 12 because we aren't outputting d18o
+endyear=100
 plt.figure(figureno)
 get_seaice(HadCM3,exptname,startyear,endyear)
 figureno=figureno+1
