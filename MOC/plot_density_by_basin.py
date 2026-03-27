@@ -488,11 +488,11 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 
 
 #######################################################################
-exptname = 'xpsig'
+exptname = 'xpsie'
 startyear=2
 endyear=52
 basin='Pacific'
-anom_only = 'y'
+anom_only = 'n'
 FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
 #FILEINIT = '/home/earjcti/'
 
@@ -541,8 +541,33 @@ if anom_only == 'n':
                   '/basin_diagnostics/mean_' + exptname + '_' +
                   basin + str(startyear) + '_' + str(endyear-1)+'.nc')
     iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
-          fileout,fill_value = -99999.)
-   
+              fileout,fill_value = -99999.)
+
+    # plot density to screen
+    constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -40)
+    constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 500)
+        
+    int1 = dens_avg_cube.extract(constraint1)
+    dens_SH = int1.extract(constraint2)
+
+
+    vals = np.arange(36,38.1,0.1)
+    figure = plt.figure(figsize=[8.0,8.0])
+    ax = figure.add_subplot(1,1,1)
+    cs=iplt.contourf(dens_SH,levels=vals,extend='both')
+    plt.xlabel('Latitude (degrees)',fontsize=14)
+    plt.ylabel('Depth (m)',fontsize=14)
+    ax.tick_params(labelsize=14)
+    
+    cb=plt.colorbar(cs,orientation='vertical')
+    cb.ax.set_xlabel('kg m$^{-3}$',fontsize=16)
+    cb.ax.tick_params(labelsize=14)
+    cb.ax.xaxis.set_label_position('bottom')
+    cb.ax.xaxis.labelpad=25
+    plt.title(exptname)
+    plt.show()
+    sys.exit(0)
+
 ################################################
 # plot anomalies
 

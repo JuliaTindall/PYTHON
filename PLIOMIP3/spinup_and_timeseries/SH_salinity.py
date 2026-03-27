@@ -27,7 +27,7 @@ def get_avg(year, latstart):
     """
  
     yearuse = str(year).zfill(9)
-    filename=('/nfs/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
               + yearuse + 'c1+.nc')
     cube_alllevs = iris.load_cube(filename,
                                   'SALINITY (OCEAN)       (PSU-35)/1000')
@@ -35,7 +35,7 @@ def get_avg(year, latstart):
     cube=cube * 1000. + 35.0
     cube.coord('latitude').guess_bounds()
     cube.coord('longitude').guess_bounds()
-    weights = iris.analysis.cartography.area_weights(cube) # this is in m2
+    weights = iris.analysis.cartography.area_weights(cube).copy() # this is in m2
   
     for j,lat in enumerate(cube.coord('latitude').points):
         if lat > latstart:
@@ -66,24 +66,24 @@ def plotdrifts(salinity,startyear,endyear,latstart):
         latstartuse = str(latstart) + 'N'
 
 
-    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.eps') 
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.eps') 
     print('savingfig',fileout)
     plt.savefig(fileout, bbox_inches='tight')  
 
-    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.png') 
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.png') 
     print('savingfig',fileout)
     plt.savefig(fileout, bbox_inches='tight')  
 
     
     plt.close()
 
-    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.tex') 
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.tex') 
 
     f= open(fileout,'w')
     f.write("year,    SH mean salinity: top level \n")
     for year in range(startyear,endyear):
-        string = (np.str(year) + ','+ 
-                  np.str(np.round(salinity[year-startyear],2)) + '\n')
+        string = (str(year) + ','+ 
+                  str(np.round(salinity[year-startyear],2)) + '\n')
         f.write(string)
     f.close()
 
@@ -122,11 +122,11 @@ figureno=0
 P3name = {'xpsie' : 'EP400',    'xpsig':'EP490', 'xpsid':'LP','xpsic':'PI',
           'xpsij':'LP490'}
 
-latstart=-60.0   # will plot from latstart to -90.0
+latstart=-65.0   # will plot from latstart to -90.0
 HadCM3='y'
-exptname='xpsij'
-startyear=1991  # can't start before year 12 because we aren't outputting d18o
-endyear=2999
+exptname='xpsid'
+startyear=2  # can't start before year 12 because we aren't outputting d18o
+endyear=100
 plt.figure(figureno)
 get_SHsalin(HadCM3,exptname,startyear,endyear,latstart)
 figureno=figureno+1
