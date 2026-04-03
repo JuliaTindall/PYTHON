@@ -97,8 +97,8 @@ def plot_seaice(hemisphere,cube,month,lsm_cube):
     plt.title(month+': ' + name.get(expt))
     iplt.contour(lsm_cube, levels=[-2,0.5,2],
                   colors='black', linewidths=0.1)
-    plt.savefig(outstart + expt + '_' + month + hemisphere + '_seaice.png')
-    plt.savefig(outstart + expt + '_' + month + hemisphere + '_seaice.eps')
+    plt.savefig(outstart + expt + '_' + month + hemisphere + '2_22_seaice.png')
+    plt.savefig(outstart + expt + '_' + month + hemisphere + '2_22_seaice.eps')
     plt.close()
 
     
@@ -137,14 +137,14 @@ def plot_seaice_anom(hemisphere,cubeexpt,cubecntl,month,lsm_cube):
                                              ncolors=len(levels)+1,
                                              clip=False))
     cbar = plt.colorbar(axplot,  orientation= 'vertical')
-    cbar.set_label('Ice Fraction')   
+    cbar.set_label('metres')   
     #cbar.set_ticks([0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0])  
     cbar.set_ticks(levels)  
     plt.title(month+': ' + name.get(expt) +  '-' + name.get(cntl))
     iplt.contour(lsm_cube, levels=[-2,0.5,2],
                   colors='black', linewidths=0.1)
-    plt.savefig(outstart + expt + '-' +  cntl + '_' + month + hemisphere + '_seaice.png')
-    plt.savefig(outstart + expt + '-' + cntl + '_' + month + hemisphere + '_seaice.eps')
+    plt.savefig(outstart + expt + '-' +  cntl + '_' + month + hemisphere + '2_22_seaice.png')
+    plt.savefig(outstart + expt + '-' + cntl + '_' + month + hemisphere + '2_22_seaice.eps')
     plt.close()
 
 
@@ -171,9 +171,61 @@ def calc_SH_cice_volume(title,cube):
                                    iris.analysis.SUM,weights=grid_volumes)
     # divide by 1E9 to convert from m3 to km3
     
-    print(title,seaicevolume.data / 1E6)
+    print(title,seaicevolume.data)
  
-    return seaicevolume.data / 1E12
+    return seaicevolume.data 
+
+
+def calc_volume_ocean(time_ind,latitude,depth):
+    """
+    calculates the volume of the ocean southeward of latitude and to a 
+    depth of depth
+    """
+
+    if time_ind == 'pliocene':
+        file = '/home/earjcti/um/xpsid/pg/xpsido#pg000001899c1+.nc'
+        cube = iris.load_cube(file,'POTENTIAL TEMPERATURE (OCEAN)  DEG.C')
+
+
+    depth_constraint = iris.Constraint(depth_1 = lambda cell: cell  < depth)
+    cube_surf = cube.extract(depth_constraint)
+
+    lat_constraint = iris.Constraint(latitude = lambda cell: cell  < latitude)
+    cube_subset = cube_surf.extract(lat_constraint)
+
+    # calculate volume
+    #1. use mask
+    data_use = np.where(cube_subset.data.mask == True, 0.0, 1.0)
+    cube_use = cube_subset.copy(data=data_use)
+    cube_use = iris.util.squeeze(cube_use)
+    print(cube_use)
+    #qplt.contourf(cube_use[0,0,:,:])
+
+    # 2. get weights
+    cube_use.coord('longitude').guess_bounds()
+    cube_use.coord('latitude').guess_bounds()
+    cube_use.coord('depth_1').guess_bounds()
+    grid_areas = np.squeeze(iris.analysis.cartography.area_weights(cube_use))
+    depth_bounds = cube_use.coord('depth_1').bounds
+    thickness = np.diff(depth_bounds, axis=1).squeeze()  # shape: (depth,)
+
+    
+    volume_weights = np.ones(cube_use.shape)
+
+    volume_weights *= thickness[:, None, None]
+    volume_weights *= grid_areas[0, :, :]
+
+  
+    #3: calculate volume of each level
+   
+    volume = cube_use.collapsed(['depth_1','latitude','longitude'],
+                                   iris.analysis.SUM,weights=volume_weights)
+
+    print(f"{volume.data:2e}")
+    print('volume of ocean km3',f"{volume.data/1E9}")
+    
+    sys.exit(0)
+    
 
 #################
 # MAIN PROGRAM
@@ -187,14 +239,18 @@ name = {'xqbwc':'PI',
         'xqbwe':'Early Pliocene 400ppmv','xpsid':'LP',
         'xpsie':'EP - 400ppmv','xpsig':'EP'}
 
+
+
 # read in multimodel mean monthly SST data (EOI400-E280)
 expt='xpsig'
-cntl='xpsie'
+cntl='xpsid'
 
-MP_cube = iris.load_cube(filestart + 'um/'+expt+'/database_averages/'+expt+'_Monthly_Average_#pf_SeaIceDepth_2_50.nc', 'SeaIceDepth')
-PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Monthly_Average_#pf_SeaIceDepth_2_50.nc', 'SeaIceDepth')
+MP_cube = iris.load_cube(filestart + 'um/'+expt+'/database_averages/'+expt+'_Monthly_Average_#pf_SeaIceDepth_2_22.nc', 'SeaIceDepth')
+PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Monthly_Average_#pf_SeaIceDepth_2_22.nc', 'SeaIceDepth')
 #anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
 #                           'NearSurfaceTemperatureplio - pi')
+
+
 
 lsm_cube, lsm_plio_cube, lsm_both_cube = get_lsm('xqbwd','xqbwd')
 # set land to -100
@@ -256,5 +312,12 @@ print(' ')
 
 cicevolumemp=calc_SH_cice_volume('Ann ' + expt,annMP_cube)
 cicevolumepi=calc_SH_cice_volume('Ann ' + cntl,annPI_cube)
-print('volume anomaly ann',cicevolumemp - cicevolumepi)
+print('cicevolumemp',f'{cicevolumemp:2e}')
+print('volume anomaly ann (m3)',f"{cicevolumemp - cicevolumepi:2e}")
+print('volume anomaly ann (km3)',f"{(cicevolumemp - cicevolumepi)/1E9}")
 print(' ')
+sys.exit(0)
+
+volume_ocean = calc_volume_ocean('pliocene',-70,100)
+print('volume of ocean polewards of 70S to a depth of 100m is',volume_ocean)
+sys.exit(0)

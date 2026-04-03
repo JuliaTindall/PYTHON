@@ -89,7 +89,7 @@ plt.grid(True)
 plt.tight_layout()
 
 # Save the plot to a file
-plt.savefig('salinity_2_100_70.png')
+plt.savefig('salinity_plots/salinity_2_100_70.png')
 print("Plot saved to 'combined_plot.png'.")
 plt.close()
 
@@ -138,5 +138,5 @@ MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit la
 plt.subplots_adjust(**MARGINS)
 
 # Save the plot to a file
-plt.savefig('salinity_30yr_2_100_70.png')
+plt.savefig('salinity_plots/salinity_30yr_2_100_70.png')
 print("Plot saved to 'combined_plot.png'.")

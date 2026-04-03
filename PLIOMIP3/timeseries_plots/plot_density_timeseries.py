@@ -80,6 +80,7 @@ def running_mean(data, window_size):
 period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
           'xpsie':'EP400','xpsig':'EP'}
 
+yearstring = '2_100_'
 
 fig,axes = plt.subplots(3,3,figsize=(12,12))
 ax_legend=axes[2,2]
@@ -88,12 +89,14 @@ legend_handles=[]
 
 #plot data from all the files
 for expt in exptnames:
+    # this file was produced by density_gradients
+  
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
                  '_Pacific_density_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
-        filename = filestart + '12_2999_'+lat+'.txt'
+        filename = filestart + yearstring +lat+'.txt'
   
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
@@ -131,15 +134,15 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for i in range(axes.shape[0]):
-    for j in range(axes.shape[1]):
-        axes[i, j].set_xlim(1500, 2000)
-for ax in axes.flat[:-1]:
-    ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
+#for i in range(axes.shape[0]):
+#    for j in range(axes.shape[1]):
+#        axes[i, j].set_xlim(1500, 2000)
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_'+lat+'.eps')
+plt.savefig('density_plots/density_alllevs_'+yearstring + lat+'.eps')
 plt.close()
 
 
@@ -154,7 +157,7 @@ for expt in exptnames:
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
-        filename = filestart + '12_2999_'+lat+'.txt'
+        filename = filestart + yearstring+lat+'.txt'
   
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
@@ -178,12 +181,12 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for ax in axes.flat[:-1]:
-    ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_203m_diff'+lat+'.eps')
+plt.savefig('density_plots/density_alllevs_203m_diff'+yearstring + lat+'.eps')
 plt.close()
 
 
@@ -198,7 +201,7 @@ for expt in exptnames:
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
-        filename = filestart + '12_2999_'+lat+'.txt'
+        filename = filestart + yearstring+lat+'.txt'
   
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
@@ -225,12 +228,12 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for ax in axes.flat[:-1]:
-    ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_447m_diff'+lat+'.eps')
+plt.savefig('density_plots/density_alllevs_447m_diff'+yearstring + lat+'.eps')
 plt.close()
 
 
@@ -240,12 +243,13 @@ ax_legend=axes[1,2]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
+    # this file was produced by density_gradients
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
                  '_Pacific_density_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
-        filename = filestart + '12_2999_'+lat+'.txt'
+        filename = filestart + yearstring+lat+'.txt'
   
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
@@ -275,12 +279,12 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for ax in axes.flat[:-1]:
-    ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_666m_diff'+lat+'.eps')
+plt.savefig('density_plots/density_alllevs_666m_diff'+yearstring + lat+'.eps')
 plt.close()
 
 
@@ -290,12 +294,13 @@ ax_legend=axes[2,1]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
+    # this file was produced by density_gradients
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
                  '_Pacific_density_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
-        filename = filestart + '12_2999_'+lat+'.txt'
+        filename = filestart + yearstring+lat+'.txt'
   
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
@@ -328,12 +333,12 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for ax in axes.flat[:-1]:
-    ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_995m_diff'+lat+'.eps')
+plt.savefig('density_plots/density_alllevs_995m_diff'+yearstring  + lat+'.eps')
 plt.close()
 
 
@@ -343,12 +348,13 @@ ax_legend=axes[2,2]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
+    # this file was produced by density_gradients
     filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
                  '_Pacific_density_levs')
     if expt == 'xpsij':
         filename = filestart + '1991_2999_'+lat+'.txt'
     else:
-        filename = filestart + '12_2999_'+lat+'.txt'
+        filename = filestart + yearstring+lat+'.txt'
   
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
@@ -384,11 +390,11 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.xlabel('year')
 #plt.ylabel('Sv')
 #plt.legend()
-for ax in axes.flat[:-1]:
-    ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('density_plots/density_alllevs_1500m_diff'+lat+'.eps')
+plt.savefig('density_plots/density_alllevs_1500m_diff'+yearstring  + lat+'.eps')
 plt.close()
 
