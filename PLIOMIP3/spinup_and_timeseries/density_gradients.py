@@ -40,11 +40,11 @@ import sys
 import subprocess
 import matplotlib.ticker as mticker
 
-exptname='xpsid'
-startyear=12
-endyear=2999
+exptname='xpsig'
+startyear=2
+endyear=100
 filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
-latmax=-70
+latmax=-60
 single_levs = 'y'  # y write out on levels
                    # n write out bands of levels
  

@@ -332,7 +332,7 @@ expts=['xpsid','xpsie','xpsig']
 HadCM3='y' # y / orig /n
 #expt='xozzf'
 startyear=2
-endyear=50
+endyear=22
 
 #for expt in expts:
 #    field='temp_1'
