@@ -128,10 +128,29 @@ def get_avg(jobid, startyear):
         alltemps = alltemps + tempavg
         count=count+1.
 
+    alltemps = alltemps / count
     if field == 'precip': # convert to mm/day'
         alltemps = alltemps * 60. * 60. *24.
-       
-    avgtempcube=cube.copy(data=alltemps / count)
+
+
+    #temporary extract polewards of 70 and find the average
+    # mask latitudes poleward of 70S
+    print('temporary code')
+    print(alltemps.shape)
+    print(lon.shape)
+    print(lat.shape)
+    mask = lat <= -70
+
+    weights = np.cos(np.deg2rad(lat[mask]))
+
+    # weighted mean
+    mean_long = np.average(alltemps[mask, :], axis=0,weights=weights)
+
+
+    print('mean',jobid,mean_long.mean())
+     ####### end of temporary code
+    
+    avgtempcube=cube.copy(data=alltemps)
     avgtempcube.attributes = None
     avgtempcube.units = 'mm/day'
     return avgtempcube
@@ -144,7 +163,7 @@ def get_avg(jobid, startyear):
 
 LINUX_WIN='l'
 filestart = '/uolstore/Research/a/hera1/earjcti/'
-NYEARS = 100
+NYEARS = 20
 #NYEARS=5
 SEASON = 'ann'
 
@@ -153,11 +172,11 @@ MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
 #EXPTS = ['xqbwk','xqbwi','xqbwj']  # xpsic PI,  xpsij-lp490  xpsik - lp560
 EXPTS=['xpsig']
-EXPT_STARTYEAR = 1000
+EXPT_STARTYEAR = 2
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xpsie'  # xpsic pi, xpsid lp400
+CNTL = 'xpsid'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
@@ -250,8 +269,8 @@ for EXPT in EXPTS:
         titlename = EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) 
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.eps')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.png')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.eps')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.png')
         plt.close()
 
   

@@ -35,7 +35,7 @@ def get_avg_MOC():
     get average meridional overturning circulation
     """
 
-    filestart = '/home/earjcti/um/' + exptname + '/pk2/' + exptname + 'o#pk'
+    filestart = fileinit + exptname + '/pk2/' + exptname + 'o#pk'
     basin_name = {'AMOC':'Atlantic','PMOC':'Pacific','GMOC':'Global'}
     name = ('Meridional Overturning Stream Function ('
             + basin_name.get(MOCtype) + ')')
@@ -102,21 +102,26 @@ def do_nice_plot(avg_MOC_cube):
     plt.ylabel('Depth (m)',fontsize=16)
     plt.tick_params(axis='both',which='major',labelsize=16)
 
-    plt.savefig('/home/earjcti/um/' + exptname + '/MOC/struct_' + MOCtype +
+    plt.savefig(fileinit + exptname + '/MOC/struct_' + MOCtype +
                 '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
                 '.png')
 
+    iris.save(avg_MOC_cube,fileinit + exptname + '/MOC/struct_'
+              + MOCtype +
+                '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
+                '.nc',netcdf_format='NETCDF4')
 
 #######################################################################
-exptname = 'xqbwc'
-startyear=3900
+exptname = 'xqbwb'
+startyear=3970
 endyear=4000
 MOCtype='AMOC' # AMOC PMOC GMOC
+fileinit = '/uolstore/Research/a/hera1/earjcti/um/'
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
           'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
           'xqbwg':'EP',
-          'xqbwc':'PI'}
+          'xqbwc':'PI','xqbwa':'PI','xqbwb':'LP'}
 
 avg_MOC_cube = get_avg_MOC()
 print(avg_MOC_cube)
