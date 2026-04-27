@@ -250,6 +250,9 @@ PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Mon
 #anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
 #                           'NearSurfaceTemperatureplio - pi')
 
+volume_ocean = calc_volume_ocean('pliocene',-70,100)
+print('volume of ocean polewards of 70S to a depth of 100m is',volume_ocean)
+sys.exit(0)
 
 
 lsm_cube, lsm_plio_cube, lsm_both_cube = get_lsm('xqbwd','xqbwd')
@@ -318,6 +321,3 @@ print('volume anomaly ann (km3)',f"{(cicevolumemp - cicevolumepi)/1E9}")
 print(' ')
 sys.exit(0)
 
-volume_ocean = calc_volume_ocean('pliocene',-70,100)
-print('volume of ocean polewards of 70S to a depth of 100m is',volume_ocean)
-sys.exit(0)

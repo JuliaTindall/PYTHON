@@ -38,10 +38,10 @@ def get_mask(filename_nc):
     content=f.readline()
     content=f.readline()
 
-    Atlantic_mask = np.ma.zeros((20,144,288))
-    Pacific_mask = np.ma.zeros((20,144,288))
-    Indian_mask = np.ma.zeros((20,144,288))
-    Global_mask = np.ma.zeros((20,144,288))
+    Atlantic_mask = np.ma.zeros((1,20,144,288))
+    Pacific_mask = np.ma.zeros((1,20,144,288))
+    Indian_mask = np.ma.zeros((1,20,144,288))
+    Global_mask = np.ma.zeros((1,20,144,288))
   
 
     for j in range(144,0,-1):
@@ -55,24 +55,24 @@ def get_mask(filename_nc):
          bas4_d1_s,bas4_d1_e,bas4_d2_s,bas4_d2_e)=content.split()
         
         for i in range(int(bas1_d1_s),int(bas1_d1_e)+1):
-            Indian_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Indian_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
         for i in range(int(bas1_d2_s),int(bas1_d2_e)+1):
-            Indian_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Indian_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
 
         for i in range(int(bas2_d1_s),int(bas2_d1_e)+1):
-            Pacific_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Pacific_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
         for i in range(int(bas2_d2_s),int(bas2_d2_e)+1):
-            Pacific_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Pacific_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
 
         for i in range(int(bas3_d1_s),int(bas3_d1_e)+1):
-            Atlantic_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Atlantic_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
         for i in range(int(bas3_d2_s),int(bas3_d2_e)+1):
-            Atlantic_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Atlantic_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
     
         for i in range(int(bas4_d1_s),int(bas4_d1_e)+1):
-            Global_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Global_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
         for i in range(int(bas4_d2_s),int(bas4_d2_e)+1):
-            Global_mask[:,int(rowno)-1,np.mod(i-1,288)]=1.0
+            Global_mask[:,:,int(rowno)-1,np.mod(i-1,288)]=1.0
 
     f.close
 
@@ -205,14 +205,14 @@ def calc_stream(V_cube,dx,dz,coslats,basin,depout):
     #calculate zonal integral m2/s-1 (note everything we dont want to use
     #                                 should be masked
     #we multiply it by the width of the gridbox (ie dx * cos latitude)
-     
-    ztotalV=np.sum(V_cube.data,axis=2) * dx * coslats
+
+    ztotalV=np.sum(V_cube.data,axis=3) * dx * coslats
     ztotalV_cube=(V_cube.collapsed('longitude',iris.analysis.SUM)
                   * dx * coslats)
 
     vdz_cube = ztotalV_cube.copy()
     for k in range(0,20):
-        vdz_cube.data[k,:]=vdz_cube.data[k,:] * dz[k]
+        vdz_cube.data[0,k,:]=vdz_cube.data[0,k,:] * dz[k]
         
     
     # now calculate vertical integral (this is the streamfunction).
@@ -220,11 +220,11 @@ def calc_stream(V_cube,dx,dz,coslats,basin,depout):
     # everything that has gone north has also gone south and we have a closed
     # circuit
 
-    zsize,ysize = np.shape(vdz_cube.data)
-    phi_data=np.ma.zeros((zsize+1, ysize))
-    phi_data[0,:]=0.0
+    tsize,zsize,ysize = np.shape(vdz_cube.data)
+    phi_data=np.ma.zeros((tsize,zsize+1, ysize))
+    phi_data[0,0,:]=0.0
     for k in range(1,21):
-        phi_data[k,:]=(vdz_cube.data[k-1,:]+phi_data[k-1,:])
+        phi_data[0,k,:]=(vdz_cube.data[0,k-1,:]+phi_data[0,k-1,:])
         
     #phi_data = np.ma.where(phi_data > 1E20, -99999., phi_data)
     #phi_data.mask = np.where(phi_data == -99999., 1.0, 0.0)
@@ -232,16 +232,14 @@ def calc_stream(V_cube,dx,dz,coslats,basin,depout):
     # set up place for phi cube 21 levels with dep=depout
     allcubes = CubeList([])
     for dep in depout:
-        single_lev_cube = vdz_cube[0:1,:]
+        single_lev_cube = vdz_cube[:,0:1,:]
         single_lev_cube.coord('depth_1').rename('depth')
         single_lev_cube.coord('depth').points=(dep)
         allcubes.append(single_lev_cube)
 
     iris.util.equalise_attributes(allcubes)    
     shape_cube = allcubes.concatenate_cube()
-    print(shape_cube.shape)
-    sys.exit(0)
-
+  
 
     # add info to phi cube
     phi_cube=shape_cube.copy(data=phi_data / 1.0E6)
