@@ -1,0 +1,185 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+#Created on Thu Mar 18 14:13:50 2019
+
+#@author: earjcti1
+#
+#  This program will extract fileds and put in a timeseries file
+#  this is what we will upload to globus for PlioMIP2
+#
+
+import os
+import numpy as np
+import scipy as sp
+#import cf
+import iris
+from iris.cube import CubeList
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import netCDF4
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import iris.analysis.cartography
+import sys
+import warnings
+
+     
+def monthly_data_single_level(field,shortname):
+    """
+    this will get the database averages for the monthly data on a single level
+    """
+
+    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd0000039*',field)
+    #print('allcubes',allcubes,field)
+    iris.util.equalise_attributes(allcubes)
+    cubes = allcubes.concatenate_cube()
+    cubes.var_name = shortname
+
+    if shortname == 'pr':
+        # precipitation need to convert from kg/m2/s to mm/day
+        cubes.units = "mm day-1"
+        cubes.data = cubes.data * 24. * 60. * 60.
+        cubes.long_name = "TOTAL PRECIPITATION RATE"
+        cubes.attributes["title"] = cubes.long_name
+
+    if shortname == 'tas' or shortname == 'ts':
+        # convert to degC
+        cubes.convert_units("degC")
+        print(cubes)
+
+    return cubes
+   
+
+
+def monthly_data_all_levels(field,shortname):
+    """
+    this will get the database averages for the monthly data on all levels
+    (we will keep them all)
+    """
+
+    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pc0000039*',field)
+    #print('allcubes',allcubes,field)
+    iris.util.equalise_attributes(allcubes)
+    cubes = allcubes.concatenate_cube()
+    cubes.var_name = shortname
+
+    if shortname == 'ta':
+        # convert to degC
+        cubes.convert_units("degC")
+        print(cubes)
+
+
+    return cubes
+
+def monocn_data_single_level(field,shortname):
+    """
+    this will get the database averages for the monthly data on a single level
+    for the ocean
+    """
+
+    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pf/' + expt + 'o#pf0000039*',field)
+    print('allcubes',allcubes,field)
+    iris.util.equalise_attributes(allcubes)
+    cubes = allcubes.concatenate_cube()
+    cubes.var_name = shortname
+
+    cubes.data = np.ma.where(cubes.data.mask == 1.0, -999.999, cubes.data)
+
+    if shortname == 'tos':
+        cubes.long_name = "OCN TOP-LEVEL TEMPERATURE"
+        cubes.attributes["title"] = cubes.long_name
+
+    if shortname == 'siconc':
+        cubes.units = "%"
+        cubes.data = cubes.data * 100.
+
+    #    print(cubes)
+
+    return cubes
+   
+
+
+##########################################################
+# main program
+
+# this is regridding where all results are in a single file
+# create a dictionary with the long field names in and the field names we want
+# we are also using dictionaries so that we only have to change timeperiod name
+# when rerunning
+            
+
+expt = 'xqbwd'
+fields = ["U COMPNT OF WIND ON PRESSURE LEVELS",
+          "V COMPNT OF WIND ON PRESSURE LEVELS",
+          "OMEGA ON PRESSURE LEVELS",
+          "TEMPERATURE ON PRESSURE LEVELS",
+          "TOTAL PRECIPITATION RATE     KG/M2/S",
+          "SURFACE TEMPERATURE AFTER TIMESTEP",
+          "TEMPERATURE AT 1.5M",
+          "OCN TOP-LEVEL TEMPERATURE          K",
+          "AICE : ICE CONCENTRATION",
+          "HICE: MEAN ICE DEPTH OVER GRIDBOX  M"
+          ]
+
+fields = ["AICE : ICE CONCENTRATION"]
+         
+
+#expt = 'xqfmg'
+
+
+###############################
+### DICTIONARIES FOR NAMING
+# expt name
+alt_expt = {'xqfmg': 'F_EP280',
+            'xqfmh': 'F_EP',
+            'xqfme' : 'F_LP280',
+            'xqfmf' : 'F_LP',
+            'xqfmb' : 'F_PI280',
+            'xqfmc' : 'F_PI400',
+            'xqfmd' : 'F_PI490',
+            'xqbwc' : 'PI', 'xqbwd' : 'LP'}
+
+# CMIP name  ; this is from fernandas spreadsheet
+
+cmip_name = {"TEMPERATURE AT 1.5M" : "tas",
+             "SURFACE TEMPERATURE AFTER TIMESTEP" : "ts",
+             "TOTAL PRECIPITATION RATE     KG/M2/S" : "pr",
+             "U COMPNT OF WIND ON PRESSURE LEVELS" : "ua",
+             "V COMPNT OF WIND ON PRESSURE LEVELS" : "va",
+             "OMEGA ON PRESSURE LEVELS" : "wa",
+             "TEMPERATURE ON PRESSURE LEVELS" : "ta",
+             "OCN TOP-LEVEL TEMPERATURE          K" : "tos",
+             "AICE : ICE CONCENTRATION" : "siconc",
+             "HICE: MEAN ICE DEPTH OVER GRIDBOX  M" : "sithick"
+          } 
+levels_req = {'ua':'y','va':'y','ta':'y','wa':'y'}
+ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}
+            
+
+for field in fields:
+    shortname = cmip_name.get(field)
+    ocn = ocean_req.get(shortname,'n')
+    multlev = levels_req.get(shortname,'n')
+    
+    if multlev == 'n' and ocn == 'n':  # single level only atmosphere
+        cubes = monthly_data_single_level(field,shortname)
+
+    if multlev == 'y' and ocn == 'n':  # multiple level atm
+        cubes = monthly_data_all_levels(field,shortname)
+
+    if  multlev == 'n' and ocn == 'y': #single level ocean
+        cubes = monocn_data_single_level(field,shortname)
+
+        
+    fileout = ('/uolstore/Research/a//hera1/earjcti/um/' + expt + '/globus/')
+    fileout = (fileout + alt_expt.get(expt) + '_' + expt + '_' + 
+               cmip_name.get(field) + '_monthly.nc')
+    if ocn == 'y':
+        iris.save(cubes,fileout,fill_value=-999.999)
+    else:
+        iris.save(cubes,fileout)
+
+
+

@@ -1,5 +1,5 @@
 #NAME
-#    plot AMOC from pk2
+#    plot AMOC from pk2 or pk_moc
 
 #PURPOSE 
 #
@@ -35,7 +35,7 @@ def get_avg_MOC():
     get average meridional overturning circulation
     """
 
-    filestart = '/home/earjcti/um/' + exptname + '/pk2/' + exptname + 'o#pk'
+    filestart = fileinit + exptname + '/pk_moc/' + exptname + 'o#pg'
     basin_name = {'AMOC':'Atlantic','PMOC':'Pacific','GMOC':'Global'}
     name = ('Meridional Overturning Stream Function ('
             + basin_name.get(MOCtype) + ')')
@@ -51,14 +51,13 @@ def get_avg_MOC():
     cubes = allcubes.concatenate_cube()
 
     avg_cube = cubes.collapsed('time',iris.analysis.MEAN)
-
+   
     return avg_cube
 
 def do_nice_plot(avg_MOC_cube):
     """
     plots the MOC
-    """
-
+    """  
 
     if MOCtype == 'AMOC':
         lat_constraint = iris.Constraint(latitude=lambda lat: lat >= -30)
@@ -68,6 +67,8 @@ def do_nice_plot(avg_MOC_cube):
             mask = plotcube.coord('latitude').points < 8.0
             mask_2d = np.broadcast_to(mask, plotcube.shape)
             plotcube.data = np.ma.masked_where(mask_2d, plotcube.data)
+
+    print('AMOC max value = ' +  str(np.max(plotcube.data)))
 
 
     if MOCtype == 'PMOC':
@@ -101,21 +102,26 @@ def do_nice_plot(avg_MOC_cube):
     plt.ylabel('Depth (m)',fontsize=16)
     plt.tick_params(axis='both',which='major',labelsize=16)
 
-    plt.savefig('/home/earjcti/um/' + exptname + '/MOC/struct_' + MOCtype +
+    plt.savefig(fileinit + exptname + '/MOC/struct_' + MOCtype +
                 '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
                 '.png')
 
+    iris.save(avg_MOC_cube,fileinit + exptname + '/MOC/struct_'
+              + MOCtype +
+                '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
+                '.nc',netcdf_format='NETCDF4')
 
 #######################################################################
-exptname = 'xqbwg'
-startyear=3900
+exptname = 'xqbwb'
+startyear=3970
 endyear=4000
 MOCtype='AMOC' # AMOC PMOC GMOC
+fileinit = '/uolstore/Research/a/hera1/earjcti/um/'
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
           'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
           'xqbwg':'EP',
-          'xqbwc':'PI'}
+          'xqbwc':'PI','xqbwa':'PI','xqbwb':'LP'}
 
 avg_MOC_cube = get_avg_MOC()
 print(avg_MOC_cube)

@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from netCDF4 import Dataset, MFDataset
 import sys
-from mpl_toolkits.basemap import Basemap, shiftgrid
+#from mpl_toolkits.basemap import Basemap, shiftgrid
 
 
 #functions are:
@@ -179,7 +179,7 @@ def annmean(figureno,HadCM3):
 
     # read in data from multiple files
     if HadCM3 == 'y':
-        f=MFDataset('/nfs/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[5-9]*.nc')
+        f=MFDataset('/uolstore/Research/a/hera1/earjcti/um/netcdf/xiboi_netcdf/xiboia@pdy[5-9]*.nc')
         lat = f.variables['latitude'][:]
         lon = f.variables['longitude'][:]
         aevap=f.variables['field184'][:]
@@ -218,6 +218,8 @@ def annmean(figureno,HadCM3):
     
     plotdata(pi_pme_ann,0,lon,lat,titlepi,0,275,25.0,0.0,'n','mm/month')
     print('first plot done')
+    plt.show()
+    sys.exit(0)
 
 
      #==============
@@ -901,9 +903,9 @@ figureno=0
 
 HadCM3='y'
 moses2='y'
-#plt.figure(figureno)
-#annmean(figureno,HadCM3)
-#figureno=figureno+1
+plt.figure(figureno)
+annmean(figureno,HadCM3)
+figureno=figureno+1
 
 #djf mean
 #plt.figure(figureno)
@@ -920,7 +922,7 @@ moses2='y'
 # we would like precipitation and evaporation on the same plot
 # ie all seasons on one page
 #nh_allseasons(HadCM3,moses2) # get precipitation
-nh_allseasons_precipevap(HadCM3,moses2) # get precipevap
+#nh_allseasons_precipevap(HadCM3,moses2) # get precipevap
 
 ##########################################################
 # to see what the polar amplification is
