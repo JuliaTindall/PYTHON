@@ -1,0 +1,25 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "/uolstore/home/staff_lnxhome02/earjcti/PYTHON/PROGRAMS/MOC/PJV/AMOC_from_PJV_multiplefiles.py", line 297, in <module>
+    Atlantic_cube, Pacific_cube, Indian_cube = get_mask(filename)
+                                               ^^^^^^^^^^^^^^^^^^
+  File "/uolstore/home/staff_lnxhome02/earjcti/PYTHON/PROGRAMS/MOC/PJV/AMOC_from_PJV_multiplefiles.py", line 83, in get_mask
+    cube = iris.load_cube(filename_nc,'TEMPERATURE (OCEAN)  DEG.C')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/__init__.py", line 355, in load_cube
+    cubes = _load_collection(uris, constraints, callback).cubes()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/__init__.py", line 290, in _load_collection
+    result = _CubeFilterCollection.from_cubes(cubes, constraints)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/cube.py", line 106, in from_cubes
+    for cube in cubes:
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/__init__.py", line 271, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/io/__init__.py", line 221, in load_files
+    all_file_paths = expand_filespecs(filenames)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/io/__init__.py", line 200, in expand_filespecs
+    raise IOError(msg)
+OSError: One or more of the files specified did not exist:
+    * "/uolstore/Research/a/hera1/earjcti/um/xqbwa/pg/xqbwao#pg000004001c1+.nc" didn't match any files

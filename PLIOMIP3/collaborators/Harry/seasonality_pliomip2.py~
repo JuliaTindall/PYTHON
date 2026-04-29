@@ -1,0 +1,40 @@
+import numpy as np
+
+def read_harry_data():
+    """
+    reads harrys data returns an array of lat lon and seasonalinty
+    """
+
+    with open('mPWP_seasonality.txt') as f:
+        lines = f.readlines()
+        
+    lats = np.zeros(len(lines)-1)
+    lons = np.zeros(len(lines)-1)
+    seasonality = np.zeros(len(lines)-1)
+        
+    for i,line in enumerate(lines):
+        if i >0:  # to avoid title line 
+            a,b,c,d = line.split()
+            lat[i] = b
+            lon[i] = c
+            seas_data[i]=d
+       
+    return lat,lon,seas_data
+
+
+
+def get_pliomip2_mean(latreq,lonreq):
+    """
+    gets the pliomip2 mean for the latreq,lonreq
+    """
+    
+
+
+# main program
+# 1 read data
+
+datalat,datalon,dataseas = read_harry_data()
+
+# 2 get model output
+
+modelseas = get_pliomip2_mean(datalat,datalon)

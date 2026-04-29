@@ -250,6 +250,8 @@ def calc_stream(V_cube,dx,dz,coslats,basin,depout):
     phi_cube.attributes.pop('valid_min',None)
     phi_cube.attributes.pop('valid_max',None)
     phi_cube.attributes.pop('history',None)
+    phi_cube.units = 'Sv'
+    phi_cube.coord('t').rename('time')
 
   
     # read in the original for plotting
@@ -283,9 +285,9 @@ def calc_stream(V_cube,dx,dz,coslats,basin,depout):
 #####################################################################
 
 # gets the basins over which we calculate
-expt = 'xqbwb'
+expt = 'xqbwd'
 startyear=3960
-endyear=3961
+endyear=4010
  
 
 for year in range(startyear, endyear):
@@ -316,5 +318,5 @@ for year in range(startyear, endyear):
     Ind_stream = calc_stream(V_ind,dx,dz,coslats,'Indian',depths)
     Glob_stream = calc_stream(V_glob,dx,dz,coslats,'Global',depths)
 
-    fileout = filestart + '/pk_moc/' + fileend
+    fileout = filename.replace('/pg/','/pk_moc/').replace('#pg','#pk')
     iris.save([Atl_stream,Pac_stream,Ind_stream,Glob_stream],fileout,fill_value=-99999.)

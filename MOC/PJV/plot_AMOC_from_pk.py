@@ -35,7 +35,7 @@ def get_avg_MOC():
     get average meridional overturning circulation
     """
 
-    filestart = fileinit + exptname + '/pk_moc/' + exptname + 'o#pg'
+    filestart = fileinit + exptname + '/pk2/' + exptname + 'o#pk'
     basin_name = {'AMOC':'Atlantic','PMOC':'Pacific','GMOC':'Global'}
     name = ('Meridional Overturning Stream Function ('
             + basin_name.get(MOCtype) + ')')
@@ -104,15 +104,15 @@ def do_nice_plot(avg_MOC_cube):
 
     plt.savefig(fileinit + exptname + '/MOC/struct_' + MOCtype +
                 '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
-                '.png')
+                '_orig.png')
 
     iris.save(avg_MOC_cube,fileinit + exptname + '/MOC/struct_'
               + MOCtype +
                 '_' + exptname + '#' + str(startyear) + '_' + str(endyear) +
-                '.nc',netcdf_format='NETCDF4')
+                '_orig.nc',netcdf_format='NETCDF4')
 
 #######################################################################
-exptname = 'xqbwb'
+exptname = 'xqbwa'
 startyear=3970
 endyear=4000
 MOCtype='AMOC' # AMOC PMOC GMOC
