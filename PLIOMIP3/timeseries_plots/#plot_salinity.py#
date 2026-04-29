@@ -1,20 +1,22 @@
 #python program
 #
-# this program will plot the sea ice area from files created from seaicearea.py
+# this program will plot the salinity SH from files created from SH_salinity.py
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
 exptnames = ['xpsid','xpsig','xpsie']
 
 # Function to read data from a file, skipping the first line
 def read_data(filename):
     x_vals = []
     y_vals = []
-    print(filename)
     with open(filename, 'r') as file:
-        next(file)  # Skip the title line
+        next(file)  # Skip the title line  
         for line in file:
+            #print(line) # this should be the title
+            #sys.exit(0)
             try:
                 x, y = map(float, line.strip().split(','))
                 x_vals.append(x)
@@ -35,30 +37,33 @@ period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
 
 #plot data from all the files
 for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
+   
     if expt == 'xpsij':
-        filename = 'seaice_area_' + expt + '_SH_1991_2999.tex'
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
     else:
-        filename = 'seaice_area_' + expt + '_SH_12_2999.tex'
-  
+        filename = filestart + '_70.0S-90S_2_100.tex'
+   
     x, y = read_data(filename)
 
     # Plot the data
     plt.subplot(211)
     plt.plot(x, y, label=period.get(expt) )
-    plt.title('SH Sea ice area')
+    plt.title('SSS 70S-90S')
 
 plt.xlabel('year')
-plt.ylabel('km2')
+plt.ylabel('psu')
 plt.legend()
 plt.grid(True)
 
 
 #do a 30 year running mean
 for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
     if expt == 'xpsij':
-        filename = 'seaice_area_' + expt + '_SH_1991_2999.tex'
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
     else:
-        filename = 'seaice_area_' + expt + '_SH_12_2999.tex'
+        filename = filestart + '_70.0S-90S_2_100.tex'
   
     x, y = read_data(filename)
     window=30
@@ -66,38 +71,38 @@ for expt in exptnames:
     x_mean=x[window-1:]
 
     # Plot the data
-    plt.subplot(212) 
+    plt.subplot(212)
     if expt == 'xpsie':
-        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt),linestyle='--',
-                 linewidth=3)
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
     else:
-        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt) )
-    plt.title('SH Sea ice area (30 year running mean)')
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('SSS 70S-90S (30 year running mean)')
 
 plt.xlabel('year',fontsize=14)
-plt.ylabel('million km$^2$',fontsize=14)
+plt.ylabel('psu',fontsize=14)
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
+#plt.xlim(0,1000)
 plt.legend(fontsize=14)
-#plt.xlim(1000,2000)
 plt.grid(True)
-
 plt.tight_layout()
 
-
 # Save the plot to a file
-plt.savefig('sea-ice.png')
+plt.savefig('salinity_plots/salinity_2_100_70.png')
+print("Plot saved to 'combined_plot.png'.")
 plt.close()
 
-# now do a 30 year running mean on its own for the paper
-#do a 30 year running mean
+
+#do the 30 year running mean on its own for the paper
 plt.figure(figsize=(12, 4))
 
 for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
     if expt == 'xpsij':
-        filename = 'seaice_area_' + expt + '_SH_1991_2999.tex'
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
     else:
-        filename = 'seaice_area_' + expt + '_SH_12_2999.tex'
+        filename = filestart + '_70.0S-90S_2_100.tex'
   
     x, y = read_data(filename)
     window=30
@@ -106,32 +111,32 @@ for expt in exptnames:
 
     # Plot the data
     if expt == 'xpsie':
-        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt),linestyle='--',
-                 linewidth=3)
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
     else:
-        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt) )
-    plt.title('SH Sea ice area (30 year running mean)')
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('SSS 70S-90S (30 year running mean)')
 
 #plt.xlabel('year',fontsize=16)
-plt.ylabel('million km$^2$',fontsize=16)
+plt.ylabel('psu',fontsize=16)
 #plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
-plt.legend(fontsize=20)
-#plt.xlim(1000,2000)
+plt.xlim(0,3000)
+#plt.legend(fontsize=14)
 plt.grid(True)
-# remove x axis
-ax = plt.gca()
 
 # Hide bottom spine and all x ticks/labels
 #ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
 ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
 
 # Remove x label if present
 ax.set_xlabel(None)
+plt.axvline(x=1803,color='red',linestyle='--')
 
-MARGINS = dict(left=0.14, right=0.98, bottom=0.16, top=0.96)  # tweak to suit labels
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
 plt.subplots_adjust(**MARGINS)
 
-
 # Save the plot to a file
-plt.savefig('sea-ice_30yr.png')
+plt.savefig('salinity_plots/salinity_30yr_2_100_70.png')
+print("Plot saved to 'combined_plot.png'.")

@@ -234,7 +234,7 @@ def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
     exp1='xpsi' + expt_name
     for year in range(yearstart_1,yearend_1):
         if extra == '#':
-            datasetname = '/nfs/hera1/earjcti/um/' + exp1 + '/pk2/' + exp1 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            datasetname = '/uolstore/Research/a/hera1/earjcti/um/' + exp1 + '/pk2/' + exp1 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
             print(datasetname)
 
         (AMOC, lat, depth)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
@@ -256,7 +256,7 @@ def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
         exp2='xpsi' + expt_name
     for year in range(yearstart_2,yearend_2):
         if extra == '#':
-            datasetname = '/nfs/hera1/earjcti/um/' + exp2 + '/pk2/' + exp2 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            datasetname = '/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/pk2/' + exp2 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
             print(datasetname)
 
         (AMOC, lat, depth)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
@@ -288,13 +288,13 @@ def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
     meanmaxamoc = np.mean(maxAMOC)
     
     plt.tight_layout()
-    fileout = ('/nfs/hera1/earjcti/um/' + exp2 + '/MOC/'+ AMOC_PMOC_IND +
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/'+ AMOC_PMOC_IND +
                '_' + exp2 + extra + 
                np.str(np.int(yearstart_1)) + '_' + np.str(np.int(yearend_2)) + 
                '.eps')
     plt.savefig(fileout, bbox_inches='tight')  
 
-    fileout = ('/nfs/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
                '_' + exp2 + extra + np.str(np.int(yearstart_1)) + '_' + 
                np.str(np.int(yearend_2)) + 
                '.png')
@@ -309,10 +309,11 @@ def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
 
     plotdata(avgAMOC,-99,lat,depth,titlename,-30,35,5.0,0.0,'n','Sv',
              'avg',ax1,AMOC_PMOC_IND)
-    fileout = ('/nfs/hera1/earjcti/um/' + exp2 + '/MOC/struct_' + AMOC_PMOC_IND + 
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/struct_' + AMOC_PMOC_IND + 
             '_' + exp2 + extra + np.str(np.int(yearstart_1)) + '_' + 
                np.str(np.int(yearend_2)))
-    plt.savefig(fileout + '.png', bbox_inches='tight')  
+    plt.savefig(fileout + '.png', bbox_inches='tight')
+    iris.save(avgAMOC,fileout = '.png')
     print(fileout)
     
     return(lat,depth,avgAMOC)
@@ -345,7 +346,7 @@ def amoc_diff(expt_name,cntl_name,AMOC_e,AMOC_c,lat,depth,AMOC_PMOC_IND,
     plotdata(AMOC_diff,-99,lat,depth,titlename,0,0,0,V,'la','Sv','diff',ax1,
              AMOC_PMOC_IND)
   
-    fileout = ('/nfs/hera1/earjcti/um/' + expt + '/MOC/' 
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/MOC/' 
                +AMOC_PMOC_IND 
                + expt + '-' +  cntl + '_' + np.str(np.int(startyear)) + '_' + 
                np.str(np.int(endyear)))
@@ -367,9 +368,9 @@ def plot_all_moc(expt_name,extra,yearstart,yearend,plotallyears):
     figcount=0
     for year in range(yearstart,yearend):
         if year >= 10:
-            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+            datasetname='/uolstore/Research/a/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
         else:
-            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+            datasetname='/uolstore/Research/a/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
         f=Dataset(datasetname)
         lat = f.variables['latitude'][:]
         depth = f.variables['depth'][:]
@@ -409,9 +410,9 @@ def MOC_PC(expt_name,extra,yearstart,yearend):
     figcount=0
     for year in range(yearstart,yearend+1):
         if year >= 10:
-            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
+            datasetname='/uolstore/Research/a/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+str(year)+ending+'.nc'
         else:
-            datasetname='/nfs/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
+            datasetname='/uolstore/Research/a/hera1/earjcti/um/'+expt_name+'/pk2/'+expt_name+'o@pg'+extra+'0'+str(year)+ending+'.nc'
         f=Dataset(datasetname)
         lat = f.variables['latitude'][:]
         depth = f.variables['depth'][:]
@@ -597,7 +598,7 @@ def PCs_to_climate_telecon(exptname,fieldlocation,fileext,fieldname,seasname,mon
 
     nmonths=len(monthnames)
 
-    dirname='/nfs/hera1/earjcti/um/'+exptname+'/'+fieldlocation+'/'
+    dirname='/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/'+fieldlocation+'/'
     os.chdir(dirname)
 
     # firstly get average field over the season
@@ -937,6 +938,15 @@ depth=retdata[1]
 d_AMOC=retdata[2]
 
 
+EXPTNAME = 'g'
+retdata=plot_avg_moc(EXPTNAME,'#',basin,startyear,endyear)
+lat=retdata[0]
+depth=retdata[1]
+d_AMOC=retdata[2]
+
+sys.exit(0)
+
+
 
 
 
@@ -958,7 +968,7 @@ sys.exit(0)
 plt.figure(figureno)
 plotallyears='y'
 #plot_all_moc('xjpld','n',1,99,plotallyears)
-plot_all_moc('xqbwc','#',3900,4000,plotallyears)
+plot_all_moc('xqbwd','#',3900,4000,plotallyears)
 figureno=figureno+1
 
 ###########################################################################
