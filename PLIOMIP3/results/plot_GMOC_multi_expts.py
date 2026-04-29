@@ -48,9 +48,9 @@ def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,cba
     labels=np.copy(V)
     for i,label in enumerate(labels):
         if label - int(label) == 0.0:
-            label = np.str(int(label))
+            label = str(int(label))
         else:
-            label = np.str(label)
+            label = str(label)
         labels[i]=label
 
         
@@ -290,13 +290,13 @@ def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
     plt.tight_layout()
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/'+ AMOC_PMOC_IND +
                '_' + exp2 + extra + 
-               np.str(np.int(yearstart_1)) + '_' + np.str(np.int(yearend_2)) + 
+               str(int(yearstart_1)) + '_' + str(int(yearend_2)) + 
                '.eps')
     plt.savefig(fileout, bbox_inches='tight')  
 
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
-               '_' + exp2 + extra + np.str(np.int(yearstart_1)) + '_' + 
-               np.str(np.int(yearend_2)) + 
+               '_' + exp2 + extra + str(int(yearstart_1)) + '_' + 
+               str(int(yearend_2)) + 
                '.png')
     plt.savefig(fileout, bbox_inches='tight')  
 
@@ -304,14 +304,14 @@ def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
 
     fig = plt.figure()
     ax1 = plt.subplot(1,1,1)
-    maxstr = np.str(np.round(meanmaxamoc))
+    maxstr = str(np.round(meanmaxamoc))
     titlename=AMOC_PMOC_IND + ' avg: '+expt_name + ' maxval='+maxstr
 
     plotdata(avgAMOC,-99,lat,depth,titlename,-30,35,5.0,0.0,'n','Sv',
              'avg',ax1,AMOC_PMOC_IND)
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/struct_' + AMOC_PMOC_IND + 
-            '_' + exp2 + extra + np.str(np.int(yearstart_1)) + '_' + 
-               np.str(np.int(yearend_2)))
+            '_' + exp2 + extra + str(int(yearstart_1)) + '_' + 
+               str(int(yearend_2)))
     plt.savefig(fileout + '.png', bbox_inches='tight')
     iris.save(avgAMOC,fileout = '.png')
     print(fileout)
@@ -348,8 +348,8 @@ def amoc_diff(expt_name,cntl_name,AMOC_e,AMOC_c,lat,depth,AMOC_PMOC_IND,
   
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/MOC/' 
                +AMOC_PMOC_IND 
-               + expt + '-' +  cntl + '_' + np.str(np.int(startyear)) + '_' + 
-               np.str(np.int(endyear)))
+               + expt + '-' +  cntl + '_' + str(int(startyear)) + '_' + 
+               str(int(endyear)))
    
     print('diff',fileout)
     plt.savefig(fileout + '.eps', bbox_inches='tight')  

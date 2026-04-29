@@ -308,6 +308,10 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
     plt.savefig(FILEINIT + 'um/' + exptname +
                   '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
                 + basin + str(startyear) + '_' + str(endyear-1)+region+'.png')
+    iris.save(temp_anom,FILEINIT + 'um/' + exptname +
+                  '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+region+'.nc')
+    #plt.show()
     #plt.show()
     plt.close()
    
@@ -357,6 +361,10 @@ def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,reg
                   '/basin_diagnostics/meansal_' + exptname + '-' +
                 cntlname + '_' + basin + str(startyear) + '_' +
                 str(endyear-1)+region+'.png')
+    plt.savefig(sal_anom,FILEINIT + 'um/' + exptname +
+                  '/basin_diagnostics/meansal_' + exptname + '-' +
+                cntlname + '_' + basin + str(startyear) + '_' +
+                str(endyear-1)+region+'.nc')
     plt.close()
     
     
@@ -488,9 +496,9 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 
 
 #######################################################################
-exptname = 'xpsie'
-startyear=2
-endyear=52
+exptname = 'xqbwg'
+startyear=3900
+endyear=4000
 basin='Pacific'
 anom_only = 'n'
 FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
@@ -571,7 +579,7 @@ if anom_only == 'n':
 ################################################
 # plot anomalies
 
-cntlname = 'xpsid'
+cntlname = 'xqbwj'
 cntlstart=startyear
 cntlend=endyear
 #cntlstart=1400
