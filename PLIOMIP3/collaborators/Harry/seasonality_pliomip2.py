@@ -1,11 +1,13 @@
 import numpy as np
 import iris
 import matplotlib.pyplot as plt
+import iris.plot as iplt
 import iris.quickplot as qplt
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 import cartopy.crs as ccrs
+import sys
 
 def make_cmap(colors, position=None, bit=False):
     '''
@@ -77,11 +79,7 @@ def read_harry_data():
             lats[i-1] = b
             lons[i-1] = c
             site[i-1] = a
-            # i think if it is SH then multiply by -1
-            if float(b) < 0.0:
-                seasonality[i-1]=float(d) * (-1.0)
-            else:
-                seasonality[i-1]=d
+            seasonality[i-1]=d
        
     return lats,lons,seasonality,site
 
@@ -103,7 +101,7 @@ def get_pliomip2_mean(latreq,lonreq):
     #julcube = cube[6,:,:]
     augcube = cube[7,:,:]
 
-    seascube = augcube - febcube
+    seascube = augcube.copy(data=np.abs(augcube.data - febcube.data))
     cubelats = seascube.coord('latitude').points
     cubelons = seascube.coord('longitude').points
 
@@ -136,28 +134,29 @@ def plot(seascube,datalon,datalat,dataseas,modelseas):
 
     # plot model
 
-    V= np.arange(-20,22,2)
-    mycmap = customise_cmap2()
+    V= np.arange(0.0,16.0,2.0)
+    print(V)
+    #mycmap = customise_cmap2()
+    mycmap=plt.cm.Reds
+  
 
-    
-    qplt.contourf(seascube,levels=np.arange(-20,22,2),cmap=mycmap,
-                  extend='both')
+    qplt.contourf(seascube,levels=V,extend='max',cmap=mycmap) 
+    #qplt.contourf(seascube,levels=V,cmap=mycmap,extend='max')
     plt.gca().coastlines()
-    plt.title('LP:  SST (Aug-Feb)')
-
+    plt.title('LP: ABS( SST (Aug-Feb))')
     
 
     # overplot data
   
     norm = colors.BoundaryNorm(boundaries=V,ncolors=mycmap.N)
-
+  
     plt.scatter(datalon, datalat, c='black',  marker='o',
                 s=60, transform=ccrs.Geodetic())
 
     plt.scatter(datalon, datalat, c=dataseas,  marker='o', s=30,
-                norm = norm , cmap='RdBu_r', transform=ccrs.Geodetic())
+                norm = norm , cmap=mycmap , transform=ccrs.Geodetic())
 
-    plt.savefig('data_model_comparison.png')
+    plt.savefig('data_model_comparison_abs.png')
 
 
 # main program
@@ -165,7 +164,7 @@ def plot(seascube,datalon,datalat,dataseas,modelseas):
 
 datalat,datalon,dataseas,datasite = read_harry_data()
 
-# 2 get model output
+# 2 get model output (we want seasonality to return absolute value)
 
 modelseas,seascube = get_pliomip2_mean(datalat,datalon)
 
