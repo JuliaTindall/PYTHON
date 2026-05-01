@@ -26,7 +26,7 @@ def run_mean(y):
     return yout
 
 def roll_linear_trend(ts,years,expt,threshold):
-    window=50
+    window=100
 
     # ts   = your data array
 
@@ -67,28 +67,12 @@ def roll_linear_trend(ts,years,expt,threshold):
             #        break
 
 
-    # plot the rolling linear trend
-    plt.close()
-    plt.figure(figsize=[8,4])
-    plt.plot(years,trends)
-    plt.plot([0,3000],[threshold,threshold],linestyle='dashed')
-    plt.plot([0,3000],[0,0],color='black')
-    plt.xlabel('year',fontsize=14)
-    plt.ylabel('trend (degC / century)',fontsize=14)
-    plt.yticks(fontsize=14)
-    plt.xticks(fontsize=14)
-    plt.xlim(0,3000)
-    plt.ylim(-0.7,1.70)
-    plt.title(period.get(expt),fontsize=16)
-    MARGINS = dict(left=0.15, right=0.95, bottom=0.16, top=0.9)  # tweak to suit labels
-    plt.subplots_adjust(**MARGINS)
-    plt.savefig('temperature_roll_linear_trend_' + expt + '.png')
-
+    
                              
     #threshold=0.726  # this is the threshold calculated as
                              # xpsig * 1.1 
 
-    return threshold
+    return threshold,trends
 
 # Function to read data from a file, skipping the first line
 def read_data_nothreshold(filename):
@@ -176,10 +160,11 @@ def read_data(filename,expt,threshold):
     y995_valsa= run_mean(y995_vals)
     y1500_valsa= run_mean(y1500_vals)
 
-    threshold=roll_linear_trend(y5_valsa,x_vals,expt,threshold)
+    threshold,trends=roll_linear_trend(y5_valsa,x_vals,expt,threshold)
                 
     return (x_vals, y5_valsa, y25_valsa, y47_valsa,
-            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa,threshold)
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa,
+            threshold,trends)
 
 # Function to compute running mean**
 def running_mean(data, window_size):
@@ -188,7 +173,7 @@ def running_mean(data, window_size):
 
 ##################################################################
 period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
-          'xpsie':'EP400','xpsig':'EP'}
+          'xpsie':'EP$_{400}$','xpsig':'EP'}
 
 
 fig,axes = plt.subplots(3,3,figsize=(12,12))
@@ -197,6 +182,7 @@ ax_legend.axis('off')
 legend_handles=[]
 
 for_paper_list = []
+for_paper_trends= []
 #plot data from all the files
 for expt in exptnames:
     if expt == 'xpsid' or expt == 'xpsig':
@@ -212,9 +198,11 @@ for expt in exptnames:
         filename = filestart + '12_2999_'+lat+'.txt'
   
     (x, y5, y25, y47, y203,
-     y447 ,y666, y995,y1500,threshold)  = read_data(filename,expt,threshold)
+     y447 ,y666, y995,y1500,
+     threshold,trends)  = read_data(filename,expt,threshold)
     print(expt,threshold)
     for_paper_list.append(y5)
+    for_paper_trends.append(trends)
 
     # Plot the data
     line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
@@ -251,19 +239,36 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.legend()
 plt.close()
 
-# do plots for paper.  This is temperature at 5m
+# do plots for paper.  This is temperature at 5m and rolling linear trends
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 
 for i,expt in enumerate(exptnames):
-    ax.plot(x,for_paper_list[i],label=expt)
+    ax.plot(x,for_paper_list[i],label=period.get(expt))
 ax.legend(frameon=True,fontsize=14)
 plt.xlabel('year',fontsize=16)
-plt.ylabel('degC',fontsize=16)
+plt.ylabel('$^\circ$ C',fontsize=16)
 plt.yticks(fontsize=16)
 plt.xticks(fontsize=16)
 MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
 plt.subplots_adjust(**MARGINS)
 plt.savefig('temperature_timeseries_5m.png')
+
+# grends
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+
+for i,expt in enumerate(exptnames):
+    ax.plot(x,for_paper_trends[i],label=period.get(expt))
+ax.legend(frameon=True,fontsize=14)
+plt.xlabel('year',fontsize=14)
+plt.ylabel('$^\circ$ C / centuary',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+plt.axvline(x=1803,color='orange',linestyle='--')
+plt.axhline(y=threshold,color='orange',linestyle='--')
+
+MARGINS = dict(left=0.15, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+plt.savefig('temperature_roll_linear_trend.png')
 
 
 
