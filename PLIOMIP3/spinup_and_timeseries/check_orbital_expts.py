@@ -35,14 +35,16 @@ def plot_toa_insolation():
     # 3 calculate expt-toa insol - cntl_toa insolation
     # 4 plot a month-latitude plot showing the difference
 
-    exptfilestart = ('/nfs/hera1/earjcti/um/'+expt+
+    exptfilestart = ('/uolstore/Research/a/hera1/earjcti/um/'+expt+
                      '/netcdf/'+expt+'a#pd000002099')
-    cntlfilestart = ('/nfs/hera1/earjcti/um/'+cntl+
+    cntlfilestart = ('/uolstore/Research/a/hera1/earjcti/um/'+cntl+
                      '/netcdf/'+cntl+'a#pd000002099')
 
 
     exptnames = {'xpsin' : 'LP_highNH_lowSH_orbit',
                  'xpsio' : 'LP_lowNH_highSH_orbit',
+                 'xqbwn' : 'LP_highNH_lowSH_orbit',
+                 'xqbwo' : 'LP_lowNH_highSH_orbit',
                  'xpsic' :'PI'}
 
     monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
@@ -99,8 +101,9 @@ def plot_toa_insolation():
     
 
 
-    fileout='/nfs/hera1/earjcti/um/'+expt+'/spinup/orbitanom_'+expt+'.eps' 
-    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/spinup/orbitanom_'+expt+'-' + cntl  
+    plt.savefig(fileout + '.eps', bbox_inches='tight')  
+    plt.savefig(fileout + '.png', bbox_inches='tight')  
     
     plt.close()
 
@@ -114,6 +117,8 @@ def check_toa_insolation_daily(exptfilestart,cntlfilestart,expt):
     monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
     exptnames = {'xpsin' : 'LP_highNH_lowSH_orbit',
                  'xpsio' : 'LP_lowNH_highSH_orbit',
+                 'xqbwn' : 'LP_highNH_lowSH_orbit',
+                 'xqbwo' : 'LP_lowNH_highSH_orbit',
                  'xpsip' : 'LP_highNH_lowSH_orbit',
                  'xpsiq' : 'LP_lowNH_highSH_orbit',
                  'xpsic' :'PI'}
@@ -123,7 +128,7 @@ def check_toa_insolation_daily(exptfilestart,cntlfilestart,expt):
     exptcubelist = CubeList([])
     cntlcubelist = CubeList([])
     for month in monthnames:
-        print(month)
+        print(exptfilestart,month)
         expt_cube = iris.load_cube(exptfilestart + month + '+.nc',
                                         'field200')
         exptcubelist.append(expt_cube)
@@ -259,12 +264,13 @@ def check_toa_insolation_daily(exptfilestart,cntlfilestart,expt):
     plt.colorbar(cs6,orientation='horizontal',label='W/m2')
 
     
-    plt.show()
-    sys.exit(0)
+    #plt.show()
+    #sys.exit(0)
 
 
-    fileout='/nfs/hera1/earjcti/um/'+expt+'/spinup/orbitanomdaily_'+expt+'.eps' 
-    plt.savefig(fileout, bbox_inches='tight')  
+    fileout='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/spinup/orbitanomdaily_'+expt+'-' + cntl 
+    plt.savefig(fileout + '.eps', bbox_inches='tight')  
+    plt.savefig(fileout + '.png', bbox_inches='tight')  
     
     plt.close()
 
@@ -286,9 +292,11 @@ HadCM3='y'
 
 # checks using the daily insolation
 # use as baseline xozza which is preindustrial so with modern orbit
-expt='xpsip'
-exptfilestart = '/nfs/hera1/earjcti/um/'+expt+'/datam/'+expt+'a#pb000002167'
-cntlfilestart = '/nfs/hera1/earjcti/um/xozza/netcdf/xozzaa@pam34'
+expt='xqbwn'
+cntl='xqbwc'
+exptfilestart = '/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pb/'+expt+'a#pb000003900'
+cntlfilestart = '/uolstore/Research/a/hera1/earjcti/um/'+cntl+'/pb/'+cntl+'a#pb000003900'
+#cntlfilestart = '/uolstore/Research/a/hera1/earjcti/um/xozza/netcdf/xozzaa@pam34'
 check_toa_insolation_daily(exptfilestart,cntlfilestart,expt)
 
 

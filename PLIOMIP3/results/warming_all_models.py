@@ -63,7 +63,7 @@ def get_mean_val(expt,cube):
     if LAND_OCN_IND == 'Globe':
         grid_areas=iris.analysis.cartography.area_weights(cube)
 
-    filename = ('/nfs/hera1/earjcti/ancil/'+direct.get(expt)+'/' + 
+    filename = ('/uolstore/Research/a/hera1/earjcti/ancil/'+direct.get(expt)+'/' + 
                 filestart.get(expt) + 'mask.nc')
     if LAND_OCN_IND == 'Land':
         lsm_cube = iris.load_cube(filename,'LAND MASK (LOGICAL: LAND=TRUE)')
@@ -89,14 +89,14 @@ def get_globmean_temperature(expt):
     gets the globalmean temperature for the annual average 
     the JJA average and the DJF average
     """
-    tempfile = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+    tempfile = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/database_averages/' + 
                 expt + '_Annual_Average_#pd_Temperature_3900_4000.nc')
     ann_temp_cube = iris.load_cube(tempfile)
     ann_temp_cube=iris.util.squeeze(ann_temp_cube)
 
   
     # get the values for the seasons
-    tempfile = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+    tempfile = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/database_averages/' + 
                 expt + '_Monthly_Average_#pd_Temperature_3900_4000.nc')
     temp_cube = iris.load_cube(tempfile)
     temp_cube=iris.util.squeeze(temp_cube)
@@ -145,7 +145,7 @@ EXPTNAMES={'xqbwc':'PI', 'xqbwd':'LP','xqbwg':'EP',
            'xqbwn':'LP_highNH_orb','xqbwo':'LP_lowNH_orb',
            'xqbwt':'PI_dyn-veg','xqbws':'LP_dyn-veg'}
 
-LAND_OCN_IND='Ocean'  # options are Land; Ocean, Globe
+LAND_OCN_IND='Globe'  # options are Land; Ocean, Globe
 #EXPTS=['xqbwn']
 (controlTann, controlTjja, controlTdjf)=get_globmean_temperature(CONTROL)
 
@@ -215,8 +215,10 @@ rects=ax.bar(x+0.25,mean_djf_warming,width,label='Mean DJF warming',
 
 if LAND_OCN_IND == 'Globe':
     plt.savefig('plots/warming_all_models.eps')
+    plt.savefig('plots/warming_all_models.png')
 else:
     plt.savefig('plots/warming_all_models_' + LAND_OCN_IND + '.eps')
-plt.show()
+    plt.savefig('plots/warming_all_models_' + LAND_OCN_IND + '.png')
+plt.close()
            
            

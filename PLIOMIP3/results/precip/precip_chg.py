@@ -108,8 +108,8 @@ def get_avg(jobid, startyear):
     count=0.
 
     # get template map
-    cube = iris.load_cube(filestart + '/um/xpsid/pcpd/' + 
-                          'xpsida#pd' + str(startyear).zfill(9) + 'dc+.nc',
+    cube = iris.load_cube(filestart + '/um/'+jobid+'/pcpd/' + jobid + 
+                          'a#pd' + str(startyear).zfill(9) + 'dc+.nc',
                           longfield.get(field))
 
     cube = iris.util.squeeze(cube)
@@ -163,7 +163,7 @@ def get_avg(jobid, startyear):
 
 LINUX_WIN='l'
 filestart = '/uolstore/Research/a/hera1/earjcti/'
-NYEARS = 20
+NYEARS = 100
 #NYEARS=5
 SEASON = 'ann'
 
@@ -171,12 +171,12 @@ SEASON = 'ann'
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
 #EXPTS = ['xqbwk','xqbwi','xqbwj']  # xpsic PI,  xpsij-lp490  xpsik - lp560
-EXPTS=['xpsig']
-EXPT_STARTYEAR = 2
+EXPTS=['xqbwi']
+EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xpsid'  # xpsic pi, xpsid lp400
+CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
@@ -237,8 +237,8 @@ for EXPT in EXPTS:
     if field == 'precip': # also plot percentage change
         ratiocube = expt_cube/cntl_cube
         ratiocube.units = None
-        vals = np.arange(0.85,1.65,0.1)
-        qplt.contourf(ratiocube,levels=vals,extend='both')
+        vals = np.arange(0.4,1.7,0.1)
+        qplt.contourf(ratiocube,levels=vals,extend='both',cmap='RdBu')
         titlename = EXPT + '/' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS)
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()

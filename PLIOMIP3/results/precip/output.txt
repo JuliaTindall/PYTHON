@@ -1,0 +1,355 @@
+nohup: ignoring input
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+ut_scale(): NULL factor argument
+ut_raise(): NULL unit argument
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003900??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003901??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003902??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003903??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003904??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003905??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003906??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003907??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003908??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003909??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003910??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003911??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003912??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003913??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003914??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003915??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003916??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003917??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003918??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003919??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003920??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003921??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003922??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003923??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003924??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003925??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003926??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003927??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003928??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003929??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003930??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003931??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003932??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003933??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003934??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003935??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003936??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003937??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003938??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003939??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003940??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003941??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003942??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003943??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003944??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003945??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003946??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003947??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003948??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003949??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003950??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003951??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003952??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003953??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003954??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003955??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003956??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003957??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003958??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003959??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003960??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003961??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003962??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003963??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003964??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003965??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003966??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003967??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003968??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003969??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003970??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003971??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003972??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003973??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003974??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003975??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003976??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003977??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003978??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003979??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003980??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003981??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003982??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003983??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003984??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003985??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003986??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003987??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003988??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003989??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003990??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003991??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003992??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003993??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003994??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003995??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003996??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003997??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003998??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwc/pcpd/xqbwca#pd000003999??+.nc
+temporary code
+(73, 96)
+(96,)
+(73,)
+mean xqbwc 0.6971510006843458
+got cntl cube
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003900??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003901??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003902??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003903??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003904??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003905??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003906??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003907??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003908??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003909??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003910??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003911??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003912??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003913??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003914??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003915??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003916??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003917??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003918??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003919??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003920??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003921??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003922??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003923??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003924??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003925??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003926??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003927??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003928??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003929??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003930??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003931??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003932??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003933??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003934??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003935??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003936??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003937??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003938??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003939??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003940??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003941??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003942??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003943??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003944??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003945??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003946??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003947??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003948??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003949??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003950??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003951??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003952??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003953??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003954??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003955??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003956??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003957??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003958??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003959??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003960??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003961??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003962??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003963??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003964??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003965??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003966??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003967??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003968??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003969??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003970??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003971??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003972??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003973??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003974??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003975??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003976??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003977??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003978??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003979??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003980??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003981??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003982??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003983??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003984??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003985??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003986??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003987??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003988??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003989??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003990??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003991??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003992??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003993??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003994??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003995??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003996??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003997??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003998??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwm/pcpd/xqbwma#pd000003999??+.nc
+temporary code
+(73, 96)
+(96,)
+(73,)
+mean xqbwm 0.9936106031828502
+got expt_cube
+about to plot
+[-2.0000000e+00 -1.8000000e+00 -1.6000000e+00 -1.4000000e+00
+ -1.2000000e+00 -1.0000000e+00 -8.0000000e-01 -6.0000000e-01
+ -4.0000000e-01 -2.0000000e-01 -4.4408921e-16  2.0000000e-01
+  4.0000000e-01  6.0000000e-01  8.0000000e-01  1.0000000e+00
+  1.2000000e+00  1.4000000e+00  1.6000000e+00  1.8000000e+00
+  2.0000000e+00]
+about to write to file
+about to write to file
+[-5.00000000e-01 -4.00000000e-01 -3.00000000e-01 -2.00000000e-01
+ -1.00000000e-01 -1.11022302e-16  1.00000000e-01  2.00000000e-01
+  3.00000000e-01  4.00000000e-01  5.00000000e-01]
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003900??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003901??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003902??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003903??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003904??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003905??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003906??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003907??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003908??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003909??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003910??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003911??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003912??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003913??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003914??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003915??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003916??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003917??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003918??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003919??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003920??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003921??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003922??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003923??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003924??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003925??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003926??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003927??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003928??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003929??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003930??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003931??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003932??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003933??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003934??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003935??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003936??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003937??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003938??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003939??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003940??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003941??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003942??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003943??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003944??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003945??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003946??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003947??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003948??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003949??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003950??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003951??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003952??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003953??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003954??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003955??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003956??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003957??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003958??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003959??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003960??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003961??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003962??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003963??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003964??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003965??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003966??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003967??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003968??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003969??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003970??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003971??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003972??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003973??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003974??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003975??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003976??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003977??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003978??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003979??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003980??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003981??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003982??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003983??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003984??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003985??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003986??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003987??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003988??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003989??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003990??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003991??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003992??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003993??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003994??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003995??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003996??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003997??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003998??+.nc
+/uolstore/Research/a/hera1/earjcti//um/xqbwl/pcpd/xqbwla#pd000003999??+.nc
+temporary code
+(73, 96)
+(96,)
+(73,)
+mean xqbwl 0.8410529583305241
+got expt_cube
+about to plot
+[-2.0000000e+00 -1.8000000e+00 -1.6000000e+00 -1.4000000e+00
+ -1.2000000e+00 -1.0000000e+00 -8.0000000e-01 -6.0000000e-01
+ -4.0000000e-01 -2.0000000e-01 -4.4408921e-16  2.0000000e-01
+  4.0000000e-01  6.0000000e-01  8.0000000e-01  1.0000000e+00
+  1.2000000e+00  1.4000000e+00  1.6000000e+00  1.8000000e+00
+  2.0000000e+00]
+about to write to file
+about to write to file
+[-5.00000000e-01 -4.00000000e-01 -3.00000000e-01 -2.00000000e-01
+ -1.00000000e-01 -1.11022302e-16  1.00000000e-01  2.00000000e-01
+  3.00000000e-01  4.00000000e-01  5.00000000e-01]

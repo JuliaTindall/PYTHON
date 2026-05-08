@@ -4,7 +4,7 @@
 #PURPOSE 
 #
 #  This program will show the SAT warming in the last 30 years of each 
-#  experiment for the months JJA
+#  experiment for the months JJA.  I don't think it will accurately do orbital
 """
 
 # Import necessary libraries
@@ -94,7 +94,7 @@ EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
+CNTL = 'xqbwo'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',

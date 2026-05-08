@@ -3,7 +3,7 @@
 #   avgAMOC from pk files (also does GMOC PMOC IMOC)
 #PURPOSE
 #writest to a netcdf file for reading in elsewehere
-#  
+#  b
 # Julia September 2024
 
 
@@ -97,10 +97,10 @@ def get_data():
 # annual mean
 figureno=0
 
-timeperiod = {'xpsia':'PI','xpsib':'MP_3.205Ma','xqbwa':'PI','xqbwb':'MP_3.205Ma'}
+timeperiod = {'xpsia':'PI','xpsib':'MP_3.205Ma','xqbwa':'PI','xqbwb':'MP_3.205Ma','xqbwj':'LP490'}
 
 HadCM3='y'
-exptname='xqbwg'
+exptname='xqbwj'
 centuary='39'  # currently doing one centuary
 basins = ['Atlantic','Pacific','Indian','Global']
 

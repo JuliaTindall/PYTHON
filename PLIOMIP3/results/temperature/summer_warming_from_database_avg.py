@@ -37,9 +37,9 @@ def get_season(jobid, startyear, endyear):
     gets the average data fpr the field
     """  
 
-    filename = ('/nfs/hera1/earjcti/um/' + jobid + '/database_averages/' + 
+    filename = ('/uolstore/Research/a/hera1/earjcti/um/' + jobid + '/database_averages/' + 
                 jobid + '_Monthly_Average_#pd_' + FIELD + '_' + STARTYEAR + 
-                '_' + ENDYEAR + '.nc')
+                '_' + ENDYEAR + '_orbital.nc')
 
     longfield = {'Temperature' : 'TEMPERATURE AT 1.5M',
                  'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
@@ -93,8 +93,8 @@ SEASON = 'ann'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPT = 'xqbws'  # xsic PI,  xpsij-lp490  xpsik - lp560
-CNTL = 'xqbwd'  # xpsic pi, xpsid lp400
+EXPT = 'xqbwn'  # xsic PI,  xpsij-lp490  xpsik - lp560
+CNTL = 'xqbwo'  # xpsic pi, xpsid lp400
 STARTYEAR='3900'
 ENDYEAR='4000'
 
@@ -108,9 +108,12 @@ diff_cube_jja = expt_cube_jja - cntl_cube_jja
 print('got cntl cube')
 
 #boundaries = [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0]
-boundaries = [0.0, 1.0, 2.0, 3.0,  4.0, 5.0, 6.0,7.0, 8.0,9.0, 10.0, 11.0, 12.0]
-cmap_use=plt.cm.get_cmap('Reds',len(boundaries))
-cmap_use.set_under('lightsteelblue')
+#boundaries = [0.0, 1.0, 2.0, 3.0,  4.0, 5.0, 6.0,7.0, 8.0,9.0, 10.0, 11.0, 12.0]
+#cmap_use=plt.cm.get_cmap('Reds',len(boundaries))
+#cmap_use.set_under('lightsteelblue')
+
+boundaries=np.arange(-16,18,2)
+cmap_use = plt.cm.get_cmap('RdBu_r',len(boundaries))
 
 # plot djf
 try:
@@ -135,8 +138,8 @@ plt.title(titlename, fontsize=10)
 plt.gca().coastlines()
       
 print('about to write to file')
-plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
-plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
 plt.close()
 
 
@@ -163,6 +166,6 @@ plt.title(titlename, fontsize=10)
 plt.gca().coastlines()
       
 print('about to write to file')
-plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
-plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
 plt.close()

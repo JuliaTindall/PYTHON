@@ -1,10 +1,11 @@
+
 #!/usr/bin/env python2.7
 #NAME
-#   avg_v_w_for_heather
+#   avg_T_S_forErin Kim
 #PURPOSE
-#   Heather wants v and w values
+#   Erin wants T and S values
 #  
-# Julia September 2024
+# Julia May 2026
 
 
 
@@ -27,7 +28,7 @@ import subprocess
 
 def get_avg(year):
     """
-    gets the average v and w for this year
+    gets the average T and S for this year
     """
  
    
@@ -39,44 +40,44 @@ def get_avg(year):
     #for cube in cubelist:
     #    print(cube.var_name, cube.long_name)
     #sys.exit(0)
-    Vcube = cubelist.extract('field704')[0]
-    Wcube = cubelist.extract('W')[0]
+    Tcube = cubelist.extract('insitu_T')[0]
+    Scube = cubelist.extract('salinity')[0]
 
 
-    return (Vcube,Wcube)
+    return (Tcube,Scube)
 
 #######################################################
-def get_v_and_w():
+def get_T_and_S():
     """
     as described
     """
 
     # arrays for storing mean salratioeratures
-    cubelist_v = CubeList([])
-    cubelist_w = CubeList([])
+    cubelist_T = CubeList([])
+    cubelist_S = CubeList([])
 
     # obtain means for each year and store in the arrays
     for year in range(startyear,startyear+nyears):
         print(year)
-        (v_cube, w_cube) = get_avg(year)
-        cubelist_v.append(v_cube)
-        cubelist_w.append(w_cube)
+        (T_cube, S_cube) = get_avg(year)
+        cubelist_T.append(T_cube)
+        cubelist_S.append(S_cube)
 
     
     # put into a single cube and average
-    iris.util.equalise_attributes(cubelist_v)
-    iris.util.equalise_attributes(cubelist_w)
+    iris.util.equalise_attributes(cubelist_T)
+    iris.util.equalise_attributes(cubelist_S)
     
-    cubesV = cubelist_v.concatenate_cube()
-    cubesW = cubelist_w.concatenate_cube()
+    cubesT = cubelist_T.concatenate_cube()
+    cubesS = cubelist_S.concatenate_cube()
 
-    avgV_cube = cubesV.collapsed('t',iris.analysis.MEAN)
-    avgW_cube = cubesW.collapsed('t',iris.analysis.MEAN)
+    avgT_cube = cubesT.collapsed('t',iris.analysis.MEAN)
+    avgS_cube = cubesS.collapsed('t',iris.analysis.MEAN)
 
-    avgV_cube.data = np.ma.where(avgV_cube.data < -900.0,
-                                 -99999.,avgV_cube.data)
-    avgW_cube.data = np.ma.where(avgW_cube.data < -900.0,
-                                 -99999.,avgW_cube.data)
+    avgT_cube.data = np.ma.where(avgT_cube.data < -900.0,
+                                 -99999.,avgT_cube.data)
+    avgS_cube.data = np.ma.where(avgS_cube.data < -900.0,
+                                 -99999.,avgS_cube.data)
    
     #iris.util.mask_cube(cubeavgd18o,np.where(cubeavg18o.data > 1.0E10))
     #iris.util.mask_cube(cubeavgd18o_adj,np.where(cubeavg18o_adj.data < -900.0))
@@ -84,12 +85,12 @@ def get_v_and_w():
     
     #print('j2',cubeavgd18o_adj.data)
    
-    filename = (timeperiod.get(exptname) + '_' + exptname + '_V_and_W_'
+    filename = (timeperiod.get(exptname) + '_' + exptname + '_T_and_S_'
                 + str(startyear) + '_' + str(startyear+nyears) + '.nc')
 
 
     
-    iris.save([avgV_cube, avgW_cube],filename,fill_value = -99999.)
+    iris.save([avgT_cube, avgS_cube],filename,fill_value = -99999.)
 
 
 def diff_two_files():
@@ -150,14 +151,14 @@ def plot_ss_d18o():
 # annual mean
 figureno=0
 
-timeperiod = {'xpsia':'PI','xpsib':'MP_3.205Ma','xqbwa':'PI','xqbwb':'MP_3.205Ma'}
+timeperiod = {'xpsia':'PI','xpsib':'MP_3.205Ma','xqbwa':'PI','xqbwb':'MP_3.205Ma','xqbwg':'EP'}
 
 HadCM3='y'
 exptname='xqbwa'
 startyear=3900  # can't start before year 12 because we aren't outputting d18o
 nyears=100
 plt.figure(figureno)
-get_v_and_w()
+get_T_and_S()
 
 
 # difference the two files
