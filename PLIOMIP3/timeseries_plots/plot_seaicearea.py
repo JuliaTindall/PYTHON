@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-exptnames = ['xpsid','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsig']
 
 # Function to read data from a file, skipping the first line
 def read_data(filename):

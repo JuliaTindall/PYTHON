@@ -34,7 +34,7 @@ def get_temperature_bands(expt):
     """
     gets the polar amplification for the NH and the SH
     """
-    tempfile = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+    tempfile = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/database_averages/' + 
                 expt + '_Annual_Average_#pd_Temperature_3900_4000.nc')
     temp_cube = iris.load_cube(tempfile)
     temp_cube=iris.util.squeeze(temp_cube)

@@ -7,7 +7,7 @@
 #"""
 #
 #  plot the sea ice for summer and winter for NH and SH
-#
+#  think volume might be too high so we won't do this
 #
 
 import cartopy.crs as ccrs
@@ -224,7 +224,7 @@ def calc_volume_ocean(time_ind,latitude,depth):
     print(f"{volume.data:2e}")
     print('volume of ocean km3',f"{volume.data/1E9}")
     
-    sys.exit(0)
+  #  sys.exit(0)
     
 
 #################
@@ -250,9 +250,9 @@ PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Mon
 #anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
 #                           'NearSurfaceTemperatureplio - pi')
 
-volume_ocean = calc_volume_ocean('pliocene',-70,100)
-print('volume of ocean polewards of 70S to a depth of 100m is',volume_ocean)
-sys.exit(0)
+#volume_ocean = calc_volume_ocean('pliocene',-70,100)
+#print('volume of ocean polewards of 70S to a depth of 100m is',volume_ocean)
+#sys.exit(0)
 
 
 lsm_cube, lsm_plio_cube, lsm_both_cube = get_lsm('xqbwd','xqbwd')

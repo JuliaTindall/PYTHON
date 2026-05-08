@@ -1,0 +1,1317 @@
+::::::::::::::
+allplots_figure2.py
+::::::::::::::
+#python program
+#
+# all plots for figure 4 of the paper
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+import numpy as np
+import iris
+import iris.quickplot as qplt
+import iris.plot as iplt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import sys
+
+
+##################################################################
+# set up figure and subplot
+fig = plt.figure(figsize=[10.5,6])
+
+spec = gridspec.GridSpec(ncols=3, nrows=2,hspace=0.1,
+                         wspace=0.1, width_ratios=[1, 1,1],
+                         height_ratios=[1,0.3])
+
+
+period = {'xqbwd':'LP','xqwbj':'LP$_{490}','xqbwe':'EP$_{400}$',
+          'xqbwg':'EP','xqbwc':'PI'}
+filestart = '/home/earjcti/um/'
+
+# read in data
+file_LP = (filestart + 'xqbwd/MOC/xqbwdpkmean_3900_3999.nc')
+file_LP490 = (filestart + 'xqbwj/MOC/xqbwjpkmean_3900_3999.nc')
+file_EP = (filestart+ 'xqbwg/MOC/xqbwgpkmean_3900_3999.nc')
+
+field = 'Meridional Overturning Stream Function (Atlantic)'
+
+LPmoc_cube = iris.load_cube(file_LP,field)
+EPmoc_cube = iris.load_cube(file_EP,field)
+LP490moc_cube = iris.load_cube(file_LP490,field)
+
+#temperature xqbwg-xqbwj Atlantic
+ax0=fig.add_subplot(spec[0])
+
+constraint = iris.Constraint(latitude = lambda cell: cell > -30)
+moc_cube = LPmoc_cube.extract(constraint)
+max_strength = str(np.round(np.max(moc_cube.data)))
+print('LP max strength=',max_strength)
+cs=iplt.contourf(moc_cube,cmap='RdBu_r',
+              levels=np.arange(-25.,30.,5.),extend='both')
+
+ax0.set_title('a) LP',fontsize=16)
+plt.ylabel('depth (m)',fontsize=14)
+plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax0.set_xticks([-30,0,30,60,90])
+
+
+# do LP490
+
+ax0=fig.add_subplot(spec[1])
+
+constraint = iris.Constraint(latitude = lambda cell: cell > -30)
+moc_cube = LP490moc_cube.extract(constraint)
+max_strength = str(np.round(np.max(moc_cube.data)))
+print('LP490 max strength=',max_strength)
+
+cs=iplt.contourf(moc_cube,cmap='RdBu_r',
+              levels=np.arange(-25.,30.,5.),extend='both')
+
+ax0.set_title('b) LP$_{490}$',fontsize=16)
+#plt.ylabel('depth (m)',fontsize=14)
+plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax0.set_yticklabels([])
+ax0.set_xticks([0,30,60,90])
+
+# do EP
+
+ax0=fig.add_subplot(spec[2])
+
+constraint = iris.Constraint(latitude = lambda cell: cell > -30)
+moc_cube = EPmoc_cube.extract(constraint)
+for j,lat in enumerate(moc_cube.coord('latitude').points):
+    if lat < 8.:
+        moc_cube.data[:,j] = np.nan
+max_strength = str(np.round(np.max(moc_cube.data)))
+print('eP max strength=',max_strength)
+
+cs=iplt.contourf(moc_cube,cmap='RdBu_r',
+              levels=np.arange(-25.,30.,5.),extend='both')
+
+ax0.set_title('c) EP',fontsize=16)
+#plt.ylabel('depth (m)',fontsize=14)
+plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax0.set_yticklabels([])
+ax0.set_xticks([0,30,60,90])
+
+
+#colorbar
+cax_holder=fig.add_subplot(spec[1,0:3])
+cax_holder.axis("off")
+cax = inset_axes(
+    cax_holder,
+    width="100%",   # fraction of the subplot width
+    height="30%",  # fraction of the subplot height
+    loc="lower center"
+)
+cbar=plt.colorbar(cs, cax=cax, orientation="horizontal")
+cbar.set_label("$^\circ$ C", fontsize=14)
+cbar.ax.tick_params(labelsize=14)
+
+cax_holder.spines[:].set_visible(False)
+cax_holder.tick_params(axis='both', which='both', bottom=False, top=False,
+                  right=False, left=False,labelbottom=False,
+                  labeltop=False,labelleft=False,labelright=False)
+
+plt.tight_layout()
+plt.savefig('Figure2.png')
+
+
+# Save the plot to a file
+#plt.savefig('seaice/sea-ice_30yr_2_2999.png')
+::::::::::::::
+allplots_figure4.py
+::::::::::::::
+#python program
+#
+# all plots for figure 4 of the paper
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+import numpy as np
+import iris
+#import iris.quickplot as qplt
+import iris.plot as iplt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import sys
+
+
+##################################################################
+# set up figure and subplot
+fig = plt.figure(figsize=[10.5,9])
+
+spec = gridspec.GridSpec(ncols=2, nrows=3,
+                         width_ratios=[1, 1], wspace=0.5,
+                         hspace=0.5, height_ratios=[1, 1,0.3])
+
+
+period = {'xqbwd':'LP','xqwbj':'LP$_{490}','xqbwe':'EP$_{400}$',
+          'xqbwg':'EP','xqbwc':'PI'}
+filestart = '/home/earjcti/um/'
+
+# read in data
+fileg_Atl = (filestart +
+             'xqbwg/basin_diagnostics/mean_xqbwg_Atlantic3900_3999.nc')
+filej_Atl = (filestart +
+             'xqbwj/basin_diagnostics/mean_xqbwj_Atlantic3900_3999.nc')
+fileg_Pac = (filestart +
+             'xqbwg/basin_diagnostics/mean_xqbwg_Pacific3900_3999.nc')
+filej_Pac = (filestart +
+             'xqbwj/basin_diagnostics/mean_xqbwj_Pacific3900_3999.nc')
+
+
+#temperature xqbwg-xqbwj Atlantic
+ax0=fig.add_subplot(spec[0])
+xqbwg_atltemp_cube = iris.load_cube(fileg_Atl,'temperature basin')
+xqbwj_atltemp_cube = iris.load_cube(filej_Atl,'temperature basin')
+
+Tanom_cube = xqbwg_atltemp_cube - xqbwj_atltemp_cube
+
+cs=iplt.contourf(Tanom_cube,cmap='RdBu_r',
+              levels=np.arange(-2.0,2.2,0.2),extend='both')
+
+ax0.set_title('a) Atlantic temperature anomaly: EP-LP$_{400}$',fontsize=15)
+plt.ylabel('depth (m)',fontsize=14)
+#plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax0.set_xticks([-60,-30,0,30,60])
+
+
+#colorbar
+cax_holder=fig.add_subplot(spec[4])
+cax_holder.axis("off")
+cax = inset_axes(
+    cax_holder,
+    width="100%",   # fraction of the subplot width
+    height="30%",  # fraction of the subplot height
+    loc="upper center"
+)
+cbar=plt.colorbar(cs, cax=cax, orientation="horizontal")
+cbar.set_label("$^\circ$ C", fontsize=15)
+cbar.ax.tick_params(labelsize=14,labelrotation=45)
+
+cax_holder.spines[:].set_visible(False)
+cax_holder.tick_params(axis='both', which='both', bottom=False, top=False,
+                  right=False, left=False,labelbottom=False,
+                  labeltop=False,labelleft=False,labelright=False)
+                      
+
+
+
+
+# now do atlantic salinity anomaly
+ax1=fig.add_subplot(spec[1])
+xqbwg_atl_cube = iris.load_cube(fileg_Atl,'salinity basin')
+xqbwj_atl_cube = iris.load_cube(filej_Atl,'salinity basin')
+
+Sanom_cube = xqbwg_atl_cube - xqbwj_atl_cube
+
+cs2=iplt.contourf(Sanom_cube,cmap='RdBu_r',
+              levels=np.arange(-0.5,0.55,0.05),extend='both')
+
+ax1.set_title('b) Atlantic salinity anomaly: EP-LP$_{400}$',fontsize=15)
+plt.ylabel('depth (m)',fontsize=14)
+#plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax1.set_xticks([-60,-30,0,30,60])
+
+#colorbar
+cax_holder=fig.add_subplot(spec[5])
+cax_holder.axis("off")
+cax = inset_axes(
+    cax_holder,
+    width="100%",   # fraction of the subplot width
+    height="30%",  # fraction of the subplot height
+    loc="upper center"
+)
+cbar=plt.colorbar(cs2, cax=cax, orientation="horizontal")
+cbar.set_label("psu", fontsize=15)
+cbar.ax.tick_params(labelsize=14,labelrotation=45)
+
+cax_holder.spines[:].set_visible(False)
+cax_holder.tick_params(axis='both', which='both', bottom=False, top=False,
+                  right=False, left=False,labelbottom=False,
+                  labeltop=False,labelleft=False,labelright=False)
+                      
+
+
+#temperature xqbwg-xqbwj Pacific
+ax2=fig.add_subplot(spec[2])
+xqbwg_pactemp_cube = iris.load_cube(fileg_Pac,'temperature basin')
+xqbwj_pactemp_cube = iris.load_cube(filej_Pac,'temperature basin')
+
+Tanom_cube = xqbwg_pactemp_cube - xqbwj_pactemp_cube
+
+iplt.contourf(Tanom_cube,cmap='RdBu_r',
+              levels=np.arange(-2.0,2.2,0.2),extend='both')
+
+ax2.set_title('c) Pacific temperature anomaly: EP-LP$_{400}$',fontsize=15)
+plt.ylabel('depth (m)',fontsize=14)
+plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax2.set_xticks([-60,-30,0,30,60])
+
+# now do pacific salinity anomaly
+ax3=fig.add_subplot(spec[3])
+xqbwg_pac_cube = iris.load_cube(fileg_Pac,'salinity basin')
+xqbwj_pac_cube = iris.load_cube(filej_Pac,'salinity basin')
+
+Sanom_cube = xqbwg_pac_cube - xqbwj_pac_cube
+
+iplt.contourf(Sanom_cube,cmap='RdBu_r',
+              levels=np.arange(-0.5,0.55,0.05),extend='both')
+
+ax3.set_title('d) Pacific salinity anomaly: EP-LP$_{400}$',fontsize=15)
+plt.ylabel('depth (m)',fontsize=14)
+plt.xlabel('latitude ($^\circ$)',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+ax3.set_xticks([-60,-30,0,30,60])
+
+
+
+plt.tight_layout()
+plt.savefig('Figure4.png')
+
+
+# Save the plot to a file
+#plt.savefig('seaice/sea-ice_30yr_2_2999.png')
+::::::::::::::
+allplots_figure5.py
+::::::::::::::
+#python program
+#
+# this program will plot the sea ice area from files created from seaicearea.py
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+import numpy as np
+import iris
+#import iris.quickplot as qplt
+import iris.plot as iplt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import sys
+
+exptnames = ['xpsid','xpsig','xpsie']
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    x_vals = []
+    y_vals = []
+    print(filename)
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read density from a file, skipping the first line
+def read_dens(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y666_vals) - np.array(y203_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+##################################################################
+# set up figure and subplot
+fig = plt.figure(figsize=[10.5,9])
+
+spec = gridspec.GridSpec(ncols=2, nrows=4,
+                         width_ratios=[2, 1], wspace=0.2,
+                         hspace=0.5, height_ratios=[1, 1, 1,0.5])
+
+
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP$_{400}$',
+          'xpsig':'EP','xpsic':'PI'}
+
+#plot data from all the seaice
+ax0=fig.add_subplot(spec[0])
+for expt in exptnames:
+    if expt == 'xpsij':
+        filename = '../timeseries_plots/seaice/seaice_area_' + expt + '_SH_1991_2999.tex'
+    else:
+        filename = '../timeseries_plots/seaice/seaice_area_' + expt + '_SH_2_2999.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+   
+    # Plot the data
+    if expt == 'xpsie':
+        ax0.plot(x_mean, y_mean /1.0E6, label=period.get(expt),linestyle='--',
+                 linewidth=3)
+    else:
+        ax0.plot(x_mean, y_mean /1.0E6, label=period.get(expt) )
+    #plt.title('SH Sea ice area (30 year running mean)')
+ax0.set_title('a) Southern Hemisphere Sea Ice',fontsize=15)
+plt.ylabel('million km$^2$',fontsize=15)
+plt.yticks(fontsize=15)
+#plt.legend(fontsize=20)
+handles,labels = ax0.get_legend_handles_labels()
+plt.xlim(0,3000)
+plt.grid(True)
+plt.axvline(x=1803,color='red',linestyle='--')
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax0.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+ax0.set_xlabel(None)
+
+#legend
+axleg=fig.add_subplot(spec[6])
+plt.legend(handles,labels,ncol=3,loc='lower center',fontsize=15)
+axleg.spines[:].set_visible(False)
+axleg.tick_params(axis='both', which='both', bottom=False, top=False,
+                  right=False, left=False,labelbottom=False,
+                  labeltop=False,labelleft=False,labelright=False)
+
+#plot data from all the salinity
+ax1=fig.add_subplot(spec[2])
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
+    if expt == 'xpsij':
+        filename = filestart + '_60.0S-90S_1991_2999.tex'
+    else:
+        filename = filestart + '_60.0S-90S_2_2999.tex'
+  
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+   
+    # Plot the data
+    if expt == 'xpsie':
+        ax1.plot(x_mean, y_mean, label=period.get(expt),linestyle='--',
+                 linewidth=3)
+    else:
+        ax1.plot(x_mean, y_mean, label=period.get(expt) )
+ax1.set_title('b) Sea Surface Salinity (60\N{degree sign}S - 90\N{degree sign}S)',fontsize=15)
+plt.ylabel('psu',fontsize=15)
+ax1.set_yticks([33.2,33.6,34.0])
+plt.yticks(fontsize=15)
+plt.xlim(0,3000)
+plt.grid(True)
+plt.axvline(x=1803,color='red',linestyle='--')
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax1.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+ax1.set_xlabel(None)
+
+
+
+# do density
+ax2=fig.add_subplot(spec[4])
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_-65.txt'
+    else:
+        filename = filestart + '12_2999_-65.txt'
+  
+    x, y = read_dens(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        ax2.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        ax2.plot(x_mean, y_mean, label=period.get(expt) )
+    ax2.set_title('c) density anomaly (intermediate - near surface)',fontsize=15)
+
+plt.xlabel('year',fontsize=15)
+plt.ylabel('kg/m$^3$',fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.xlim(0,3000)
+#plt.legend(fontsize=14)
+plt.axvline(x=1803,color='red',linestyle='--')
+plt.grid(True)
+
+
+# plot LP AMOC
+cube = iris.load_cube('/home/earjcti/um/xqbwd/MOC/xqbwdpkmean_3900_3999.nc',
+                      'Meridional Overturning Stream Function (Global)')
+ax3=fig.add_subplot(spec[1])
+iplt.contourf(cube,cmap='RdBu_r',levels=np.arange(-30,35,5),extend='both')
+ax3.set_title('d) GMOC: LP',fontsize=15)
+ax3.tick_params(axis='y', which='both', left=False, labelleft=False,
+                right=True,labelright=True)
+plt.yticks(fontsize=15)
+ax3.yaxis.set_label_position("right")
+ax3.set_ylabel('Depth (m)',fontsize=15)
+
+# plot EP AMOC
+cube = iris.load_cube('/home/earjcti/um/xqbwg/MOC/xqbwgpkmean_3900_3999.nc',
+                      'Meridional Overturning Stream Function (Global)')
+ax4=fig.add_subplot(spec[3])
+iplt.contourf(cube,cmap='RdBu_r',levels=np.arange(-30,35,5),extend='both')
+ax4.set_title('e) GMOC: EP',fontsize=15)
+ax4.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+ax4.set_xlabel(None)
+ax4.tick_params(axis='y', which='both', left=False, labelleft=False,
+                right=True,labelright=True)
+plt.yticks(fontsize=15)
+ax4.yaxis.set_label_position("right")
+ax4.set_ylabel('Depth (m)',fontsize=15)
+
+# plot EP400 AMOC
+cube = iris.load_cube('/home/earjcti/um/xqbwe/MOC/xqbwepkmean_3900_3999.nc',
+                      'Meridional Overturning Stream Function (Global)')
+ax5=fig.add_subplot(spec[5])
+cs =iplt.contourf(cube,cmap='RdBu_r',levels=np.arange(-30,35,5),extend='both')
+ax5.set_title('f) GMOC: EP$_{400}$',fontsize=15)
+ax5.tick_params(axis='y', which='both', left=False, labelleft=False,
+                right=True,labelright=True)
+plt.yticks(fontsize=15)
+plt.xticks(fontsize=15)
+ax5.yaxis.set_label_position("right")
+ax5.set_ylabel('Depth (m)',fontsize=15)
+ax5.set_xlabel('latitude',fontsize=15)
+
+
+#colorbar
+cax_holder=fig.add_subplot(spec[7])
+
+# Turn off the holder axis
+cax_holder.axis("off")
+
+# Create a centred inset axis for the colourbar
+cax = inset_axes(
+    cax_holder,
+    width="100%",   # fraction of the subplot width
+    height="30%",  # fraction of the subplot height
+    loc="center"
+)
+
+cbar=plt.colorbar(cs, cax=cax, orientation="horizontal")
+cbar.set_label("Sv", fontsize=15)
+cbar.ax.tick_params(labelsize=15)
+
+cax_holder.spines[:].set_visible(False)
+cax_holder.tick_params(axis='both', which='both', bottom=False, top=False,
+                  right=False, left=False,labelbottom=False,
+                  labeltop=False,labelleft=False,labelright=False)
+                      
+
+
+
+
+plt.tight_layout()
+plt.savefig('Figure5.png')
+
+
+# Save the plot to a file
+#plt.savefig('seaice/sea-ice_30yr_2_2999.png')
+::::::::::::::
+allplots_figure6.py
+::::::::::::::
+#python program
+#
+# all plots for figure 4 of the paper
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+import numpy as np
+import iris
+#import iris.quickplot as qplt
+import iris.plot as iplt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import sys
+
+
+##################################################################
+# set up figure and subplot
+fig = plt.figure(figsize=[10.5,9])
+
+spec = gridspec.GridSpec(ncols=3, nrows=2,
+                         width_ratios=[1, 1,1], wspace=0.5,
+                         hspace=0.5, height_ratios=[1,1])
+
+
+period = {'xqbwd':'LP','xqwbj':'LP$_{490}','xqbwe':'EP$_{400}$',
+          'xqbwg':'EP','xqbwc':'PI'}
+filestart = '/home/earjcti/um/'
+
+# read in data
+f_ep400 = (filestart + 'xpsie/basin_diagnostics/mean_xpsie_Pacific1400_1499.nc')
+f_ep = (filestart + 'xpsig/basin_diagnostics/mean_xpsig_Pacific1400_1499.nc')
+f_lp = (filestart + 'xpsid/basin_diagnostics/mean_xpsid_Pacific1400_1499.nc')
+
+#density EP400-LP
+
+ax0=fig.add_subplot(spec[0])
+EP400_cube_a = iris.load_cube(f_ep400,'density basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP400_cube_b = EP400_cube_a.extract(constraint1)
+EP400_cube = EP400_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'density basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP400_cube - LP_cube
+
+vals = np.arange(-0.1,0.11,0.01)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+#plt.xlabel('Latitude (degrees)',fontsize=14)
+plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('a) Density: EP$_{400}$ - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('kg m$^{-3}$',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+
+#salinity EP400-LP
+
+ax0=fig.add_subplot(spec[1])
+EP400_cube_a = iris.load_cube(f_ep400,'salinity basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP400_cube_b = EP400_cube_a.extract(constraint1)
+EP400_cube = EP400_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'salinity basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP400_cube - LP_cube
+
+vals = np.arange(-0.2,0.22,0.02)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+#plt.xlabel('Latitude (degrees)',fontsize=14)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.set_yticks([])
+plt.title('b) Salinity: EP$_{400}$ - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('psu',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+#temperature EP400-LP
+
+ax0=fig.add_subplot(spec[2])
+EP400_cube_a = iris.load_cube(f_ep400,'temperature basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP400_cube_b = EP400_cube_a.extract(constraint1)
+EP400_cube = EP400_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'temperature basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP400_cube - LP_cube
+
+vals = np.arange(-1.0,1.1,0.1)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+#plt.xlabel('Latitude (degrees)',fontsize=14)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('c) Temperature: EP$_{400}$ - LP',fontsize=14)
+ax0.set_yticks([])
+
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('$^\circ$C',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+# now do EP-LP
+
+#density EP-LP
+
+ax0=fig.add_subplot(spec[3])
+EP_cube_a = iris.load_cube(f_ep,'density basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP_cube_b = EP_cube_a.extract(constraint1)
+EP_cube = EP_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'density basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP_cube - LP_cube
+
+vals = np.arange(-0.2,0.01,0.01)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+plt.xlabel('Latitude ($^\circ$)',fontsize=10)
+plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('d) Density: EP - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('kg m$^{-3}$',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+
+#salinity EP-LP
+
+ax0=fig.add_subplot(spec[4])
+EP_cube_a = iris.load_cube(f_ep,'salinity basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP_cube_b = EP_cube_a.extract(constraint1)
+EP_cube = EP_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'salinity basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP_cube - LP_cube
+
+vals = np.arange(-0.2,0.22,0.02)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+plt.xlabel('Latitude ($^\circ$)',fontsize=10)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.set_yticks([])
+plt.title('e) Salinity: EP - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('psu',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+#temperature EP-LP
+
+ax0=fig.add_subplot(spec[5])
+EP_cube_a = iris.load_cube(f_ep,'temperature basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP_cube_b = EP_cube_a.extract(constraint1)
+EP_cube = EP_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'temperature basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP_cube - LP_cube
+
+vals = np.arange(-2.0,2.2,0.2)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+plt.xlabel('Latitude ($^\circ$)',fontsize=10)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('f) Temperature: EP - LP',fontsize=14)
+ax0.set_yticks([])
+
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('$^\circ$C',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+
+plt.tight_layout()
+plt.savefig('Figure6.png')
+
+
+# Save the plot to a file
+#plt.savefig('seaice/sea-ice_30yr_2_2999.png')
+::::::::::::::
+plot_OHT_with_anomaly_allbasins.py
+::::::::::::::
+#python program
+#
+# this program will plot the diagnostics associated with ocean heat transport
+#
+# will do
+# 1. mean OHT over a given number of years and anomaly between them for all
+# basins.  will put in one figure
+# 
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import numpy as np
+from matplotlib.gridspec import GridSpec
+import sys
+
+#exptnames = ['xpsic','xpsid','xpsig','xpsie']
+exptnames = ['xpsie','xpsig']
+timeseries_req='n'
+yearstart=1400
+yearend=1600
+
+
+
+# Function to read data from a netcdf file
+def get_data(filestart,yearstart,yearend):
+    """
+    this will read the data from a netcdf files according to yearstart,yearend
+    note that the netcdf files will be in chunks of 1000 years
+    I am assume that the date in the file corresponds to the calendar year
+    """
+
+    Atl_allcubes = CubeList([])
+    Pac_allcubes = CubeList([])
+    Glob_allcubes = CubeList([])
+
+    if yearstart < 2000 and yearend > 1000:
+        try:
+            Atlcube = iris.load_cube(filestart + '_1000_2000Tref_is_zero.nc',
+                                  'Ocean heat transport (atlantic)')
+            Paccube = iris.load_cube(filestart + '_1000_2000Tref_is_zero.nc',
+                                  'Ocean heat transport (pacific)')
+            Globcube = iris.load_cube(filestart + '_1000_2000Tref_is_zero.nc',
+                                  'Ocean heat transport (global)')
+        except:
+            Atlcube = iris.load_cube(filestart + '_1000_2000.nc',
+                                  'Ocean heat transport (atlantic)')
+            Paccube = iris.load_cube(filestart + '_1000_2000.nc',
+                                  'Ocean heat transport (pacific)')
+            Globcube = iris.load_cube(filestart + '_1000_2000.nc',
+                                  'Ocean heat transport (global)')
+
+        Atl_allcubes.append(Atlcube)
+        Pac_allcubes.append(Paccube)
+        Glob_allcubes.append(Globcube)
+    else:
+        print('add more years - already set up to cross files')
+        sys.exit(0)
+  
+
+    time_constraint = iris.Constraint(t=lambda
+                      cell: yearstart <= cell.point.year <= yearend)
+
+
+    fullcube = Atl_allcubes.concatenate_cube()
+    Atl_timecube = fullcube.extract(time_constraint)
+    Atl_meancube = Atl_timecube.collapsed('t',iris.analysis.MEAN)
+
+    fullcube = Pac_allcubes.concatenate_cube()
+    Pac_timecube = fullcube.extract(time_constraint)
+    Pac_meancube = Pac_timecube.collapsed('t',iris.analysis.MEAN)
+
+    fullcube = Glob_allcubes.concatenate_cube()
+    Glob_timecube = fullcube.extract(time_constraint)
+    Glob_meancube = Glob_timecube.collapsed('t',iris.analysis.MEAN)
+
+    return Atl_meancube, Pac_meancube, Glob_meancube
+
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP$_{400}$','xpsig':'EP',
+          'xpsic':'PI','xqbwg':'EP','xqbwj':'LP490'}
+
+
+filestart = '/home/earjcti/um/xpsig/timeseries/OHT_xpsig'
+Atl_cube_g, Pac_cube_g, Glob_cube_g =get_data(filestart,yearstart,yearend)
+
+filestart = '/home/earjcti/um/xpsie/timeseries/OHT_xpsie'
+Atl_cube_e, Pac_cube_e, Glob_cube_e =get_data(filestart,yearstart,yearend)
+
+
+
+
+fig = plt.figure(figsize=[10.5,9])
+spec = GridSpec(ncols=4, nrows=2,
+                         width_ratios=[1, 1,1,1], wspace=0.1,
+                         hspace=0.5, height_ratios=[1, 1])
+
+# plot Atlantic
+
+ax=fig.add_subplot(spec[0,0:2])
+latitudes = Atl_cube_e.coord('latitude').points
+values_g = Atl_cube_g.data
+values_e = Atl_cube_e.data
+values_anom = values_g - values_e
+
+ax.plot(latitudes, values_g, label=period.get('xpsig'),linewidth=2)
+ax.plot(latitudes, values_e, label=period.get('xpsie'),linewidth=2,linestyle='--')
+
+ax2=ax.twinx()
+ax2.plot(latitudes,values_anom,label=period.get('xpsig') +  ' - ' +
+         period.get('xpsie'),linewidth=2,color='grey',
+         linestyle='dotted')
+
+#anomvals = (valuse_anom / values) * 100.
+#for ix,anom in enumerate(anomvals):
+#if -85 < latitudes[ix] < 0.0:
+#print(latitudes[ix],round(anom,0),round(values[ix],2),round(cntl_values[ix],2),round((values[ix]-cntl_values[ix]),2))
+#                sys.exit(0)
+                
+                
+ax.set_xlabel('Latitude',fontsize=16)
+ax.set_ylabel('OHT (PW)',fontsize=16)
+ax.tick_params(axis='both',which='major',labelsize=14)
+
+   
+ax.axhline(y=0, color='black', linewidth=2)
+   
+# sort out legend
+    
+lines1, labels1 = ax.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+
+lines = lines1 + lines2
+labels = labels1 + labels2
+
+
+ax.set_ylim(-1.5,1.5)
+ax2.set_ylim(-0.15,0.15)
+ax2.set_yticklabels([])
+#ax2.tick_params(axis='y', colors='grey',labelsize=14)
+#ax2.spines['right'].set_color('grey')
+#ax2.set_ylabel('anomaly (PW)',fontsize=16,color='grey')
+
+ax.grid(True)
+
+ax.set_title('a) Atlantic Ocean Heat Transport',fontsize=16)
+ax.set_xlim(-30,90)
+#ax.legend(lines, labels, loc='lower right',fontsize=16)
+
+
+
+# plot Pacific
+
+ax=fig.add_subplot(spec[0,2:4])
+latitudes = Pac_cube_e.coord('latitude').points
+values_g = Pac_cube_g.data
+values_e = Pac_cube_e.data
+values_anom = values_g - values_e
+
+ax.plot(latitudes, values_g, label=period.get('xpsig'),linewidth=2)
+ax.plot(latitudes, values_e, label=period.get('xpsie'),linewidth=2,linestyle='--')
+
+ax2=ax.twinx()
+ax2.plot(latitudes,values_anom,label=period.get('xpsig') +  ' - ' +
+         period.get('xpsie'),linewidth=2,color='grey',
+         linestyle='dotted')
+
+                
+ax.set_xlabel('Latitude',fontsize=16)
+#ax.set_ylabel('OHT (PW)',fontsize=16)
+ax.tick_params(axis='both',which='major',labelsize=14)
+
+   
+ax.axhline(y=0, color='black', linewidth=2)
+
+ax.set_yticklabels([])
+ax.set_ylim(-1.5,1.5)
+ax2.set_ylim(-0.15,0.15)
+ax2.tick_params(axis='y', colors='grey',labelsize=14)
+ax2.spines['right'].set_color('grey')
+ax2.set_ylabel('anomaly (PW)',fontsize=16,color='grey')
+
+ax.grid(True)
+
+ax.set_title('b) Pacific Ocean Heat Transport',fontsize=16)
+ax.set_xlim(-30,90)
+#ax.legend(lines, labels, loc='lower right',fontsize=16)
+
+
+
+
+# plot Global
+
+ax=fig.add_subplot(spec[1,0:3])
+latitudes = Glob_cube_e.coord('latitude').points
+values_g = Glob_cube_g.data
+values_e = Glob_cube_e.data
+values_anom = values_g - values_e
+
+ax.plot(latitudes, values_g, label=period.get('xpsig'),linewidth=2)
+ax.plot(latitudes, values_e, label=period.get('xpsie'),linewidth=2,linestyle='--')
+
+ax2=ax.twinx()
+ax2.plot(latitudes,values_anom,label=period.get('xpsig') +  ' - ' +
+         period.get('xpsie'),linewidth=2,color='grey',
+         linestyle='dotted')
+
+                
+ax.set_xlabel('Latitude',fontsize=16)
+ax.set_ylabel('OHT (PW)',fontsize=16)
+ax.tick_params(axis='both',which='major',labelsize=14)
+
+   
+ax.axhline(y=0, color='black', linewidth=2)
+
+ax.set_ylim(-1.5,1.5)
+ax2.set_ylim(-0.15,0.15)
+ax2.tick_params(axis='y', colors='grey',labelsize=14)
+ax2.spines['right'].set_color('grey')
+ax2.set_ylabel('anomaly (PW)',fontsize=16,color='grey')
+
+ax.grid(True)
+
+ax.set_title('c) Global Ocean Heat Transport',fontsize=16)
+ax.set_xlim(-90,90)
+ax.legend(lines, labels, loc='lower right',fontsize=16,bbox_to_anchor=[1.50,0.6])
+
+
+
+plt.tight_layout() 
+#plt.show()
+#sys.exit()
+plt.savefig('supp_figure3.png')
+plt.close()
+sys.exit(0)
+
+::::::::::::::
+plot_supp_fig5.py
+::::::::::::::
+#python program
+#
+# this program will plot sea ice in volume for supplementary figure 5
+#
+# 
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import numpy as np
+from matplotlib.gridspec import GridSpec
+import sys
+
+#exptnames = ['xpsic','xpsid','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    x_vals = []
+    y_vals = []
+    print(filename)
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP$_{400}$','xpsig':'EP',
+          'xpsic':'PI','xqbwg':'EP','xqbwj':'LP490'}
+
+fig = plt.figure(figsize=[10.5,6])
+#spec = GridSpec(ncols=2, nrows=2,
+#                         width_ratios=[1,1], wspace=0.1,
+#                         hspace=0.5, height_ratios=[1, 1])
+
+
+# plot sea ice area as timeseries
+
+ax=plt.subplot(111)
+
+for expt in exptnames:
+    if expt == 'xpsij':
+        filename = '../timeseries_plots/seaice/seaice_area_' + expt + '_SH_1991_2999.tex'
+    else:
+        filename = '../timeseries_plots/seaice/seaice_area_' + expt + '_SH_2_100.tex'
+  
+    x, y = read_data(filename)
+    if expt == 'xpsie':
+        plt.plot(x,y,label=period.get(expt),linestyle='--')
+    else:
+        plt.plot(x,y,label=period.get(expt))
+             
+plt.title('SH Sea ice area',fontsize=14)
+ax.tick_params(axis='both',which='major',labelsize=14)
+plt.xlabel('year',fontsize=14)
+plt.ylabel('km$^2$',fontsize=14)
+plt.legend()
+plt.xlim(0,50)
+plt.grid(True)
+
+ax.grid(True)
+
+ax.legend(fontsize=14)
+
+#plt.show()
+
+    
+
+
+#plt.tight_layout() 
+#plt.show()
+#sys.exit()
+plt.savefig('supp_figure5.png')
+plt.close()
+sys.exit(0)
+
+::::::::::::::
+supp_fig4.py
+::::::::::::::
+#python program
+#
+# all plots for figure 4 of the paper
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+import numpy as np
+import iris
+#import iris.quickplot as qplt
+import iris.plot as iplt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import sys
+
+
+##################################################################
+# set up figure and subplot
+fig = plt.figure(figsize=[10.5,9])
+
+spec = gridspec.GridSpec(ncols=3, nrows=2,
+                         width_ratios=[1, 1,1], wspace=0.5,
+                         hspace=0.5, height_ratios=[1,1])
+
+
+period = {'xqbwd':'LP','xqwbj':'LP$_{490}','xqbwe':'EP$_{400}$',
+          'xqbwg':'EP','xqbwc':'PI'}
+filestart = '/home/earjcti/um/'
+
+# read in data
+f_ep400 = (filestart + 'xpsie/basin_diagnostics/mean_xpsie_Pacific2_51.nc')
+f_ep = (filestart + 'xpsig/basin_diagnostics/mean_xpsig_Pacific2_51.nc')
+f_lp = (filestart + 'xpsid/basin_diagnostics/mean_xpsid_Pacific2_51.nc')
+
+#density EP400-LP
+
+ax0=fig.add_subplot(spec[0])
+EP400_cube_a = iris.load_cube(f_ep400,'density basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP400_cube_b = EP400_cube_a.extract(constraint1)
+EP400_cube = EP400_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'density basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP400_cube - LP_cube
+
+vals = np.arange(-0.1,0.11,0.01)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+#plt.xlabel('Latitude (degrees)',fontsize=14)
+plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('a) Density: EP$_{400}$ - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('kg m$^{-3}$',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+
+#salinity EP400-LP
+
+ax0=fig.add_subplot(spec[1])
+EP400_cube_a = iris.load_cube(f_ep400,'salinity basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP400_cube_b = EP400_cube_a.extract(constraint1)
+EP400_cube = EP400_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'salinity basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP400_cube - LP_cube
+
+vals = np.arange(-0.2,0.22,0.02)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+#plt.xlabel('Latitude (degrees)',fontsize=14)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.set_yticks([])
+plt.title('b) Salinity: EP$_{400}$ - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('psu',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+#temperature EP400-LP
+
+ax0=fig.add_subplot(spec[2])
+EP400_cube_a = iris.load_cube(f_ep400,'temperature basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP400_cube_b = EP400_cube_a.extract(constraint1)
+EP400_cube = EP400_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'temperature basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP400_cube - LP_cube
+
+vals = np.arange(-0.5,0.55,0.05)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+#plt.xlabel('Latitude (degrees)',fontsize=14)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('c) Temperature: EP$_{400}$ - LP',fontsize=14)
+ax0.set_yticks([])
+
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('$^\circ$C',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+# now do EP-LP
+
+#density EP-LP
+
+ax0=fig.add_subplot(spec[3])
+EP_cube_a = iris.load_cube(f_ep,'density basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP_cube_b = EP_cube_a.extract(constraint1)
+EP_cube = EP_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'density basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP_cube - LP_cube
+
+vals = np.arange(-0.1,0.11,0.01)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+plt.xlabel('Latitude ($^\circ$)',fontsize=10)
+plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('d) Density: EP - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('kg m$^{-3}$',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+
+#salinity EP-LP
+
+ax0=fig.add_subplot(spec[4])
+EP_cube_a = iris.load_cube(f_ep,'salinity basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP_cube_b = EP_cube_a.extract(constraint1)
+EP_cube = EP_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'salinity basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP_cube - LP_cube
+
+vals = np.arange(-0.2,0.22,0.02)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+plt.xlabel('Latitude ($^\circ$)',fontsize=10)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.set_yticks([])
+plt.title('e) Salinity: EP - LP',fontsize=14)
+    
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('psu',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+#temperature EP-LP
+
+ax0=fig.add_subplot(spec[5])
+EP_cube_a = iris.load_cube(f_ep,'temperature basin')
+constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -60)
+constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 2200)
+EP_cube_b = EP_cube_a.extract(constraint1)
+EP_cube = EP_cube_b.extract(constraint2)
+       
+LP_cube_a = iris.load_cube(f_lp,'temperature basin')
+LP_cube_b = LP_cube_a.extract(constraint1)
+LP_cube =  LP_cube_b.extract(constraint2)
+
+anom_cube = EP_cube - LP_cube
+
+vals = np.arange(-0.5,0.55,0.05)
+cs=iplt.contourf(anom_cube,levels=vals,extend='both',cmap='RdBu_r')
+plt.xlabel('Latitude ($^\circ$)',fontsize=10)
+#plt.ylabel('Depth (m)',fontsize=10)
+ax0.tick_params(labelsize=10)
+plt.title('f) Temperature: EP - LP',fontsize=14)
+ax0.set_yticks([])
+
+cb=plt.colorbar(cs,orientation='vertical')
+cb.ax.set_xlabel('$^\circ$C',fontsize=12)
+cb.ax.tick_params(labelsize=12)
+cb.ax.xaxis.set_label_position('bottom')
+cb.ax.xaxis.labelpad=15
+
+
+plt.tight_layout()
+plt.savefig('Supp_Figure4.png')
+
+
+# Save the plot to a file
+#plt.savefig('seaice/sea-ice_30yr_2_2999.png')
