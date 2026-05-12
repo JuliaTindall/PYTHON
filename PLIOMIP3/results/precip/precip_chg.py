@@ -19,6 +19,7 @@ import iris
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.ticker as mticker
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import iris.quickplot as qplt
 import iris.plot as iplt
@@ -29,6 +30,18 @@ import sys
 if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
+
+class PiecewiseNorm(Normalize):
+    def __init__(self, levels, clip=False):
+        # the input levels
+        self._levels = np.sort(levels)
+        # corresponding normalized values between 0 and 1
+        self._normed = np.linspace(0, 1, len(levels))
+        Normalize.__init__(self, None, None, clip)
+
+    def __call__(self, value, clip=None):
+        # linearly interpolate to get the normalized value
+        return np.ma.masked_array(np.interp(value, self._levels, self._normed))
 
 
 def make_cmap(colors, position=None, bit=False):
@@ -237,8 +250,20 @@ for EXPT in EXPTS:
     if field == 'precip': # also plot percentage change
         ratiocube = expt_cube/cntl_cube
         ratiocube.units = None
-        vals = np.arange(0.4,1.7,0.1)
-        qplt.contourf(ratiocube,levels=vals,extend='both',cmap='RdBu')
+        vals = [0.33,0.5,0.66,0.75,0.8,0.9,1.0,1.1,1.25,1.33,1.5,2.0,3.0]
+        # put white in middle of colormap
+        cmapname_w=mp.cm.get_cmap(cmapname,len(vals)+1)
+        newcolors=cmapname_w(np.linspace(0,1,len(vals)+1))
+        white=([1,1,1,1])
+        newcolors[6:8,:]=white
+        cmapname_w=ListedColormap(newcolors)
+
+        cs=iplt.contourf(ratiocube,levels=vals,extend='both',cmap=cmapname_w,
+                      norm=PiecewiseNorm(vals))
+        cbar=plt.colorbar(cs,orientation='horizontal',ticks=vals)
+       
+        #vals = np.arange(0.4,1.7,0.1)
+        #qplt.contourf(ratiocube,levels=vals,extend='both',cmap='RdBu')
         titlename = EXPT + '/' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS)
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()

@@ -19,6 +19,7 @@ import iris
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.ticker as mticker
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import iris.quickplot as qplt
 import iris.plot as iplt
@@ -30,7 +31,20 @@ if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
 
+class PiecewiseNorm(Normalize):
+    def __init__(self, levels, clip=False):
+        # the input levels
+        self._levels = np.sort(levels)
+        # corresponding normalized values between 0 and 1
+        self._normed = np.linspace(0, 1, len(levels))
+        Normalize.__init__(self, None, None, clip)
 
+    def __call__(self, value, clip=None):
+        # linearly interpolate to get the normalized value
+        return np.ma.masked_array(np.interp(value, self._levels, self._normed))
+
+
+    
 def make_cmap(colors, position=None, bit=False):
     '''
     I didn't write this I found it on the web.
@@ -108,18 +122,18 @@ def get_avg(jobid, startyear):
     count=0.
 
     # get template map
-    cube = iris.load_cube('/nfs/hera1/earjcti/um/xqbwd/pcpd/' + 
+    cube = iris.load_cube('/uolstore/Research/a/hera1/earjcti/um/xqbwd/pcpd/' + 
                           'xqbwda#pd' + str(startyear).zfill(9) + 'dc+.nc',
                           longfield.get(field))
 
     cube = iris.util.squeeze(cube)
       
     for year in range(startyear, startyear+NYEARS):
-        dccube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+        dccube = iris.load_cube('/uolstore/Research/a/hera1/earjcti/um/' + jobid + '/pcpd/' + 
                  jobid + 'a#pd' + str(year-1).zfill(9) + 'dc+.nc',field)
-        jacube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+        jacube = iris.load_cube('/uolstore/Research/a/hera1/earjcti/um/' + jobid + '/pcpd/' + 
                  jobid + 'a#pd' + str(year).zfill(9) + 'ja+.nc',field)
-        fbcube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
+        fbcube = iris.load_cube('/uolstore/Research/a/hera1/earjcti/um/' + jobid + '/pcpd/' + 
                  jobid + 'a#pd' + str(year).zfill(9) + 'fb+.nc',field)
 
         tempavg = np.squeeze((dccube.data + jacube.data + fbcube.data) / 3.0)
@@ -150,13 +164,13 @@ SEASON = 'djf'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPTS = ['xqbwd']  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPTS = ['xqbwn']  # xpsic PI,  xpsij-lp490  xpsik - lp560
 #EXPTS=['xqbwd']
 EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
+CNTL = 'xqbwi'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
@@ -203,29 +217,41 @@ for EXPT in EXPTS:
         cmapname = customise_cmap2()
 
     print(vals)
-    qplt.contourf(diff_cube,levels=vals,extend='both',cmap=cmapname)
+    qplt.contourf(diff_cube,levels=vals*2,extend='both',cmap=cmapname)
     titlename = 'precip: ' + EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) + '.Meandiff =' +  diffchar
     plt.title(titlename, fontsize=10)
     plt.gca().coastlines()
   
       
     print('about to write to file')
-    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) +  '.eps')
-    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '.png')
+    plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) +  '.eps')
+    plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '.png')
     plt.close()
     
     if field == 'precip': # also plot percentage change
         ratiocube = expt_cube/cntl_cube
         ratiocube.units = None
-        vals = np.arange(0.85,1.65,0.1)
-        qplt.contourf(ratiocube,levels=vals,extend='both')
+        vals = [0.33,0.5,0.66,0.75,0.8,0.9,1.0,1.1,1.25,1.33,1.5,2.0,3.0]
+        # put white in middle of colormap
+        cmapname_w=mp.cm.get_cmap(cmapname,len(vals)+1)
+        newcolors=cmapname_w(np.linspace(0,1,len(vals)+1))
+        white=([1,1,1,1])
+        newcolors[6:8,:]=white
+        cmapname_w=ListedColormap(newcolors)
+
+        cs=iplt.contourf(ratiocube,levels=vals,extend='both',cmap=cmapname_w,
+                      norm=PiecewiseNorm(vals))
+        cbar=plt.colorbar(cs,orientation='horizontal',ticks=vals)
+
+        #vals = np.arange(0.85,1.65,0.1)
+        #qplt.contourf(ratiocube,levels=vals,extend='both')
         titlename = EXPT + '/' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS)
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()
       
         print('about to write to file')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.eps')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.png')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.eps')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.png')
 
         # also plot north america
         plt.close()
@@ -249,8 +275,8 @@ for EXPT in EXPTS:
         titlename = EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) 
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.eps')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.png')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.eps')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.png')
         plt.close()
 
   

@@ -2421,3 +2421,59 @@ about to write to file
 [-5.00000000e-01 -4.00000000e-01 -3.00000000e-01 -2.00000000e-01
  -1.00000000e-01 -1.11022302e-16  1.00000000e-01  2.00000000e-01
   3.00000000e-01  4.00000000e-01  5.00000000e-01]
+Traceback (most recent call last):
+  File "/uolstore/home/staff_lnxhome02/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/precip/winter_precip_chg.py", line 264, in <module>
+    axplot=qplt.contourf(diff_cube,cmap=cmapname,levels=vals,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/quickplot.py", line 216, in contourf
+    result = iplt.contourf(cube, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/plot.py", line 1152, in contourf
+    result = _draw_2d_from_points("contourf", None, cube, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/plot.py", line 499, in _draw_2d_from_points
+    result = _map_common(
+             ^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/plot.py", line 1092, in _map_common
+    return plotfn(*new_args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/matplotlib/pyplot.py", line 2938, in contourf
+    __ret = gca().contourf(
+            ^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/mpl/geoaxes.py", line 315, in wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/mpl/geoaxes.py", line 359, in wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/mpl/geoaxes.py", line 1666, in contourf
+    self.update_datalim(result.get_datalim(self.transData))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/matplotlib/collections.py", line 267, in get_datalim
+    paths = [transform.transform_path_non_affine(p) for p in paths]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/matplotlib/transforms.py", line 2426, in transform_path_non_affine
+    return self._a.transform_path_non_affine(path)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/mpl/geoaxes.py", line 186, in transform_path_non_affine
+    proj_geom = self.target_projection.project_geometry(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/crs.py", line 817, in project_geometry
+    return getattr(self, method_name)(geometry, src_crs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/crs.py", line 972, in _project_polygon
+    return self._rings_to_multi_polygon(rings, is_ccw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/cartopy/crs.py", line 1190, in _rings_to_multi_polygon
+    elif polygon.crosses(interior_ring):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/shapely/geometry/base.py", line 688, in crosses
+    return _maybe_unpack(shapely.crosses(self, other))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/shapely/decorators.py", line 77, in wrapped
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/shapely/predicates.py", line 469, in crosses
+    return lib.crosses(a, b, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+shapely.errors.GEOSException: TopologyException: side location conflict at 0 90. This can occur if the input geometry is invalid.

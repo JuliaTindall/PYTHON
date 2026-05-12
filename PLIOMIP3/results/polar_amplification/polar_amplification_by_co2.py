@@ -36,7 +36,7 @@ def get_temperature_bands(expt):
     """
     gets the polar amplification for the NH and the SH
     """
-    tempfile = ('/nfs/hera1/earjcti/um/' + expt + '/database_averages/' + 
+    tempfile = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/database_averages/' + 
                 expt + '_Annual_Average_#pd_Temperature_3900_4000.nc')
     temp_cube = iris.load_cube(tempfile)
     temp_cube=iris.util.squeeze(temp_cube)
@@ -80,7 +80,7 @@ def get_temperature_bands(expt):
 PI_CONTROL='xqbwc'
 LP_CONTROL='xqbwi'
 
-PI_EXPTS=['xqbwd','xqbwl','xqbwm']
+PI_EXPTS=['xqbwi','xqbwl','xqbwm']
 LP_EXPTS=['xqbwd','xqbwj','xqbwk']
 EXPTNAMES={'xqbwc':'PI280', 'xqbwd':'LP400','xqbwg':'EP',
            'xqbwr':'LP_alt','xqbwl':'PI400','xqbwm':'PI560',
@@ -89,7 +89,7 @@ EXPTNAMES={'xqbwc':'PI280', 'xqbwd':'LP400','xqbwg':'EP',
            'xqbwt':'PI_dyn-veg','xqbws':'LP_dyn-veg'}
 EXPTCO2={'xqbwc':'280ppmv', 'xqbwd':'400ppmv','xqbwg':'EP',
            'xqbwr':'LP_alt','xqbwl':'400pmv','xqbwm':'560ppmv',
-           'xqbwi':'280','xqbwj':'490ppmv','xqbwk':'560ppmv',
+           'xqbwi':'LP-PI','xqbwj':'490ppmv','xqbwk':'560ppmv',
            'xqbwn':'LP_highNH_orb','xqbwo':'LP_lowNH_orb',
            'xqbwt':'PI_dyn-veg','xqbws':'LP_dyn-veg'}
 #EXPTS=['xqbwd','xqbwg','xqbwr']
@@ -148,7 +148,7 @@ ax.set_title('Polar Amplification relative to CO2=280ppmv')
 ax.set_ylabel('Amplification Factor')
 ax.set_xticks(x+0.2,exptnames_used,rotation=90)
 ax.legend(loc='lower left',ncol=2,bbox_to_anchor=(-0.05, -0.4))
-ax.set_ylim(1.0,3.0)
+ax.set_ylim(1.0,4.0)
 ax.set_xlim(-0.5,5.75)
 
 # put some colors dividing the experiments
@@ -166,8 +166,8 @@ for i,amp in enumerate(NH_amplification):
 for i,amp in enumerate(SH_amplification):
     rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
 
-plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP3/results/polar_amplification_by_co2.eps')
-plt.savefig('/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP3/results/polar_amplification_by_co2.png')
+plt.savefig('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/results/polar_amplification_by_co2.eps')
+plt.savefig('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/results/polar_amplification_by_co2.png')
 plt.show()
 plt.close()           
            

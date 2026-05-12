@@ -215,7 +215,7 @@ for EXPT in EXPTS:
         cmapname = customise_cmap2()
 
     print(vals)
-    qplt.contourf(diff_cube,levels=vals*2,extend='both',cmap=cmapname)
+    qplt.contourf(diff_cube,levels=vals,extend='both',cmap=cmapname)
     titlename = 'precip: ' + EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) + '.Meandiff =' +  diffchar
     plt.title(titlename, fontsize=10)
     plt.gca().coastlines()
