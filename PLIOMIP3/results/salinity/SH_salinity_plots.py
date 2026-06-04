@@ -69,7 +69,7 @@ def plot_SH_salin(cube,month,lsm_cube):
     """
     plots the SH salinity for the experiment
     """
-    outstart = ('/nfs/hera1/earjcti/um/' + expt + '/avgplots/salinity/' + 
+    outstart = ('/nfs/hera1/earjcti/um/' + expt + '/avgplots/SH_salin/' + 
                 str(startyear) + '_' + str(endyear) + '_')
     
     levels=np.arange(0.0, 1.01, 0.01)
@@ -145,10 +145,10 @@ name = {'xqbwc':'PI','xpsic':'PI',
         'xpsie':'Early Pliocene 400ppmv'}
 
 # read in multimodel mean monthly SST data (EOI400-E280)
-expt='xqbwd'
-cntl='xqbwc'
-startyear=3900
-endyear=4000
+expt='xpsie'
+cntl='xpsic'
+startyear=800
+endyear=1400
 
 MP_cube = iris.load_cube('/nfs/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Annual_Average_#pf_SSS_' + str(startyear) + '_' + str(endyear) + '.nc', 'OCN TOP-LEVEL SALINITY')
 PI_cube =iris.load_cube('/nfs/hera1/earjcti/um/'+cntl+'/database_averages/'+cntl+'_Annual_Average_#pf_SSS_' + str(startyear) + '_' + str(endyear) + '.nc', 'OCN TOP-LEVEL SALINITY') 

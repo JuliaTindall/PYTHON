@@ -37,9 +37,14 @@ def get_season(jobid, startyear, endyear):
     gets the average data fpr the field
     """  
 
-    filename = ('/uolstore/Research/a/hera1/earjcti/um/' + jobid + '/database_averages/' + 
-                jobid + '_Monthly_Average_#pd_' + FIELD + '_' + STARTYEAR + 
-                '_' + ENDYEAR + '_orbital.nc')
+    if jobid == 'xqbwn' or jobid == 'xqbwo':
+        filename = (filestart + jobid + '/database_averages/' + 
+                    jobid + '_Monthly_Average_#pd_' + FIELD + '_' + STARTYEAR + 
+                    '_' + ENDYEAR + '_orbital.nc')
+    else:
+        filename = (filestart + jobid + '/database_averages/' + 
+                    jobid + '_Monthly_Average_#pd_' + FIELD + '_' + STARTYEAR + 
+                    '_' + ENDYEAR + '.nc')
 
     longfield = {'Temperature' : 'TEMPERATURE AT 1.5M',
                  'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
@@ -77,14 +82,22 @@ def get_season(jobid, startyear, endyear):
     jja_cubelist.append(cube[7,:,:,:])
     jja_3cube = jja_cubelist.merge_cube()
     jja_cube = jja_3cube.collapsed(['time'],iris.analysis.MEAN)
-   
-    return djf_cube, jja_cube
+
+    son_cubelist = CubeList([])
+    son_cubelist.append(cube[8,:,:,:])
+    son_cubelist.append(cube[9,:,:,:])
+    son_cubelist.append(cube[10,:,:,:])
+    son_3cube = son_cubelist.merge_cube()
+    son_cube = son_3cube.collapsed(['time'],iris.analysis.MEAN)
+  
+    return djf_cube, jja_cube, son_cube
                    
     
 #=================================================================
 # MAIN PROGRAM STARTS HERE
 
-
+filestart = '/uolstore/Research/a/hera1/earjcti/um/'
+filestart = '/home/earjcti/um/'
 
 LINUX_WIN='l'
 NYEARS = 100
@@ -93,18 +106,19 @@ SEASON = 'ann'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPT = 'xqbwn'  # xsic PI,  xpsij-lp490  xpsik - lp560
+EXPT = 'xqbwd'  # xsic PI,  xpsij-lp490  xpsik - lp560
 CNTL = 'xqbwo'  # xpsic pi, xpsid lp400
 STARTYEAR='3900'
 ENDYEAR='4000'
 
 FIELD = 'Temperature'
 
-cntl_cube_djf, cntl_cube_jja = get_season(CNTL,STARTYEAR,ENDYEAR)
-expt_cube_djf, expt_cube_jja = get_season(EXPT,STARTYEAR,ENDYEAR)
+cntl_cube_djf, cntl_cube_jja, cntl_cube_son = get_season(CNTL,STARTYEAR,ENDYEAR)
+expt_cube_djf, expt_cube_jja, expt_cube_son = get_season(EXPT,STARTYEAR,ENDYEAR)
 
 diff_cube_djf = expt_cube_djf - cntl_cube_djf
 diff_cube_jja = expt_cube_jja - cntl_cube_jja
+diff_cube_son = expt_cube_son - cntl_cube_son
 print('got cntl cube')
 
 #boundaries = [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0]
@@ -138,8 +152,36 @@ plt.title(titlename, fontsize=10)
 plt.gca().coastlines()
       
 print('about to write to file')
-plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
-plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
+plt.savefig(filestart + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
+plt.savefig(filestart + EXPT +  '/avgplots/djf_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
+plt.close()
+
+
+# plot son
+try:
+    diff_cube_son.coord('longitude').guess_bounds()
+    diff_cube_son.coord('latitude').guess_bounds()
+except:
+    pass
+grid_areas = iris.analysis.cartography.area_weights(diff_cube_son)
+meandiff_son = diff_cube_son.collapsed(['longitude','latitude'],
+                               iris.analysis.MEAN, weights=grid_areas)
+diffchar_son = str(np.around(meandiff_son.data,2))
+
+cs=iplt.pcolormesh(diff_cube_son,cmap=cmap_use,
+                 norm=mp.colors.BoundaryNorm(boundaries, 
+                                             ncolors=len(boundaries)-1,
+                                             clip=False))
+cbar=plt.colorbar(cs,orientation='horizontal',extend='both')
+cbar.set_ticks(boundaries)
+cbar.set_label('degC')
+titlename = EXPT + '-' +  CNTL + '. Years:' + str(STARTYEAR) + '-' + str(ENDYEAR) + '. SON. Meandiff =' +  diffchar_son
+plt.title(titlename, fontsize=10)
+plt.gca().coastlines()
+      
+print('about to write to file')
+plt.savefig(filestart + EXPT +  '/avgplots/son_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
+plt.savefig(filestart + EXPT +  '/avgplots/son_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
 plt.close()
 
 
@@ -166,6 +208,6 @@ plt.title(titlename, fontsize=10)
 plt.gca().coastlines()
       
 print('about to write to file')
-plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
-plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
+plt.savefig(filestart + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.eps')
+plt.savefig(filestart + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + FIELD + '.png')
 plt.close()

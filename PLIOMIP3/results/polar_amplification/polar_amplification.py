@@ -34,7 +34,9 @@ def get_temperature_bands(expt):
     """
     gets the polar amplification for the NH and the SH
     """
-    tempfile = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/database_averages/' + 
+    filestart = '/home/earjcti/um/'
+    #filestart = '/uolstore/Research/a/hera1/earjcti/um'
+    tempfile = (filestart + expt + '/database_averages/' + 
                 expt + '_Annual_Average_#pd_Temperature_3900_4000.nc')
     temp_cube = iris.load_cube(tempfile)
     temp_cube=iris.util.squeeze(temp_cube)
@@ -103,7 +105,7 @@ for expt in EXPTS:
 x=np.arange(len(EXPTS))
 width=0.35 # the width of the bars
 bar_colors=['tab:blue','tab:orange']
-fig,ax=plt.subplots(layout='constrained')
+fig,ax=plt.subplots(layout='constrained',figsize=[12.,10.])
 #plot NH
 for i,amp in enumerate(NH_amplification):
     if i == 0:
@@ -119,13 +121,13 @@ for i,amp in enumerate(SH_amplification):
     else:
         rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
 # labels
-ax.set_title('Polar Amplification')
-ax.set_ylabel('Amplification Factor')
-ax.set_xticks(x+0.2,exptnames_used,rotation=90)
-ax.legend(loc='lower left',ncol=2,bbox_to_anchor=(-0.05, -0.3))
+ax.set_title('Polar Amplification',fontsize=16)
+ax.set_ylabel('Amplification Factor',fontsize=16)
+ax.set_xticks(x+0.2,exptnames_used,rotation=90,fontsize=16)
+ax.set_yticklabels(['1','1.5','2','2.5','3','3.5','4'],fontsize=16)
+ax.legend(loc='lower left',ncol=2,bbox_to_anchor=(-0.05, -0.3),fontsize=16)
 ax.set_ylim(1.0,4.0)
 ax.set_xlim(-0.5,11.75)
-
 # put some colors dividing the experiments
 plt.axvspan(-0.5,2.75,facecolor='pink',alpha=0.2)
 plt.axvspan(2.75,7.75,facecolor='yellow',alpha=0.2)
@@ -134,10 +136,10 @@ plt.axvspan(9.75,11.75,facecolor='green',alpha=0.2)
 plt.axvline(x=2.75,ymin=0.0,ymax=1.0,color='black')
 plt.axvline(x=7.75,ymin=0.0,ymax=1.0,color='black')
 plt.axvline(x=9.75,ymin=0.0,ymax=1.0,color='black')
-plt.text(-0.25,3.75,'core and extension')
-plt.text(4.0, 3.75,'CO2 sensitivity')
-plt.text(8.0,3.75,'orbital')
-plt.text(10.0,3.75,'vegetaton')
+plt.text(-0.25,3.75,'core and extension',fontsize=16)
+plt.text(4.0, 3.75,'CO2 sensitivity',fontsize=16)
+plt.text(8.0,3.75,'orbital',fontsize=16)
+plt.text(10.0,3.75,'vegetaton',fontsize=16)
 
 #plot the data again because of the background
 for i,amp in enumerate(NH_amplification):
@@ -145,6 +147,8 @@ for i,amp in enumerate(NH_amplification):
 for i,amp in enumerate(SH_amplification):
     rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
 
-plt.show()
+plt.savefig('polar_amp_orig.png')
+plt.close()
+#plt.show()
            
            

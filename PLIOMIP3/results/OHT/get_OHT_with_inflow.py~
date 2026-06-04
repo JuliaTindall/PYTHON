@@ -118,13 +118,9 @@ def get_mask():
     #plt.show()
     #sys.exit(0)
 
-    lat_constraint = iris.Constraint(latitude=lambda cell: -10 <= cell <= 15)
-    lon_constraint = iris.Constraint(longitude=lambda cell: 260 <= cell <= 300)
-
-    Atlantic_cube_sub = Atlantic_cube.extract(lat_constraint & lon_constraint)
-
-
-    #iris.save([Atlantic_cube,Atlantic_cube_sub],'temporary.nc',fill_value=-99999.)
+    Atlantic_cube_alt = Atlantic_cube.copy(data=np.where(Atlantic_cube.data > 1E20,2.0,Atlantic_cube.data))
+    iris.save(Atlantic_cube,'temporary.nc',fill_value=-99999.)
+    sys.exit(0)
 
     return Atlantic_cube, Pacific_cube, Indian_cube, Global_cube
 
@@ -216,15 +212,6 @@ def V_grid_mask(orig_cube,vgrid_cube):
 
     vmaskcube = vgrid_cube.copy(data=vmaskdata)
                 
-
-    lat_constraint = iris.Constraint(latitude=lambda cell: -10 <= cell <= 15)
-    lon_constraint = iris.Constraint(longitude=lambda cell: 260 <= cell <= 300)
-
-    Atlantic_cube_sub = vmaskcube.extract(lat_constraint & lon_constraint)
-
-
-    #iris.save([vmaskcube,Atlantic_cube_sub],'temporary2.nc',fill_value=-99999.)
-    #sys.exit(0)
     
     return vmaskcube
 
@@ -240,18 +227,11 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
     # lat=10.0  (10.625, 9.375) lon=277.5   (276.25,277.5,278.75)
     # lat=7.5  (8.125, 6.875) lon=281.25 (280,281.25,282.5)
     #
-    #  using the atlantic mask.  The change from Atlantic to pacific means that
-    #  flow is northwards between 8.125 and 9.375 from lons 282.50-276.25
-    #         and between         10.625 and 11.875 from lons 272.5-273.75
-    #  flow is eastward between 271.25-272.5 from lats 11.875 and 13.125
-    #         and between       275.0 - 276.25 from lats10.625 and 9.375
+    #  ugrid
     #
-    #  so vacross1=8.75 lons 282.5-276.25
-    #     vacross2=11.25 lons 272.5-273.75
+    # note that the atlantic mask is 0 at
+    # 290 and 1 at 291,25 for latitudes 8.125 and 8.875
     #
-    #  uacross1 = 271.88 lat=12.5
-    #  uacross2 = 275.625 lats 11.25 and 10.0
-    # orig
     #lonmin=276.0
     #lonmax=283.125
     #vacross=13.75
@@ -260,13 +240,10 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
     #latmin=11.0
     #uacross=283.125
 
-    vacross=[8.75,11.25]
-    lonmin=[272.5,276.25]
-    lonmax=[273.75,282.5]
-
-    uacross=[273.125,276.875]
-    latmin = [12.0,9.5]
-    latmax = [13.0,11.5]
+    lonmin=270.0
+    lonmax=285.0
+    latmax=13.0
+    latmin=7.0
   
     density=1025
     cp=4000
@@ -274,13 +251,13 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
     lats=Vcube.coord('latitude').points
     lons=Vcube.coord('longitude').points
 
-    #for j, lat in enumerate(lats):
-    #    if latmin < lat < latmax:
-    #        for i, lon in enumerate(lons):
-    #            if lonmin < lon < lonmax:
-    #                print(lat,lon,mask_ugrid.data[0,j,i],mask_ugrid.data[0,j,i-1]#,
-   #                       mask_ugrid.data[0,j+1,i],mask_ugrid.data[0,j-1,i])
-   # sys.exit(0)
+    for j, lat in enumerate(lats):
+        if latmin < lat < latmax:
+            for i, lon in enumerate(lons):
+                if lonmin < lon < lonmax:
+                    print(lat,lon,mask_ugrid.data[0,j,i],mask_ugrid.data[0,j,i-1],
+                          mask_ugrid.data[0,j+1,i],mask_ugrid.data[0,j-1,i])
+    sys.exit(0)
  
    
     # find northward flux from V cube across latitude=vacross and
@@ -291,6 +268,7 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
         depdiff[k]=(depths[k+1] - depths[k-1]) / 2.0
     depdiff[0]=depths[1]-depths[0]
     depdiff[19]=depths[19]-depths[18]
+    coslat = np.cos(vacross * 2.0 * np.pi / 360.) # cos latitude of vacross
     onedeg=111100.   # 111.3 km
     
     northheat_flux = np.zeros(20) # calculate the amount of heat exchanged
@@ -300,12 +278,18 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
   
     
     for j, lat in enumerate(lats):
-        if lat in vacross:
-            ix = vacross.index(lat)
-            coslat = np.cos(lat * 2.0 * np.pi / 360.) 
+        if lat == vacross:
             for i,lon in enumerate(lons):
-                if lonmin[ix] < lon < lonmax[ix]:
+                if lonmin < lon < lonmax:
+                    print('foundlat',j,lat,i,lon,Vcube.data[0,0,j,i])
+                    print('foundlat',j-1,lats[j-1],i,lon,Vcube.data[0,0,j-1,i])
+                    print('foundlat',j-2,lats[j-2],i,lon,Vcube.data[0,0,j-2,i])
+                    print('foundlat',j-3,lats[j-3],i,lon,Vcube.data[0,0,j-3,i])
+                    print('foundlat',j-4,lats[j-4],i,lon,Vcube.data[0,0,j-4,i])
+                    print('foundlat',j-5,lats[j-5],i,lon,Vcube.data[0,0,j-5,i])
+                    sys.exit(0)
                     for k,dep in enumerate(depths):
+                        print(k,dep,Vcube.data.mask[0,k,j,i],Vcube.data[0,k,j,i])
                         if not Vcube.data.mask[0,k,j,i]:
                             # add on the northward flux for all depths
                             flux_add = ((Vcube.data[0,k,j,i] *
@@ -313,14 +297,13 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
                                         * depdiff[k]
                                         * coslat * onedeg * (lons[1]-lons[0]))
                             northheat_flux[k] = northheat_flux[k] + flux_add
-
+                            print('adding',k)
                             
     eastheat_flux=np.zeros(20) # this is U x T Xarea
     for i, lon in enumerate(lons):
-        if lon in uacross:
-            ix=uacross.index(lon)
+        if lon == uacross:
             for j,lat in enumerate(lats):
-                if latmin[ix] < lat < latmax[ix]:
+                if latmin < lat < latmax:
                     for k,dep in enumerate(depths):
                         if not Ucube.data.mask[0,k,j,i]:
                             # add on the eastward flux for all depths
@@ -334,8 +317,9 @@ def get_CAS_OHT(Vcube,Ucube,Tcube,mask_ugrid):
     eastOHT=np.sum(eastheat_flux) * density * cp / 1.0E15
 
     print(northOHT,eastOHT,northOHT+eastOHT)
+    sys.exit(0)
  
-    return northOHT,eastOHT,vacross[0]
+    return northOHT,eastOHT,vacross
 
   
 
@@ -475,7 +459,7 @@ def calc_OHT(V_cube,dx,dz,coslats,T_cube,T_cube_origgrid,basin,U_cube,mask_vgrid
 #####################################################################
 
 # gets the basins over which we calculate
-expt = 'xqbwe'
+expt = 'xqbwg'
 yearstart=3970
 yearend=3972
 

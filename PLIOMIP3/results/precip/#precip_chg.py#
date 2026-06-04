@@ -19,8 +19,8 @@ import iris
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.ticker as mticker
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import iris.quickplot as qplt
 import iris.plot as iplt
 from netCDF4 import Dataset, MFDataset
@@ -42,6 +42,7 @@ class PiecewiseNorm(Normalize):
     def __call__(self, value, clip=None):
         # linearly interpolate to get the normalized value
         return np.ma.masked_array(np.interp(value, self._levels, self._normed))
+
 
 def make_cmap(colors, position=None, bit=False):
     '''
@@ -120,30 +121,49 @@ def get_avg(jobid, startyear):
     count=0.
 
     # get template map
-    cube = iris.load_cube('/nfs/hera1/earjcti/um/xqbwd/pcpd/' + 
-                          'xqbwda#pd' + str(startyear).zfill(9) + 'dc+.nc',
+    cube = iris.load_cube(filestart + '/um/'+jobid+'/pcpd/' + jobid + 
+                          'a#pd' + str(startyear).zfill(9) + 'dc+.nc',
                           longfield.get(field))
 
     cube = iris.util.squeeze(cube)
       
     for year in range(startyear, startyear+NYEARS):
-        jncube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
-                 jobid + 'a#pd' + str(year).zfill(9) + 'jn+.nc',field)
-        jlcube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
-                 jobid + 'a#pd' + str(year).zfill(9) + 'jl+.nc',field)
-        agcube = iris.load_cube('/nfs/hera1/earjcti/um/' + jobid + '/pcpd/' + 
-                 jobid + 'a#pd' + str(year).zfill(9) + 'ag+.nc',field)
-
-        tempavg = np.squeeze((jncube.data + jlcube.data + agcube.data) / 3.0)
+        
+        files = (filestart + '/um/' + jobid + '/pcpd/' + 
+                 jobid + 'a#pd' + str(year).zfill(9) + '??+.nc')
+        print(files)
+        f=MFDataset(files)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        temp=np.squeeze(f.variables[field][:])
+        tempavg = np.mean(temp,axis=0)
 
         alltemps = alltemps + tempavg
         count=count+1.
 
-     
+    alltemps = alltemps / count
     if field == 'precip': # convert to mm/day'
         alltemps = alltemps * 60. * 60. *24.
-       
-    avgtempcube=cube.copy(data=alltemps / count)
+
+
+    #temporary extract polewards of 70 and find the average
+    # mask latitudes poleward of 70S
+    print('temporary code')
+    print(alltemps.shape)
+    print(lon.shape)
+    print(lat.shape)
+    mask = lat <= -70
+
+    weights = np.cos(np.deg2rad(lat[mask]))
+
+    # weighted mean
+    mean_long = np.average(alltemps[mask, :], axis=0,weights=weights)
+
+
+    print('mean',jobid,mean_long.mean())
+     ####### end of temporary code
+    
+    avgtempcube=cube.copy(data=alltemps)
     avgtempcube.attributes = None
     avgtempcube.units = 'mm/day'
     return avgtempcube
@@ -155,20 +175,21 @@ def get_avg(jobid, startyear):
 
 
 LINUX_WIN='l'
+filestart = '/uolstore/Research/a/hera1/earjcti/'
 NYEARS = 100
 #NYEARS=5
-SEASON = 'jja'
+SEASON = 'ann'
 
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPTS = ['xqbwd','xqbwj','xqbwk']  # xpsic PI,  xpsij-lp490  xpsik - lp560
-#EXPTS=['xqbwd']
+#EXPTS = ['xqbwk','xqbwi','xqbwj']  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPTS=['xqbwi']
 EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwi'  # xpsic pi, xpsid lp400
+CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
@@ -222,8 +243,8 @@ for EXPT in EXPTS:
   
       
     print('about to write to file')
-    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) +  '.eps')
-    plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '.png')
+    plt.savefig(filestart + '/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) +  '.eps')
+    plt.savefig(filestart + '/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '.png')
     plt.close()
     
     if field == 'precip': # also plot percentage change
@@ -240,13 +261,16 @@ for EXPT in EXPTS:
         cs=iplt.contourf(ratiocube,levels=vals,extend='both',cmap=cmapname_w,
                       norm=PiecewiseNorm(vals))
         cbar=plt.colorbar(cs,orientation='horizontal',ticks=vals)
+       
+        #vals = np.arange(0.4,1.7,0.1)
+        #qplt.contourf(ratiocube,levels=vals,extend='both',cmap='RdBu')
         titlename = EXPT + '/' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS)
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()
       
         print('about to write to file')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.eps')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.png')
+        plt.savefig(filestart + '/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.eps')
+        plt.savefig(filestart + '/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.png')
 
         # also plot north america
         plt.close()
@@ -270,8 +294,8 @@ for EXPT in EXPTS:
         titlename = EXPT + '-' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS) 
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.eps')
-        plt.savefig('/nfs/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.png')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.eps')
+        plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_NAmerica.png')
         plt.close()
 
   

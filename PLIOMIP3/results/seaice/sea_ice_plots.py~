@@ -95,8 +95,8 @@ def plot_seaice(hemisphere,cube,month,lsm_cube):
     plt.title(month+': ' + name.get(expt))
     iplt.contour(lsm_cube, levels=[-2,0.5,2],
                   colors='black', linewidths=0.1)
-    plt.savefig(outstart + expt + '_' + month + hemisphere + '_seaice.png')
-    plt.savefig(outstart + expt + '_' + month + hemisphere + '_seaice.eps')
+    plt.savefig(outstart + expt + '_' + month + hemisphere + '_seaicearea_2_22.png')
+    plt.savefig(outstart + expt + '_' + month + hemisphere + '_seaicearea_2_22.eps')
     plt.close()
 
     
@@ -141,8 +141,8 @@ def plot_seaice_anom(hemisphere,cubeexpt,cubecntl,month,lsm_cube):
     plt.title(month+': ' + name.get(expt) +  '-' + name.get(cntl))
     iplt.contour(lsm_cube, levels=[-2,0.5,2],
                   colors='black', linewidths=0.1)
-    plt.savefig(outstart + expt + '-' +  cntl + '_' + month + hemisphere + '_seaice.png')
-    plt.savefig(outstart + expt + '-' + cntl + '_' + month + hemisphere + '_seaice.eps')
+    plt.savefig(outstart + expt + '-' +  cntl + '_' + month + hemisphere + '_seaice_2_22.png')
+    plt.savefig(outstart + expt + '-' + cntl + '_' + month + hemisphere + '_seaice_2_22.eps')
     plt.close()
 
 
@@ -186,11 +186,11 @@ name = {'xqbwc':'PI',
         'xpsie':'EP - 400ppmv','xpsig':'EP'}
 
 # read in multimodel mean monthly SST data (EOI400-E280)
-expt='xpsig'
-cntl='xpsie'
+expt='xpsie'
+cntl='xpsid'
 
-MP_cube = iris.load_cube(filestart + 'um/'+expt+'/database_averages/'+expt+'_Monthly_Average_#pf_SeaIceConc_2_50.nc', 'SeaIceConc')
-PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Monthly_Average_#pf_SeaIceConc_2_50.nc', 'SeaIceConc')
+MP_cube = iris.load_cube(filestart + 'um/'+expt+'/database_averages/'+expt+'_Monthly_Average_#pf_SeaIceConc_2_22.nc', 'SeaIceConc')
+PI_cube = iris.load_cube(filestart + 'um/'+cntl+'/database_averages/'+cntl+'_Monthly_Average_#pf_SeaIceConc_2_22.nc', 'SeaIceConc')
 #anom_cube = iris.load_cube('/nfs/hera1/earjcti/regridded/NearSurfaceTemperature_multimodelmean_month.nc',
 #                           'NearSurfaceTemperatureplio - pi')
 
@@ -227,7 +227,7 @@ annPI_cube = iris.util.squeeze(PI_cube.collapsed('time',iris.analysis.MEAN))
 # plot SH sea ice for all months
 #plot_seaice('SH',febMP_cube,'February',lsm_plio_cube)
 #plot_seaice('SH',sepMP_cube,'September',lsm_plio_cube)
-#plot_seaice('SH',annMP_cube,'Annual',lsm_plio_cube)
+plot_seaice('SH',annMP_cube,'Annual',lsm_plio_cube)
 
 
 # plot NH sea ice anomaly for all months
@@ -237,7 +237,7 @@ annPI_cube = iris.util.squeeze(PI_cube.collapsed('time',iris.analysis.MEAN))
 
 #plot_seaice_anom('SH',febMP_cube,febPI_cube,'February',lsm_both_cube)
 #plot_seaice_anom('SH',sepMP_cube,sepPI_cube,'September',lsm_both_cube)
-#plot_seaice_anom('SH',annMP_cube,annPI_cube,'Annual',lsm_both_cube)
+plot_seaice_anom('SH',annMP_cube,annPI_cube,'Annual',lsm_both_cube)
 
 # calculate area of SH sea ice
 ciceareamp = calc_SH_cice_area('Feb ' + expt,febMP_cube)

@@ -35,7 +35,7 @@ def get_temperature_bands(expt):
     gets the polar amplification for the NH and the SH
     """
     filestart = '/home/earjcti/um/'
-    #filestart = '/uolstore/Research/a/hera1/earjcti/um'
+    #filestart = '/uolstore/Research/a/hera1/earjcti/um/'
     tempfile = (filestart + expt + '/database_averages/' + 
                 expt + '_Annual_Average_#pd_Temperature_3900_4000.nc')
     temp_cube = iris.load_cube(tempfile)
@@ -64,8 +64,8 @@ def get_temperature_bands(expt):
                                     iris.analysis.MEAN,
                                     weights=grid_areas_SH)
 
-    print(expt,EXPTNAMES.get(expt),temp_mean.data-273.15,
-          NH_6090_mean.data-273.15,SH_6090_mean.data-273.15)
+    #print(expt,EXPTNAMES.get(expt),temp_mean.data-273.15,
+    #      NH_6090_mean.data-273.15,SH_6090_mean.data-273.15)
 
     
     return (temp_mean.data-273.15,
@@ -77,35 +77,55 @@ def get_temperature_bands(expt):
 
 
 
-CONTROL='xqbwc'
-EXPTS=['xqbwd','xqbwg','xqbwr','xqbwl','xqbwm',
-       'xqbwi','xqbwj','xqbwk','xqbwn','xqbwo','xqbwt','xqbws']
 EXPTNAMES={'xqbwc':'PI', 'xqbwd':'LP','xqbwg':'EP',
-           'xqbwr':'LP_alt','xqbwl':'PI400','xqbwm':'PI560',
-           'xqbwi':'LP280','xqbwj':'LP490','xqbwk':'LP560',
-           'xqbwn':'LP_highNH_orb','xqbwo':'LP_lowNH_orb',
-           'xqbwt':'PI_dyn-veg','xqbws':'LP_dyn-veg'}
-#EXPTS=['xqbwd','xqbwg','xqbwr']
-(controlT, controlNH_60N90N, controlSH_60S90S)=get_temperature_bands(CONTROL)
+           'xqbwr':'LP_alt','xqbwl':'PI$_{400}$','xqbwm':'PI$_{560}$',
+           'xqbwi':'LP$_{280}$','xqbwj':'LP$_{490}$','xqbwk':'LP$_{560}$',
+           'xqbwn':'LP$_{highNHorb}$','xqbwo':'LP$_{lowNHorb}$',
+           'xqbwt':'PI$_{dynveg}$','xqbws':'LP$_{dynveg}$'}
+
+CONTROLNAMES = {'xqbwi':'xqbwc', # LP280, PI
+                'xqbwl':'xqbwc', # PI400, PI
+                'xqbwm':'xqbwc', # PI560, PI
+                'xqbwd':'xqbwi', # LP, LP280
+                'xqbwj':'xqbwi', # LP490, LP280
+                'xqbwk':'xqbwi', # lP560, LP280
+                'xqbwn':'xqbwd', # LP_high orbit, LP
+                'xqbwo':'xqbwd', # LP_low_orbit, LP
+                'xqbwt':'xqbwc', # PI dyn veg, PI
+                'xqbws':'xqbwd', # Plio dyn veg, PI
+                'xqbwg':'xqbwj', # EP - LP490
+                'xqbwr':'xqbwd'}  # LP_alt - LP
+                
+EXPTS=['xqbwi','xqbwl','xqbwm','xqbwd','xqbwj','xqbwk','xqbwn',
+       'xqbwo','xqbwt','xqbws','xqbwg','xqbwr']
+#EXPTS=['xqbwn']
 
 NH_amplification=[]
 SH_amplification=[]
+globalTanom = []
 exptnames_used=[]
 for expt in EXPTS:
     (globalmeanT,NH_60N90N_T,SH_60S90S_T) = get_temperature_bands(expt)
+    
+    cntrl = CONTROLNAMES.get(expt)
+    (controlT,controlNH_60N90N,controlSH_60S90S) = get_temperature_bands(cntrl)
+  
     glob_warm=globalmeanT-controlT
+    globalTanom.append(str(np.round(np.abs(glob_warm),1)))
     NH_warm=NH_60N90N_T - controlNH_60N90N
     SH_warm=SH_60S90S_T - controlSH_60S90S
 
     NH_amplification.append(NH_warm / glob_warm)
     SH_amplification.append(SH_warm / glob_warm)
-    exptnames_used.append(EXPTNAMES.get(expt))
+    exptnames_used.append(EXPTNAMES.get(expt) +  ' - ' + EXPTNAMES.get(cntrl))
+
+    print('j',expt,glob_warm)
 
 # plot as a bar chart with NH and SH next to each other
 x=np.arange(len(EXPTS))
 width=0.35 # the width of the bars
 bar_colors=['tab:blue','tab:orange']
-fig,ax=plt.subplots(layout='constrained',figsize=[12.,10.])
+fig,ax=plt.subplots(layout='constrained',figsize=[12,10])
 #plot NH
 for i,amp in enumerate(NH_amplification):
     if i == 0:
@@ -121,25 +141,40 @@ for i,amp in enumerate(SH_amplification):
     else:
         rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
 # labels
-ax.set_title('Polar Amplification',fontsize=16)
-ax.set_ylabel('Amplification Factor',fontsize=16)
+ax.set_title('Polar Amplification',fontsize=14)
+ax.set_ylabel('Amplification Factor',fontsize=14)
 ax.set_xticks(x+0.2,exptnames_used,rotation=90,fontsize=16)
-ax.set_yticklabels(['1','1.5','2','2.5','3','3.5','4'],fontsize=16)
-ax.legend(loc='lower left',ncol=2,bbox_to_anchor=(-0.05, -0.3),fontsize=16)
-ax.set_ylim(1.0,4.0)
+for i,amp in enumerate(NH_amplification):
+    print(i,amp,globalTanom[i])
+    plt.text(x[i],max(amp, SH_amplification[i],0) + 0.15,globalTanom[i],fontsize=12)  
+#ax.legend(loc='upper left',ncol=2,bbox_to_anchor=(-0.05, -0.3))
+ax.set_ylim(0.1,10.0)
 ax.set_xlim(-0.5,11.75)
+ax.set_yscale('symlog',linthresh=2,linscale=0.5)
+ax.set_yticks([0.1,0.25,0.5,1,2,4,8,10])
+ax.get_yaxis().set_major_formatter(mp.ticker.ScalarFormatter())
+ax.set_yticklabels(['0.1','0.25','0.5','1','2','4','8','10'],fontsize=16)
+
 # put some colors dividing the experiments
-plt.axvspan(-0.5,2.75,facecolor='pink',alpha=0.2)
-plt.axvspan(2.75,7.75,facecolor='yellow',alpha=0.2)
-plt.axvspan(7.75,9.75,facecolor='purple',alpha=0.2)
-plt.axvspan(9.75,11.75,facecolor='green',alpha=0.2)
-plt.axvline(x=2.75,ymin=0.0,ymax=1.0,color='black')
+#plt.axvspan(-0.5,0.75,facecolor='pink',alpha=0.2)
+plt.axvspan(0.75,5.75,facecolor='yellow',alpha=0.2)
+plt.axvspan(5.75,7.75,facecolor='pink',alpha=0.2)
+plt.axvspan(7.75,9.75,facecolor='green',alpha=0.2)
+plt.axvspan(9.75,11.75,facecolor='purple',alpha=0.2)
+plt.axvline(x=0.75,ymin=0.0,ymax=1.0,color='black')
+plt.axvline(x=5.75,ymin=0.0,ymax=1.0,color='black')
 plt.axvline(x=7.75,ymin=0.0,ymax=1.0,color='black')
 plt.axvline(x=9.75,ymin=0.0,ymax=1.0,color='black')
-plt.text(-0.25,3.75,'core and extension',fontsize=16)
-plt.text(4.0, 3.75,'CO2 sensitivity',fontsize=16)
-plt.text(8.0,3.75,'orbital',fontsize=16)
-plt.text(10.0,3.75,'vegetaton',fontsize=16)
+plt.text(2.5, 6.00,'CO$_2$ SENSITIVITY',fontsize=14)
+plt.text(6.2, 6.00,'ORBITAL',fontsize=14)
+plt.text(8.0, 6.00,'VEGETATION',fontsize=14)
+plt.text(10.5, 6.00,'EXT',fontsize=14)
+#plt.text(8.0,3.75,'orbital')
+#plt.text(10.0,3.75,'vegetaton')
+#ax.legend(loc='upper center',fontsize=14)
+ax.legend(loc='lower left',ncol=2,bbox_to_anchor=(-0.05, -0.3),fontsize=18)
+
+plt.axhline(y=1.0,color='black')
 
 #plot the data again because of the background
 for i,amp in enumerate(NH_amplification):
@@ -147,7 +182,9 @@ for i,amp in enumerate(NH_amplification):
 for i,amp in enumerate(SH_amplification):
     rects=ax.bar(x+width,SH_amplification,width,color=bar_colors[1])
 
-plt.savefig('polar_amp_orig.png')
+
+plt.savefig('polar_amp_bcs.png')
+plt.savefig('polar_amp_bcs.eps')
 plt.close()
 #plt.show()
            

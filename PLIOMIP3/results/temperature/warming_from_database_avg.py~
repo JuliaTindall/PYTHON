@@ -1,0 +1,165 @@
+"""
+#NAME
+#    Summer_warming.py
+#PURPOSE 
+#
+#  This program will show the SAT warming in the last 30 years of each 
+#  experiment for the months JJA
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import math
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+import iris.plot as iplt
+from iris.cube import CubeList
+from netCDF4 import Dataset, MFDataset
+from matplotlib.colors import LinearSegmentedColormap
+import sys
+#from netCDF4 import Dataset, MFDataset
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+def get_cmap(boundaries, mean):
+    # Shift boundaries by mean
+    b = np.array(boundaries)
+
+    # Normalised positions (0 → 1) for each boundary
+    t = np.linspace(0, 1, len(b))
+
+    # Find the normalised positions of 0 and mean
+    pos0 = np.interp(0, b, t)      # blue → grey transition
+    posM = np.interp(mean, b, t)   # grey → red transition
+
+    # Base colormaps
+    blues = plt.cm.Blues(np.linspace(0.2, 1, 128))
+    rdgy  = plt.cm.RdGy_r(np.linspace(0, 1, 256))
+
+    # Extract grey and red regions from RdGy_r
+    grey_region = rdgy[:128]   # lower half = greys
+    red_region  = rdgy[128:]   # upper half = reds
+
+    # Build a 3‑segment gradient colormap
+    colors = [
+        (0.0, blues[0]),         # start blue
+        (pos0, blues[-1]),       # end blue at x=0
+        (pos0, grey_region[0]),  # start grey
+        (posM, grey_region[-1]), # end grey at x=mean
+        (posM, red_region[0]),   # start red
+        (1.0, red_region[-1])    # end red
+    ]
+
+    return LinearSegmentedColormap.from_list("custom", colors)
+
+    
+def get_average(jobid, startyear, endyear):
+    """
+    gets the average data fpr the field
+    """  
+
+    filename = (filestart + jobid + '/database_averages/' + 
+                jobid + '_Annual_Average_#pd_' + FIELD + '_' + STARTYEAR + 
+                '_' + ENDYEAR + '.nc')
+
+    longfield = {'Temperature' : 'TEMPERATURE AT 1.5M',
+                 'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
+                 'precipmm' : 'TOTAL PRECIPITATION RATE MM/DAY',
+                 'cloud_cover' : 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
+                 'mslp' : 'PRESSURE AT MEAN SEA LEVEL',
+                 'mslp_hPa' : 'PRESSURE AT MEAN SEA LEVEL hPa',
+                 'evapsea' : 'EVAPORATION FROM SEA (GBM)   KG/M2/S',
+                 'seaiceconc' : 'AICE : ICE CONCENTRATION',
+                 'icefrac' : 'SEA ICE FRACTION AFTER TIMESTEP',
+                 'oceansurftemp' : 'OCN TOP-LEVEL TEMPERATURE          K',
+                 'oceansurftempK' : 'OCN TOP-LEVEL TEMPERATURE K',
+                 'surfsalinity': 'SALINITY (OCEAN)       (PSU-35)/1000',
+                 'surfsalinitypsu': 'SALINITY (OCEAN) (PSU)',
+                 'MLD' : 'MIXED LAYER DEPTH (OCEAN)          M',
+                 'MLDm' : 'MIXED LAYER DEPTH (OCEAN) M',
+                 'AMOC' : 'Meridional Overturning Stream Function (Atlantic)'   
+                     }
+
+    cube = iris.load_cube(filename)
+    cube = iris.util.squeeze(cube)
+    
+    return cube
+                   
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+
+
+LINUX_WIN='l'
+NYEARS = 100
+SEASON = 'ann'
+
+filestart = '/uolstore/Research/a/hera1/earjcti/um/'
+filestart = '/home/earjcti/um/'
+# data from new experiemnt
+MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
+
+EXPT = 'xqbwi'  # xsic PI,  xpsij-lp490  xpsik - lp560
+CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
+STARTYEAR='3900'
+ENDYEAR='4000'
+
+FIELD = 'Temperature'
+
+cntl_cube_ann = get_average(CNTL,STARTYEAR,ENDYEAR)
+expt_cube_ann= get_average(EXPT,STARTYEAR,ENDYEAR)
+
+diff_cube = expt_cube_ann - cntl_cube_ann
+
+#boundaries = [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0]
+#boundaries = [0.0, 1.0, 2.0, 3.0,  4.0, 5.0, 6.0,7.0, 8.0,9.0, 10.0, 11.0, 12.0]
+#cmap_use=plt.cm.get_cmap('Reds',len(boundaries))
+#cmap_use.set_under('lightsteelblue')
+
+boundaries=np.arange(-4,4.5,.5)
+
+try:
+    diff_cube.coord('longitude').guess_bounds()
+    diff_cube.coord('latitude').guess_bounds()
+except:
+    pass
+grid_areas = iris.analysis.cartography.area_weights(diff_cube)
+meandiff = diff_cube.collapsed(['longitude','latitude'],
+                               iris.analysis.MEAN, weights=grid_areas)
+diffchar = str(np.around(meandiff.data,2))
+
+cmap_use = get_cmap(boundaries,meandiff) 
+
+boundaries = boundaries + meandiff.data  # recentralise
+
+cs=iplt.pcolormesh(diff_cube,cmap=cmap_use,
+                 norm=mp.colors.BoundaryNorm(boundaries, 
+                                             ncolors=len(boundaries)-1,
+                                             clip=False))
+cbar=plt.colorbar(cs,orientation='horizontal',extend='both',format=lambda x, _: f"{x:.1f}")
+cbar.set_ticks(boundaries)
+print(len(boundaries))
+#cbar.ax.set_yticklabels(['{:.0f}'.format(x) for x in boundaries])
+
+cbar.set_label('degC')
+titlename = EXPT + '-' +  CNTL + '. Years:' + str(STARTYEAR) + '-' + str(ENDYEAR) + '. ANN. Meandiff =' +  diffchar
+plt.title(titlename, fontsize=10)
+plt.gca().coastlines()
+plt.show()
+print('about to write to file')
+plt.savefig(filestart + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + FIELD + '_shiftedscale..eps')
+plt.savefig(filestart + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + FIELD + '_shiftedscale.png')
+plt.close()
+
+

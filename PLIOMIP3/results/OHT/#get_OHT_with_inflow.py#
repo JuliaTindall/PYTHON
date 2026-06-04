@@ -475,9 +475,9 @@ def calc_OHT(V_cube,dx,dz,coslats,T_cube,T_cube_origgrid,basin,U_cube,mask_vgrid
 #####################################################################
 
 # gets the basins over which we calculate
-expt = 'xqbwe'
+expt = 'xqbwg'
 yearstart=3970
-yearend=3972
+yearend=4000
 
 Atlantic_cube, Pacific_cube, Indian_cube, Global_cube =get_mask()
 OHT_global_cubes = CubeList([])
