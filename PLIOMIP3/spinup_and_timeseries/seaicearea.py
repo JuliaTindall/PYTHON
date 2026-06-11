@@ -127,9 +127,9 @@ figureno=0
 
 incl_18o='n'
 HadCM3='y'
-exptname='xpsig'
-startyear=2  # can't start before year 12 because we aren't outputting d18o
-endyear=100
+exptname='xqbws'
+startyear=3001  # can't start before year 12 because we aren't outputting d18o
+endyear=4000
 plt.figure(figureno)
 get_seaice(HadCM3,exptname,startyear,endyear)
 figureno=figureno+1

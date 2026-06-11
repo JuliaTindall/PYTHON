@@ -127,8 +127,13 @@ def plot_avg_moc(expt_name,extra,yearstart,yearend,ending,AMOC_PMOC_IND):
     and also the AMOC strength through time
     """
 
-    field = {'AMOC':'Merid_Atlantic','PMOC':'Merid_Pacific'}
+    field = {'AMOC':'Merid_Atlantic','PMOC':'Merid_Pacific',
+             'GMOC':'Merid_Global'}
 
+    if AMOC_PMOC_IND == 'GMOC':
+        latlim = -90.
+    else:
+        latlim = -40.
     nyears=yearend-yearstart
     figcount=0
     for year in range(yearstart,yearend):
@@ -150,13 +155,14 @@ def plot_avg_moc(expt_name,extra,yearstart,yearend,ending,AMOC_PMOC_IND):
         # ignore all data below 40S
         nlat=0
         for latitude in lat_full:
-            if latitude > -40.: nlat=nlat+1
+            if latitude > latlim: nlat=nlat+1
         lat = np.zeros(nlat)
         AMOC = np.zeros((ndepth, nlat))
         latix=0
+        
         for i, latitude in enumerate(lat_full):
             #print('j',latitude)
-            if latitude > -40.:
+            if latitude > latlim:
              #  print('here',i,lat,latix)
                lat[latix]=lat_full[i]
                AMOC[:,latix]=AMOC_full[:,i]
@@ -206,16 +212,17 @@ def plot_avg_moc(expt_name,extra,yearstart,yearend,ending,AMOC_PMOC_IND):
     fig = plt.figure()
     ax1 = plt.subplot(1,1,1)
     maxstr = str(np.round(meanmaxamoc))
+    print('max=',maxstr,'Sv')
     titlename=AMOC_PMOC_IND + ' avg: '+expt_name + ' maxval='+maxstr
     plotdata(avgAMOC,-99,lat,depth,titlename,-18,20,2.0,0.0,'n','Sv','avg',ax1)
-    plt.show()
-    sys.exit(0)
+   # plt.show()
+   # sys.exit(0)
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt_name + '/MOC/struct_' + AMOC_PMOC_IND + 
             '_' + expt_name + extra + str(int(yearstart)) + '_' + 
                str(int(yearend)))
     plt.savefig(fileout + '.png', bbox_inches='tight')  
-    plt.save(avgAMOC,fileout+'.nc')
-    
+    iris.save(avgAMOC,fileout+'.nc')
+    sys.exit(0)
     return(lat,depth,avgAMOC)
     
     
@@ -784,12 +791,12 @@ def PCs_to_climate_telecon(exptname,fieldlocation,fileext,fieldname,seasname,mon
 ##################################
 # plot average of the MOC
 
-basin = 'AMOC'
+basin = 'GMOC'
 
 ##############################################
 #  plot_avg_moc will plot the lat-depth avg AMOC and also the maximum
 #  AMOC strength through time.
-EXPTNAME = 'xqbwg'
+EXPTNAME = 'xqbwd'
 retdata=plot_avg_moc(EXPTNAME,'#',3900,4000,'c1',basin) # extra is '#' or letter
 lat=retdata[0]
 depth=retdata[1]

@@ -124,9 +124,9 @@ P3name = {'xpsie' : 'EP400',    'xpsig':'EP490', 'xpsid':'LP','xpsic':'PI',
 
 latstart=-65.0   # will plot from latstart to -90.0
 HadCM3='y'
-exptname='xpsid'
-startyear=2  # can't start before year 12 because we aren't outputting d18o
-endyear=100
+exptname='xpsio'
+startyear=1991  # can't start before year 12 because we aren't outputting d18o
+endyear=3000
 plt.figure(figureno)
 get_SHsalin(HadCM3,exptname,startyear,endyear,latstart)
 figureno=figureno+1

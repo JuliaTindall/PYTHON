@@ -48,14 +48,14 @@ def get_annual_data(expt,startyear,endyear,field):
 
 # this function will extract the data and write out to a file
 
-    outdir='/Uolstore/Research/a/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Annual_Average'
+    outdir='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_Annual_Average'
     if field == 'SST':
-        infile='/Uolstore/Research/a/hera1/earjcti/um/'+expt+'/pf/'+expt+'o#pf'
-    elif field == 'SSS' or field == 'salinity':
-        infile='/Uolstore/Research/a/hera1/earjcti/um/'+expt+'/pg/'+expt+'o#pg'
+        infile='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pf/'+expt+'o#pf'
+    elif field == 'SSS' or field == 'salinity' or field == 'seaice':
+        infile='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pg/'+expt+'o#pg'
     else:
-        infile='/Uolstore/Research/a/hera1/earjcti/um/'+expt+'/pcpd/'+expt+'a#pd'
-    txtfile='/Uolstore/Research/a/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_'+ field + str(startyear) + '_' + str(endyear)  +'_global_avg.txt'
+        infile='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pcpd/'+expt+'a#pd'
+    txtfile='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/database_averages/'+expt+'_'+ field + str(startyear) + '_' + str(endyear)  +'_global_avg.txt'
     ftxt=open(txtfile,'w')
 
     # loop over all years
@@ -88,6 +88,11 @@ def get_annual_data(expt,startyear,endyear,field):
             varreq=f.variables['salinity'][:]
             salin=np.ma.mean(varreq,axis=0)
             allvar[year-startyear,:,:]=(salin[0,:,:] * 1000.)+35.0
+        elif field == 'seaice':
+            print(filename)
+            varreq=f.variables['iceconc'][:]
+            seaice=np.ma.mean(varreq,axis=0)
+            allvar[year-startyear,:,:]=seaice[0,:,:] 
         elif field == 'salinity':
             print(filename)
             varreq=f.variables['salinity'][:]
@@ -100,7 +105,7 @@ def get_annual_data(expt,startyear,endyear,field):
         globavg = get_glob_avg(varreq, latin,field)
         
         timeseries[year-startyear]=globavg
-        ftxt.write(np.str(year) + ',' + np.str(globavg) + '\n')
+        ftxt.write(str(year) + ',' + str(globavg) + '\n')
    
         f.close()
     ftxt.close()
@@ -133,6 +138,9 @@ def get_annual_data(expt,startyear,endyear,field):
           '_' + str(endyear) + '.nc')
     if field == 'salinity':
         fout=(outdir+'_#pg_salinity_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
+    if field == 'seaice':
+        fout=(outdir+'_#pg_seaice_' + str(startyear) + 
           '_' + str(endyear) + '.nc')
     print(fout)
  
@@ -248,6 +256,13 @@ def get_annual_data(expt,startyear,endyear,field):
         longname=u"OCN TOP-LEVEL SALINITY"
         unitsname=u"psu"
 
+    if field == 'seaice':
+        varfield=f2.createVariable('iceconc',np.float32,
+                              ('time','ht','latitude','longitude'),
+                               fill_value = -99999.)
+        longname=u"OCN SEAICECONCENTRATION"
+        unitsname=u"psu"
+
     if field == 'salinity':
         depth=f2.createDimension('depth',20)
         depth=f2.createVariable('depth',np.float32,('depth',))
@@ -297,11 +312,11 @@ def get_annual_data(expt,startyear,endyear,field):
 #nyears=50
 #HadCM3='y'
 
-expts=['xpsie','xpsig','xpsid']
-#expts=['xqbwd','xqbwe','xqbwg','xqbwh','xqbwi','xqbwj','xqbwk','xqbwl',
-#       'xqbwm','xqbwn','xqbwo','xqbwp','xqbwq','xqbwr','xqbws','xqbwt']
-startyear=1000
-endyear=1200
+#expts=['xqbwd','xqbwo']
+expts=['xqbwd','xqbwe','xqbwg','xqbwh','xqbwi','xqbwj','xqbwk','xqbwl',
+       'xqbwm','xqbwn','xqbwo','xqbwp','xqbwq','xqbwr','xqbws','xqbwt']
+startyear=3900
+endyear=4000
 HadCM3='y'
 
 #HadCM3='y'
@@ -315,7 +330,7 @@ HadCM3='y'
 #sys.exit(0)
 
 for expt in expts:
-    field='salinity'
+    field='seaice'
     get_annual_data(expt,startyear,endyear,field)
 sys.exit(0)
 

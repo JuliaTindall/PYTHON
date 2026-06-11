@@ -74,7 +74,8 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     if field == 'SST' or field =='SeaIceConc' or field == 'SeaIceDepth':
         infile=filestart + 'um/'+expt+'/pf/'+expt+'o'+sep+'pf'
     else:
-        infile=filestart + 'um/'+expt+'/pcpd/'+expt+'a'+sep+'pd'
+       # infile=filestart + 'um/'+expt+'/pcpd/'+expt+'a'+sep+'pd'
+       infile=filestart + 'um/'+expt+'/pi/'+expt+'a'+sep+'pi'
     txtfile=filestart + 'um/'+expt+'/database_averages/'+expt+'_'+ field + str(startyear) + '_' + str(endyear)  +'_global_avg_monthly.txt'
     ftxt=open(txtfile,'w')
     ftxt.write('year,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec\n')
@@ -101,7 +102,10 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
                 latsize=len(latin)
                 lonin = f.variables['longitude'][:]
                 lonsize=len(lonin)
-                allvar=np.ma.zeros((endyear-startyear,12,latsize,lonsize))
+                if field == 'field1391_2': # vegetation
+                    allvar=np.ma.zeros((endyear-startyear,12,9,latsize,lonsize))
+                else:
+                    allvar=np.ma.zeros((endyear-startyear,12,latsize,lonsize))
                 timeseries=np.zeros((12,(endyear-startyear)))  
            
             if field == 'SST':
@@ -113,6 +117,10 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
             elif field == 'SeaIceDepth':
                 varreq=f.variables['icedepth'][:]
                 allvar[year-startyearuse,i,:,:]=np.squeeze(varreq)
+            elif field == 'field1391_2':
+                print(year,month)
+                varreq=f.variables[field][:]
+                allvar[year-startyearuse,i,:,:,:]=np.squeeze(varreq)
             else:
                 varreq=f.variables[field][:]
                 allvar[year-startyearuse,i,:,:]=np.squeeze(varreq)
@@ -129,8 +137,10 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     ftxt.close()
 
     avgvar=np.ma.mean(allvar,axis=0)
+    print(avgvar[0,0,40,:])
+    print(avgvar.shape,'j1')
     avgvar=np.ma.where(avgvar.mask == 1.0, -99999., avgvar)
-  
+    print(avgvar[0,0,40,:])
     # write average variable out to a netcdf file
 
     # set up filename
@@ -156,6 +166,9 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     if field == 'SeaIceDepth':
         fout=(outdir+'_#pf_SeaIceDepth_' + str(startyear) + 
           '_' + str(endyear) + '.nc')
+    if field == 'field1391_2':
+        fout=(outdir+'_#pi_veg_pft_' + str(startyear) + 
+          '_' + str(endyear) + '.nc')
     print(fout)
  
     f2=Dataset(fout,mode='w',format='NETCDF3_CLASSIC')
@@ -164,6 +177,8 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     lat=f2.createDimension('latitude',latsize)
     level=f2.createDimension('ht',1)
     time=f2.createDimension('time',12)
+    if field == 'field1391_2':
+        pft = f2.createDimension('pfts',9)
     # create variables
     lons=f2.createVariable('longitude',np.float32,('longitude',))
     lats=f2.createVariable('latitude',np.float32,('latitude',))
@@ -279,6 +294,12 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
                                fill_value = -99999.)
         longname=u"Sea Ice Depth"
         unitsname=u"m"
+    if field == 'field1391_2':
+        varfield=f2.createVariable('TileFraction',np.float32,
+                              ('time','pfts','latitude','longitude'),
+                               fill_value = -99999.)
+        longname=u"TILE FRACTIONS (B.LAYER)"
+        unitsname=u"0-1"
 
    
     # create variable attributes
@@ -295,7 +316,15 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     lats[:]=latin
     levels[:]=-1.0
     times[:]=(np.arange(0,360,30))+15
-    varfield[:,0,:,:]=avgvar
+    if field == 'field1391_2':
+        print(' j2      ')
+        print(avgvar[0,0,40,:])
+  
+        print(avgvar.shape)
+        varfield[:,:,:,:]=avgvar
+        print(varfield)
+    else:
+        varfield[:,0,:,:]=avgvar
     
         
     f2.close()
@@ -306,7 +335,7 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     return 
 
 
-#=================================================================
+#================================3=================================
 # MAIN PROGRAM STARTS HERE
 
 filestart='/uolstore/Research/a/hera1/earjcti/'
@@ -331,21 +360,33 @@ expts=['xpsid','xpsie','xpsig']
 
 HadCM3='y' # y / orig /n
 #expt='xozzf'
-startyear=2
-endyear=22
+#startyear=2
+#endyear=22
+
+expts = ['xqbws']
+startyear = 3901
+endyear = 4001
+
+
+for expt in expts:
+    field='field1391_2'
+    get_monthly_data(expt,startyear,endyear,field,HadCM3)
+sys.exit(0)
+
+
 
 #for expt in expts:
 #    field='temp_1'
 #    get_monthly_data(expt,startyear,endyear,field)
 #sys.exit(0)
 
-for expt in expts:
-    field = 'SeaIceDepth'
-    get_monthly_data(expt,startyear,endyear,field,HadCM3)
-
-    field='SeaIceConc'
-    get_monthly_data(expt,startyear,endyear,field,HadCM3)
-sys.exit(0)
+#for expt in expts:
+#    field = 'SeaIceDepth'
+#    get_monthly_data(expt,startyear,endyear,field,HadCM3)
+#
+#    field='SeaIceConc'
+#    get_monthly_data(expt,startyear,endyear,field,HadCM3)
+#sys.exit(0)
 
 
 #field='p_1'
