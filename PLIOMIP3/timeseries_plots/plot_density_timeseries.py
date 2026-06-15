@@ -8,7 +8,7 @@ import numpy as np
 import sys
 
 #exptnames = ['xpsid','xpsic','xpsig','xpsie']
-exptnames = ['xpsid','xpsig','xpsie']
+exptnames = ['xpsid','xpsio']
 lat = "-65"  # we have the average southwards of this latitude in the file
 
 
@@ -78,9 +78,9 @@ def running_mean(data, window_size):
 
 ##################################################################
 period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
-          'xpsie':'EP400','xpsig':'EP'}
+          'xpsie':'EP400','xpsig':'EP','xpsio':'highSHorb'}
 
-yearstring = '2_100_'
+yearstring = '12_2999_'
 
 fig,axes = plt.subplots(3,3,figsize=(12,12))
 ax_legend=axes[2,2]
@@ -91,16 +91,21 @@ legend_handles=[]
 for expt in exptnames:
     # this file was produced by density_gradients
   
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_density_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    print(expt)
+    if expt == 'xpsio':
+        print('here')
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + yearstring +lat+'.txt'
-  
+
+
+    print(expt,filename)
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
 
+    print('read')
     # Plot the data
     line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
     axes[0,0].set_title("5m")
@@ -152,10 +157,10 @@ ax_legend=axes[1,1]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_density_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + yearstring+lat+'.txt'
   
@@ -196,10 +201,10 @@ ax_legend=axes[1,1]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_density_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + yearstring+lat+'.txt'
   
@@ -244,10 +249,10 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     # this file was produced by density_gradients
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_density_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + yearstring+lat+'.txt'
   
@@ -295,10 +300,10 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     # this file was produced by density_gradients
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_density_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + yearstring+lat+'.txt'
   
@@ -349,10 +354,10 @@ ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
     # this file was produced by density_gradients
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_density_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + yearstring+lat+'.txt'
   

@@ -8,7 +8,7 @@ import numpy as np
 import sys
 
 #exptnames = ['xpsid','xpsic','xpsig','xpsie']
-exptnames = ['xpsid','xpsig','xpsie']
+exptnames = ['xpsid','xpsio']
 lat = "-65"  # we have the average southwards of this latitude in the file
 
 
@@ -78,7 +78,7 @@ def running_mean(data, window_size):
 
 ##################################################################
 period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
-          'xpsie':'EP400','xpsig':'EP'}
+          'xpsie':'EP400','xpsig':'EP','xpsio':'highSHorb'}
 
 
 fig,axes = plt.subplots(3,3,figsize=(12,12))
@@ -88,16 +88,18 @@ legend_handles=[]
 
 #plot data from all the files
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_salinity_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
-  
+
+
     (x, y5, y25, y47, y203,
      y447 ,y666, y995,y1500)  = read_data(filename)
 
+   
     # Plot the data
     line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
     axes[0,0].set_title("5m")
@@ -133,11 +135,17 @@ ax_legend.legend(legend_handles,legend_labels,loc='center',
 #plt.legend()
 for ax in axes.flat[:-1]:
     ax.grid(True)
-    ax.axvline(x=1803,color='red',linestyle='--')
-    ax.set_xlim(1500,2000)
+    #ax.axvline(x=1803,color='red',linestyle='--')
+    #ax.set_xlim(1500,2000)
 plt.tight_layout()
-plt.savefig('salinity_plots/salinity_alllevs_'+lat+'.eps')
+plt.show()
 plt.close()
+sys.exit(0)
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_'+lat+'.eps')
+plt.close()
+
+
+sys.exit(0)
 
 
 # now plot difference between 203m level and all ones above
@@ -146,10 +154,10 @@ ax_legend=axes[1,1]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_salinity_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
@@ -180,7 +188,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('salinity_plots/salinity_alllevs_203m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_203m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -190,10 +198,10 @@ ax_legend=axes[1,1]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_salinity_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
@@ -227,7 +235,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('salinity_plots/salinity_alllevs_447m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_447m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -237,10 +245,10 @@ ax_legend=axes[1,2]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_salinity_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
@@ -277,7 +285,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('salinity_plots/salinity_alllevs_666m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_666m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -287,10 +295,10 @@ ax_legend=axes[2,1]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_salinity_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
@@ -330,7 +338,7 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('salinity_plots/salinity_alllevs_995m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_995m_diff'+lat+'.eps')
 plt.close()
 
 
@@ -340,10 +348,10 @@ ax_legend=axes[2,2]
 ax_legend.axis('off')
 legend_handles=[]
 for expt in exptnames:
-    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
                  '_Pacific_salinity_levs')
-    if expt == 'xpsij':
-        filename = filestart + '1991_2999_'+lat+'.txt'
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
     else:
         filename = filestart + '12_2999_'+lat+'.txt'
   
@@ -386,6 +394,6 @@ for ax in axes.flat[:-1]:
     ax.axvline(x=1803,color='red',linestyle='--')
 
 plt.tight_layout()
-plt.savefig('salinity_plots/salinity_alllevs_1500m_diff'+lat+'.eps')
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_1500m_diff'+lat+'.eps')
 plt.close()
 
