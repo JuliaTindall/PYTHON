@@ -120,8 +120,8 @@ def get_avg(jobid, startyear):
     count=0.
 
     # get template map
-    cube = iris.load_cube('/uolstore/Research/a/hera1/earjcti/um/xqbwd/pcpd/' + 
-                          'xqbwda#pd' + str(startyear).zfill(9) + 'dc+.nc',
+    cube = iris.load_cube('/uolstore/Research/a/hera1/earjcti/um/xpsid/pcpd/' + 
+                          'xpsida#pd' + str(startyear).zfill(9) + 'dc+.nc',
                           longfield.get(field))
 
     cube = iris.util.squeeze(cube)
@@ -162,13 +162,13 @@ SEASON = 'jja'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPTS = ['xqbwn']  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPTS = ['xpsio']  # xpsic PI,  xpsij-lp490  xpsik - lp560
 #EXPTS=['xqbwd']
-EXPT_STARTYEAR = 3900
+EXPT_STARTYEAR = 1991
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwo'  # xpsic pi, xpsid lp400
+CNTL = 'xpsid'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
@@ -243,6 +243,8 @@ for EXPT in EXPTS:
         titlename = EXPT + '/' +  CNTL + '. Years:' + str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR + NYEARS)
         plt.title(titlename, fontsize=10)
         plt.gca().coastlines()
+        plt.gca().gridlines(crs=ccrs.PlateCarree(),xlocs=range(-180,181,30),
+                            ylocs=range(-90,91,30))
       
         print('about to write to file')
         plt.savefig('/uolstore/Research/a/hera1/earjcti/um/' + EXPT +  '/avgplots/jja_' + EXPT + '-' + CNTL + '_' + field+ str(EXPT_STARTYEAR) + '-' + str(EXPT_STARTYEAR+NYEARS) + '_ratio.eps')
@@ -250,7 +252,7 @@ for EXPT in EXPTS:
 
         # also plot north america
         plt.close()
-        vals=np.arange(-0.5, 0.6, 0.1)
+        vals=np.arange(-1.5, 1.6, 0.1)
         print(vals)
         ax=plt.subplot(1,1,1,projection=ccrs.PlateCarree(central_longitude=0.0))
         ax.set_extent([210., 300.,10,70], crs=ccrs.PlateCarree())

@@ -14,7 +14,7 @@
 # Import necessary libraries
 
 import xarray as xr
-import xesmf as xe # for regridding
+#import xesmf as xe # for regridding
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -23,8 +23,11 @@ import cartopy.crs as ccrs
 import sys
 
 # === CONFIG ===
-years='0000039[7-9]'
-expts = ['xqbwg','xqbwd','xqbwe','xqbwg']
+#years='0000039[7-9]'
+#expts = ['xqbwg','xqbwd','xqbwe','xqbwg']
+
+years='00000200'  # second 10 years
+expts = ['xpsid','xpsio']
 
 uvar = "field703"
 tvar="temp"
@@ -207,6 +210,9 @@ def integrated_zonal_transport(files, uvar, lev_name, lat_name,
         acc_surf = trans_surf if acc_surf is None else acc_surf + trans_surf
         n += 1
 
+
+    print(acc)
+    print(n)
     mean_trans = acc / n
     mean_trans_surf = acc_surf / n
     
