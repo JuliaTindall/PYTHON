@@ -157,7 +157,6 @@ def get_avg(jobid, startyear):
 LINUX_WIN='l'
 NYEARS = 100
 #NYEARS=5
-SEASON = 'djf'
 
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous

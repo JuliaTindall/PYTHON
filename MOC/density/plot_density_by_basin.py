@@ -4,7 +4,7 @@
 #
 #  This program will do two things.
 #  1. It will do a latitude-depth plot of density temperature and salinity
-#     for each basin
+#     for each basin1
 #  2. It will try and optimise the number of density classes so that
 #     we have the same number of gridpoints in each density class
 #
@@ -498,19 +498,19 @@ def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
 #######################################################################
 exptname = 'xpsio'
 startyear=1991
-endyear=2001
-basin='Pacific'
+endyear=2091
+basin='Atlantic'
 anom_only = 'y'
 FILEINIT = '/uolstore/Research/a/hera1/earjcti/'
 #FILEINIT = '/home/earjcti/'
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
           'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
-          'xqbwg':'EP',
+          'xqbwg':'EP','xpsio':'LP_warm_SH_DJF',
           'xqbwc':'PI','xqbwn':'LP_warm_NH_JJA','xqbwo':'LP_warm_SH_DJF',
           'xqbwp':'EP_warm_NH_JJA','xqbwq':'EP_warm_SH_DJF'}
 
-if anom_only == 'n':
+if anom_only == 'n+':
 
     # get individual years diagnostics for the basin
     for year in range(startyear,endyear):
@@ -518,64 +518,64 @@ if anom_only == 'n':
         filename = filestart + 'o#pg00000'+str(year).zfill(4)+'c1+.nc'
         process_data(filename,basin,year)
 
-#################################################
-# get the mean dianostics for the basin
-dens_cubelist = CubeList([])
-sal_cubelist = CubeList([])
-temp_cubelist = CubeList([])
+if anom_only == 'n' or anom_only == 'n+':
+    #################################################
+    # get the mean dianostics for the basin
+    dens_cubelist = CubeList([])
+    sal_cubelist = CubeList([])
+    temp_cubelist = CubeList([])
 
-for year in range(startyear,endyear):
-    filename = (FILEINIT + 'um/' + exptname +
-                '/basin_diagnostics/' + exptname + '_' +
-                basin + str(year) + '.nc')#
+    for year in range(startyear,endyear):
+        filename = (FILEINIT + 'um/' + exptname +
+                    '/basin_diagnostics/' + exptname + '_' +
+                    basin + str(year) + '.nc')
 
-    dens_cubelist.append(iris.load_cube(filename,'density basin'))
-    temp_cubelist.append(iris.load_cube(filename,'temperature basin'))
-    sal_cubelist.append(iris.load_cube(filename,'salinity basin'))
-    sal_cube = iris.load_cube(filename,'salinity basin')
+        dens_cubelist.append(iris.load_cube(filename,'density basin'))
+        temp_cubelist.append(iris.load_cube(filename,'temperature basin'))
+        sal_cubelist.append(iris.load_cube(filename,'salinity basin'))
+        sal_cube = iris.load_cube(filename,'salinity basin')
    
-iris.util.equalise_attributes(dens_cubelist)
-iris.util.equalise_attributes(sal_cubelist)
-iris.util.equalise_attributes(temp_cubelist)
-dens_cubes = dens_cubelist.merge_cube()
-sal_cubes = sal_cubelist.merge_cube()
-temp_cubes = temp_cubelist.merge_cube()
+    iris.util.equalise_attributes(dens_cubelist)
+    iris.util.equalise_attributes(sal_cubelist)
+    iris.util.equalise_attributes(temp_cubelist)
+    dens_cubes = dens_cubelist.merge_cube()
+    sal_cubes = sal_cubelist.merge_cube()
+    temp_cubes = temp_cubelist.merge_cube()
 
-dens_avg_cube = dens_cubes.collapsed('t',iris.analysis.MEAN)
-sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
-temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
+    dens_avg_cube = dens_cubes.collapsed('t',iris.analysis.MEAN)
+    sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
+    temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
 
-fileout = (FILEINIT + 'um/' + exptname +
+    fileout = (FILEINIT + 'um/' + exptname +
            '/basin_diagnostics/mean_' + exptname + '_' +
            basin + str(startyear) + '_' + str(endyear-1)+'.nc')
-iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
+    iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
           fileout,fill_value = -99999.)
 
-# plot density to screen
-constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -40)
-constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 500)
+    # plot density to screen
+    constraint1 = iris.Constraint(latitude = lambda cell: -80 < cell <  -40)
+    constraint2 = iris.Constraint(depth_1 = lambda cell: cell < 500)
         
-int1 = dens_avg_cube.extract(constraint1)
-dens_SH = int1.extract(constraint2)
+    int1 = dens_avg_cube.extract(constraint1)
+    dens_SH = int1.extract(constraint2)
 
+    
+    vals = np.arange(36,38.1,0.1)
+    figure = plt.figure(figsize=[8.0,8.0])
+    ax = figure.add_subplot(1,1,1)
+    cs=iplt.contourf(dens_SH,levels=vals,extend='both')
+    plt.xlabel('Latitude (degrees)',fontsize=14)
+    plt.ylabel('Depth (m)',fontsize=14)
+    ax.tick_params(labelsize=14)
 
-vals = np.arange(36,38.1,0.1)
-figure = plt.figure(figsize=[8.0,8.0])
-ax = figure.add_subplot(1,1,1)
-cs=iplt.contourf(dens_SH,levels=vals,extend='both')
-plt.xlabel('Latitude (degrees)',fontsize=14)
-plt.ylabel('Depth (m)',fontsize=14)
-ax.tick_params(labelsize=14)
-
-cb=plt.colorbar(cs,orientation='vertical')
-cb.ax.set_xlabel('kg m$^{-3}$',fontsize=16)
-cb.ax.tick_params(labelsize=14)
-cb.ax.xaxis.set_label_position('bottom')
-cb.ax.xaxis.labelpad=25
-plt.title(exptname)
-plt.savefig(exptname,'.png')
-#plt.show()
-#sys.exit(0)
+    cb=plt.colorbar(cs,orientation='vertical')
+    cb.ax.set_xlabel('kg m$^{-3}$',fontsize=16)
+    cb.ax.tick_params(labelsize=14)
+    cb.ax.xaxis.set_label_position('bottom')
+    cb.ax.xaxis.labelpad=25
+    plt.title(exptname)
+    plt.show()
+    sys.exit(0)
 
 ################################################
 # plot anomalies
@@ -585,7 +585,7 @@ cntlstart=startyear
 cntlend=endyear
 #cntlstart=1400
 #cntlend=1500
-region_ind='SH' # 'SH' - SH, '' - globe
+region_ind='' # 'SH' - SH, '' - globe
 print('about to get anomalies')
 plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin,region_ind)
 #plot_Pacific_and_Atlantic(exptname,startyear,endyear,0)  # the last number is the level

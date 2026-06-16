@@ -159,18 +159,17 @@ def get_avg(jobid, startyear):
 LINUX_WIN='l'
 NYEARS = 100
 #NYEARS=5
-SEASON = 'djf'
 
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPTS = ['xqbwn']  # xpsic PI,  xpsij-lp490  xpsik - lp560
+EXPTS = ['xqbwo']  # xpsic PI,  xpsij-lp490  xpsik - lp560
 #EXPTS=['xqbwd']
 EXPT_STARTYEAR = 3900
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwi'  # xpsic pi, xpsid lp400
+CNTL = 'xqbwd'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
