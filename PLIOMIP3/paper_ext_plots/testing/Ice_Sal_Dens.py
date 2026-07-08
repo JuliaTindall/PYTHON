@@ -83,7 +83,7 @@ spec = gridspec.GridSpec(ncols=2, nrows=4,
 
 
 period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP$_{400}$',
-          'xpsig':'EP','xpsic':'PI'}
+          'xpsig':'EP','xpsic':'PI','xpsio':'highSHorb'}
 
 #plot data from all the seaice
 ax0=fig.add_subplot(spec[0])
@@ -94,7 +94,7 @@ for expt in exptnames:
         filename = '/home/earjcti/um/xpsid/spinup/seaice_area_' + expt + '_SH_2_2999.tex'
   
     x, y = read_data(filename)
-    window=30
+    window=1
     y_mean=running_mean(y,window)
     x_mean=x[window-1:]
    
@@ -139,7 +139,7 @@ for expt in exptnames:
   
   
     x, y = read_data(filename)
-    window=30
+    window=1
     y_mean=running_mean(y,window)
     x_mean=x[window-1:]
    
@@ -175,7 +175,7 @@ for expt in exptnames:
         filename = filestart + '12_2999_-65.txt'
   
     x, y = read_dens(filename)
-    window=30
+    window=1
     y_mean=running_mean(y,window)
     x_mean=x[window-1:]
 
@@ -191,11 +191,12 @@ plt.xlabel('year',fontsize=15)
 plt.ylabel('kg/m$^3$',fontsize=15)
 plt.xticks(fontsize=15)
 plt.yticks(fontsize=15)
-plt.xlim(0,3000)
+plt.xlim(1800,2200)
 #plt.legend(fontsize=14)
 #plt.axvline(x=1803,color='red',linestyle='--')
 plt.grid(True)
 
+plt.savefig('Ice_Sal_Dens.png')
 plt.show()
 sys.exit(0)
 

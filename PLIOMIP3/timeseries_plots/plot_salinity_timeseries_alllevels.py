@@ -138,14 +138,14 @@ for ax in axes.flat[:-1]:
     #ax.axvline(x=1803,color='red',linestyle='--')
     #ax.set_xlim(1500,2000)
 plt.tight_layout()
-plt.show()
-plt.close()
-sys.exit(0)
+#plt.show()
+#plt.close()
+#sys.exit(0)
 plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_'+lat+'.eps')
 plt.close()
 
 
-sys.exit(0)
+#sys.exit(0)
 
 
 # now plot difference between 203m level and all ones above
