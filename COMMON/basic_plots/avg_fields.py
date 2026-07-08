@@ -251,14 +251,14 @@ class main():
 #HadCM3='n'
 
 
-MODELTYPE = 'Ca' # n=HadGEM, C=HadCM3, Ca=HadCM3_alternate (long filenames)
+MODELTYPE = 'C' # n=HadGEM, C=HadCM3, Ca=HadCM3_alternate (long filenames)
                  #F=Famous
-EXPT = 'xqicc'
-STARTYEAR = 3900
-NYEARS=24
+EXPT = 'xqlna'
+STARTYEAR = 3020
+NYEARS=30
 AVG_SEAS = 'ann' # ann, djf, jja
 
-FILEINIT = '/home/earjcti/um/' + EXPT + '/'
+FILEINIT = '/uolstore/Research/a/hera1/earjcti/um/' + EXPT + '/'
 
 if AVG_SEAS == 'ann':
     NMONTHS = 12
@@ -266,10 +266,11 @@ if AVG_SEAS == 'djf' or AVG_SEAS== 'jja':
     NMONTHS =3
 
 FIELDS = [
-    'temp1.5','precip','cloud_cover','mslp',
+    'temp1.5','precip']
+#,'cloud_cover','mslp',
 #          'evapsea',
-    'seaiceconc','oceansurftemp',
-          'surfsalinity','MLD']
+#    'seaiceconc','oceansurftemp',
+#          'surfsalinity','MLD']
 
 #FIELDS = ['seaiceconc','oceansurftemp',
 #          'surfsalinity','MLD']

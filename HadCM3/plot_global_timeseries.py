@@ -36,47 +36,63 @@ def get_global_avg(year):
     else:
         cent = np.floor(year/100.)
         filename = (FILESTART + '@pg' + cent_ind.get(cent) + 
-                    str(np.int(year - (cent*100))).zfill(2) + 'c1.nc')
+                    str(int(year - (cent*100))).zfill(2) + 'c1.nc')
        
     cube = iris.load_cube(filename,FIELD)
     cube.coord('latitude').guess_bounds()
     cube.coord('longitude').guess_bounds()
     cube.coord('depth_1').guess_bounds()
+    top_cube = cube[0,0,:,:]
+   
     grid_areas = iris.analysis.cartography.area_weights(cube)
+    grid_areas_top = iris.analysis.cartography.area_weights(top_cube)
     meanval = cube.collapsed(['depth_1','latitude','longitude'],
                              iris.analysis.MEAN, weights=grid_areas)
+    meansurf = top_cube.collapsed(['latitude','longitude'],
+                                  iris.analysis.MEAN, weights=grid_areas_top)
+
 
     if FIELD == 'salinity':
         globmean = (meanval.data * 1000.)+35.0
+        surfmean = (meansurf.data * 1000.)+35.0
     else:
         globmean = meanval.data
+        surfmean = meansurf.data
 
     
-    return globmean[0]
+    return globmean[0],surfmean
 
 ################################
 # main program
 
-EXPT = 'xpkma'
-NEW_VERSION = True
-STARTYEAR=1851
-NYEARS=500
+EXPT = 'xqlna'
+NEW_VERSION = False
+STARTYEAR=2851
+NYEARS=200
 FIELD = 'temp'    # valid fields are 'salinity', 'temp'
 
-FILESTART = '/nfs/hera1/earjcti/um/' + EXPT + '/pg/' + EXPT + 'o'
+FILESTART = '/uolstore/Research/a/hera1/earjcti/um/' + EXPT + '/pg/' + EXPT + 'o'
 meandata = np.zeros(NYEARS)
+meansurf = np.zeros(NYEARS)
 for year in range(STARTYEAR, STARTYEAR+NYEARS):
-    globavgval = get_global_avg(year)
+    print(year)
+    globavgval,surfavgval = get_global_avg(year)
     meandata[year-STARTYEAR] = globavgval
+    meansurf[year-STARTYEAR] = surfavgval
 
 
+plt.subplot(211)
 plt.plot(meandata)
+plt.title('global values')
+plt.subplot(212)
+plt.plot(meansurf)
+plt.title('top layer')
 plt.xlabel('year')
 plt.title(FIELD)
 if FIELD == 'salinity':
     plt.ylabel('psu')
 if FIELD == 'temp':
     plt.ylabel('degC (potential temperature)')
-plt.savefig('/nfs/hera1/earjcti/HadCM3_plots/OceanTimeseries/' + EXPT + '_' + FIELD + '.eps')
-plt.savefig('/nfs/hera1/earjcti/HadCM3_plots/OceanTimeseries/' + EXPT + '_' + FIELD + '.png')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/HadCM3_plots/OceanTimeseries/' + EXPT + '_' + FIELD + '.eps')
+plt.savefig('/uolstore/Research/a/hera1/earjcti/HadCM3_plots/OceanTimeseries/' + EXPT + '_' + FIELD + '.png')
 plt.close()

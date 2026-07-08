@@ -109,8 +109,8 @@ class main():
             startfname = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\"
             startout = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\"
         else:
-            #startout = "/nfs/hera1/earjcti/um/"
-            startout = "/home/earjcti/um/"
+            startout = "/uolstore/Research/a/hera1/earjcti/um/"
+            #startout = "/home/earjcti/um/"
             if EXPT_TYPE == 'S':
                 startfname = "/nfs/hera3/palaeo_share/PlioMIP2/processed/"
             else:
@@ -182,10 +182,17 @@ class main():
                               '.' +  fileletter.get(field) + 'sd' + 
                               SEASON + '.nc')
             
-        elif EXPT_TYPE == 'S':
+        elif CNTL_TYPE == 'S':
             self.meanbench = startfname + CNTL + '_Annual.nc'
             self.sdbench = startfname + CNTL + '_Annual_std.nc'
-            
+        elif CNTL_TYPE == 'db':
+            self.meanbench = ('/uolstore/Research/a/hera2/apps/metadata/' + 
+                              'experiments/' + CNTL + '/averages/' +
+            #                  CNTL + '_Annual_Average_a@pd_Temperature.nc')
+                               CNTL + '_Annual_Average_a@pd_TotalPrecipitationRate.nc')
+            print('using experiment standard deviation for control')
+            self.sdbench = self.stdevfile
+    
         else:
             self.meanbench = (startfname + CNTL + '/average/' + CNTL + 
                               '_' + field + '_' + SEASON +'_mean_' +
@@ -247,9 +254,12 @@ class main():
         cube_exptsd, cbarunits = self.mean_equalise_cubes(cube_exptsd)
         cube_cntlsd, cbarunits = self.mean_equalise_cubes(cube_cntlsd)
         
-        print(cube_exptmean)
-        print(cube_cntlmean)
+        print(cube_exptmean.data)
+        print(cube_cntlmean.data)
         cube_anom = cube_exptmean - cube_cntlmean
+        qplt.contourf(cube_anom)
+        plt.show()
+        sys.exit(0)
         # to calculate the divisor in the t-statistic
         # you will have to look at how to do a t-test on the web for exlanation
         data1 = ((((cube_exptsd.data ** 2.0) * (NYEARS-1.0))
@@ -429,26 +439,30 @@ class main():
 
 
 LINUX_WIN='l'
-NYEARS = 24
+NYEARS = 30
 SEASON = 'ann'
 
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPT = 'xqicc'
-EXPT_STARTYEAR = 3900
+EXPT = 'xqlna'
+EXPT_STARTYEAR = 3020
 #EXPT = 'Eoi400_ARC4_2450-2499'
-EXPT_TYPE = 'L'#  A = average file like I made using 
+EXPT_TYPE = 'A'#  A = average file like I made using 
                #      program COMMON/basic_plots_avg_fields.py
                # B = Bristol file like Paul made
                # S = average file like Steve made
                # L= long filename '#'
+               # db - from STeve Pickerings database
+
                
 # data from good experiment
-CNTL_TYPE = 'L' # A = average file like I made
+CNTL_TYPE = 'db' # A = average file like I made
                # B = Bristol file like Paul made
                  # S = like file steve made
-CNTL = 'xqbwc'
+                 # db -steve p's database
+                 
+CNTL = 'tdlvc'
 CNTL_STARTYEAR = 3900
 #CNTL = 'Eoi400_2450-2499'
 #CNTL = 'tcfze'
@@ -465,7 +479,7 @@ FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
 #          'surfsalinity','MLD', 'evapsea']
 
 #FIELDS = ['AMOC']
-#FIELDS = ['temp1.5']
+FIELDS = ['precip']
 
 for i, field in enumerate(FIELDS):
     print(field)
