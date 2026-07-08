@@ -34,7 +34,7 @@ def get_rad_inbal(year):
     # other things if the budgets don't balance
 
     if HadCM3 == 'y':
-        datasetname='/nfs/hera1/earjcti/um/'+exptname+'/pcpd/'+exptname+'a#pd' + str(year).zfill(9) + '??+.nc'
+        datasetname='/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pcpd/'+exptname+'a#pd' + str(year).zfill(9) + '??+.nc'
         print(datasetname)
         #sys.exit(0)
         f=MFDataset(datasetname)
@@ -79,21 +79,24 @@ figureno=0
 
 
 HadCM3='y'
-startyear=3001
-endyear=4000
+startyear=1991
+endyear=3001
 
 #endings=['i','j','k','l','m','n','o','p','q','r','s','t']
-endings=['s','t']
+endings=['j']
 for ending in endings:
-    exptname = 'xqbw' + ending
+    #exptname = 'xqbw' + ending
+    exptname = 'xpsi' + ending
     ann_avg_ts = np.zeros(endyear-startyear+1)
     years=np.arange(startyear, endyear+1)
 
     try:
         for year in range(startyear,endyear+1):
+            print(year)
             ann_avg = get_rad_inbal(year)
             ann_avg_ts[year-startyear]=ann_avg
 
+        print('got data')
        # get running mean (30 year)
 
         weights = np.ones(30)/30
@@ -106,16 +109,27 @@ for ending in endings:
 #print(np.shape(years_run_mean))
 #sys.exit(0)
 
-
+        print('about to plot')
         plt.plot(years,ann_avg_ts)
+        print('j1')
         plt.plot(years_run_mean, run_mean)
+        print('j2')
         plt.hlines(y=0,xmin=startyear, xmax=endyear)
         plt.title('TOA radiation inbalance:'+exptname)
         plt.xlabel('year')
         plt.ylabel('W/m2')
-        fileout = '/nfs/hera1/earjcti/um/' + exptname + '/spinup/' + exptname + '_TOAinbal.eps'
+        fileout = '/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/' + exptname + '_TOAinbal.eps'
         plt.savefig(fileout)
         plt.close()
+
+
+        datafile = '/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/' + exptname + '_TOAinbal.tex'
+        print('about to open',datafile)
+        with open(datafile, 'w') as f:
+            f.write('% year  toa_imbalance_Wm2\n')
+            for yr, val in zip(years, ann_avg_ts):
+                f.write(f'{yr:d} {val:.6f}\n')
+      
 
     except:
         print('failure on',exptname)
