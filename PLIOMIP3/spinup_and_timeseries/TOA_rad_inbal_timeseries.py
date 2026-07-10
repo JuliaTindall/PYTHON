@@ -79,11 +79,11 @@ figureno=0
 
 
 HadCM3='y'
-startyear=1991
-endyear=3001
+startyear=2
+endyear=3000
 
 #endings=['i','j','k','l','m','n','o','p','q','r','s','t']
-endings=['j']
+endings=['g','e']
 for ending in endings:
     #exptname = 'xqbw' + ending
     exptname = 'xpsi' + ending

@@ -135,11 +135,20 @@ def plotdrifts(ratio18o, ratiosal, levels_plotted, incl18o):
    
     plt.tight_layout()
 
-    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/ocn_d18o_salratio/drift_'+exptname+'_' + levels_plotted + '.eps') 
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/drift_sal_18o'+exptname+'_' + levels_plotted + '_' + str(startyear) + '_' + str(endyear) +'.eps') 
     print('savingfig',fileout)
     plt.savefig(fileout, bbox_inches='tight')  
     
     plt.close()
+
+    filetxt=('/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/drift_sal_18o'+exptname+'_' + levels_plotted + '_' + str(startyear) + '_' + str(endyear) +'.txt') 
+ 
+    f=open(filetxt,'w')
+    f.write('year,integrated salinity\n')
+    for i in range(0,endyear-startyear+1):
+        f.write(str(i + startyear) +',' + str((ratiosal[i]*1000.)+35.0)+'\n')
+    f.close()
+
 
 
 #######################################################
@@ -198,9 +207,9 @@ figureno=0
 
 incl_18o='n'
 HadCM3='y'
-exptname='xpsie'
-startyear=12  # can't start before year 12 because we aren't outputting d18o
-endyear=2999
+exptname='xqbwj'
+startyear=3001  # can't start before year 12 because we aren't outputting d18o
+endyear=4000
 plt.figure(figureno)
 getdrift(HadCM3,exptname,startyear,endyear,incl_18o)
 figureno=figureno+1

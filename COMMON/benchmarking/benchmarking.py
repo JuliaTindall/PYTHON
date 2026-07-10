@@ -188,8 +188,8 @@ class main():
         elif CNTL_TYPE == 'db':
             self.meanbench = ('/uolstore/Research/a/hera2/apps/metadata/' + 
                               'experiments/' + CNTL + '/averages/' +
-            #                  CNTL + '_Annual_Average_a@pd_Temperature.nc')
-                               CNTL + '_Annual_Average_a@pd_TotalPrecipitationRate.nc')
+                              CNTL + '_Annual_Average_a@pd_Temperature.nc')
+            #                   CNTL + '_Annual_Average_a@pd_TotalPrecipitationRate.nc')
             print('using experiment standard deviation for control')
             self.sdbench = self.stdevfile
     
@@ -230,6 +230,7 @@ class main():
             cube_temp = iris.load_cube(self.sdbench, variable_constraint)
             cube_cntlsd = fix_mask(cube_temp)
         else:
+            print(self.meanbench,self.fieldname)
             cube_cntlmean = iris.load_cube(self.meanbench, self.fieldname)
             cube_cntlsd = iris.load_cube(self.sdbench, self.fieldname)
         
@@ -257,9 +258,9 @@ class main():
         print(cube_exptmean.data)
         print(cube_cntlmean.data)
         cube_anom = cube_exptmean - cube_cntlmean
-        qplt.contourf(cube_anom)
-        plt.show()
-        sys.exit(0)
+        #qplt.contourf(cube_anom)
+        #plt.show()
+        #sys.exit(0)
         # to calculate the divisor in the t-statistic
         # you will have to look at how to do a t-test on the web for exlanation
         data1 = ((((cube_exptsd.data ** 2.0) * (NYEARS-1.0))
@@ -445,8 +446,8 @@ SEASON = 'ann'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPT = 'xqlna'
-EXPT_STARTYEAR = 3020
+EXPT = 'xqlnd'
+EXPT_STARTYEAR = 2869
 #EXPT = 'Eoi400_ARC4_2450-2499'
 EXPT_TYPE = 'A'#  A = average file like I made using 
                #      program COMMON/basic_plots_avg_fields.py
@@ -479,7 +480,7 @@ FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
 #          'surfsalinity','MLD', 'evapsea']
 
 #FIELDS = ['AMOC']
-FIELDS = ['precip']
+FIELDS = ['temp1.5']
 
 for i, field in enumerate(FIELDS):
     print(field)

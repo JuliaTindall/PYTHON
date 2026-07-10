@@ -253,8 +253,8 @@ class main():
 
 MODELTYPE = 'C' # n=HadGEM, C=HadCM3, Ca=HadCM3_alternate (long filenames)
                  #F=Famous
-EXPT = 'xqlna'
-STARTYEAR = 3020
+EXPT = 'xqlnd'
+STARTYEAR = 2869
 NYEARS=30
 AVG_SEAS = 'ann' # ann, djf, jja
 
