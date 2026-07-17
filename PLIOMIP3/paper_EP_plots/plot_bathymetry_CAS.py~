@@ -1,0 +1,80 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+import iris
+import iris.plot as iplt
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+
+filename = '/home/earjcti/um/xpsie/pg/xpsieo#pg000001798c1+.nc'
+allcubes = iris.load(filename)
+
+for cube in allcubes:
+    print(cube.var_name)
+    if cube.var_name == 'insitu_T':
+        temp_cube = iris.util.squeeze(cube)
+        temp_depth = temp_cube.coord('depth_1').points
+    if cube.var_name == 'W':
+        W_cube = iris.util.squeeze(cube)
+        W_depth = W_cube.coord('depth').points
+        W_lats = W_cube.coord('latitude').points
+        W_lons = W_cube.coord('longitude').points
+
+
+
+nlats = len(W_lats)
+nlons = len(W_lons)
+W_data = W_cube.data
+
+#print(W_data.mask)
+bottom_data = np.zeros((nlats,nlons))
+
+for j in range(0,nlats):
+    for i in range(0,nlons):
+        # find where depth becomes nan
+        #print(W_data.mask[:,j,i])
+        if W_data.mask[18,j,i]==False:
+            bottom_data[j,i]=5500.
+        for k in range(0,18):
+            if W_data.mask[k+1,j,i] == True and W_data.mask[k,j,i] == False:
+                #print('here',k,W_depth[k])
+                bottom_data[j,i] = W_depth[k]
+                #print('found',bottom_data[j,i])
+                
+    
+bottom_depth_cube = (W_cube[0,:,:].copy(data=bottom_data))
+
+##########################
+# now plot CAS region  AI generated
+# CAS region (adjust as needed)
+
+boundaries=np.concatenate(([-5],temp_depth))
+boundaries=temp_depth
+  
+cmap_terrain = plt.cm.get_cmap('terrain',len(boundaries))
+colors=list(cmap_terrain(np.arange(len(boundaries))))
+cmap_terrain.set_over(colors[-1])  # set to last color
+cmap_terrain.set_under(colors[0])  # set to first color
+
+
+reg_EP_cube = bottom_depth_cube.extract(iris.Constraint(latitude = lambda cell: 0< cell < 20, longitude=lambda cell: 260 < cell < 290))
+print(reg_EP_cube)
+   
+ax=plt.subplot(1,1,1,projection=ccrs.PlateCarree())
+
+cs=iplt.pcolormesh(reg_EP_cube, cmap=cmap_terrain,
+                   norm = matplotlib.colors.BoundaryNorm(boundaries, 
+                                            ncolors=len(boundaries)-1, 
+                                                         clip=False))
+cbar=plt.colorbar(cs,orientation='vertical', extend='max')
+print(W_depth)
+cbar.set_ticks(np.concatenate(([0],W_depth)))
+#qplt.contour(e280_lsmcube,[0.5],colors='red',linewidths=0.75)
+#qplt.contour(eoi400_lsmcube,[0.5],colors='black',linewidths=0.75,linestyle='dashed')
+ax.gridlines()
+ax.coastlines()
+plt.savefig('bathymetry.png')
+sys.exit(0)
+ 
+    

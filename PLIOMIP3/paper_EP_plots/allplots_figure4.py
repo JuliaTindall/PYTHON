@@ -45,7 +45,7 @@ Tanom_cube = xqbwg_atltemp_cube - xqbwj_atltemp_cube
 cs=iplt.contourf(Tanom_cube,cmap='RdBu_r',
               levels=np.arange(-2.0,2.2,0.2),extend='both')
 
-ax0.set_title('a) Atlantic temperature anomaly: EP-LP$_{400}$',fontsize=15)
+ax0.set_title('a) Atlantic temperature anomaly: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 #plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -85,7 +85,7 @@ Sanom_cube = xqbwg_atl_cube - xqbwj_atl_cube
 cs2=iplt.contourf(Sanom_cube,cmap='RdBu_r',
               levels=np.arange(-0.5,0.55,0.05),extend='both')
 
-ax1.set_title('b) Atlantic salinity anomaly: EP-LP$_{400}$',fontsize=15)
+ax1.set_title('b) Atlantic salinity anomaly: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 #plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -122,7 +122,7 @@ Tanom_cube = xqbwg_pactemp_cube - xqbwj_pactemp_cube
 iplt.contourf(Tanom_cube,cmap='RdBu_r',
               levels=np.arange(-2.0,2.2,0.2),extend='both')
 
-ax2.set_title('c) Pacific temperature anomaly: EP-LP$_{400}$',fontsize=15)
+ax2.set_title('c) Pacific temperature anomaly: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -139,7 +139,7 @@ Sanom_cube = xqbwg_pac_cube - xqbwj_pac_cube
 iplt.contourf(Sanom_cube,cmap='RdBu_r',
               levels=np.arange(-0.5,0.55,0.05),extend='both')
 
-ax3.set_title('d) Pacific salinity anomaly: EP-LP$_{400}$',fontsize=15)
+ax3.set_title('d) Pacific salinity anomaly: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
