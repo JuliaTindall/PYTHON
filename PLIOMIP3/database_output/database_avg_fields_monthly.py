@@ -74,8 +74,8 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     if field == 'SST' or field =='SeaIceConc' or field == 'SeaIceDepth':
         infile=filestart + 'um/'+expt+'/pf/'+expt+'o'+sep+'pf'
     else:
-       # infile=filestart + 'um/'+expt+'/pcpd/'+expt+'a'+sep+'pd'
-       infile=filestart + 'um/'+expt+'/pi/'+expt+'a'+sep+'pi'
+        infile=filestart + 'um/'+expt+'/pcpd/'+expt+'a'+sep+'pd'
+       #infile=filestart + 'um/'+expt+'/pi/'+expt+'a'+sep+'pi'
     txtfile=filestart + 'um/'+expt+'/database_averages/'+expt+'_'+ field + str(startyear) + '_' + str(endyear)  +'_global_avg_monthly.txt'
     ftxt=open(txtfile,'w')
     ftxt.write('year,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec\n')
@@ -137,10 +137,10 @@ def get_monthly_data(expt,startyear,endyear,field,HadCM3):
     ftxt.close()
 
     avgvar=np.ma.mean(allvar,axis=0)
-    print(avgvar[0,0,40,:])
+    print(avgvar[0,40,:])
     print(avgvar.shape,'j1')
     avgvar=np.ma.where(avgvar.mask == 1.0, -99999., avgvar)
-    print(avgvar[0,0,40,:])
+    print(avgvar[0,40,:])
     # write average variable out to a netcdf file
 
     # set up filename
@@ -363,22 +363,22 @@ HadCM3='y' # y / orig /n
 #startyear=2
 #endyear=22
 
-expts = ['xqbws']
-startyear = 3901
-endyear = 4001
-
-
-for expt in expts:
-    field='field1391_2'
-    get_monthly_data(expt,startyear,endyear,field,HadCM3)
-sys.exit(0)
-
+expts = ['xpsid','xpsie','xpsig']
+startyear = 1400
+endyear = 1500
 
 
 #for expt in expts:
-#    field='temp_1'
-#    get_monthly_data(expt,startyear,endyear,field)
+#    field='field1391_2'
+#    get_monthly_data(expt,startyear,endyear,field,HadCM3)
 #sys.exit(0)
+
+
+
+for expt in expts:
+    field='temp'
+    get_monthly_data(expt,startyear,endyear,field,HadCM3)
+sys.exit(0)
 
 #for expt in expts:
 #    field = 'SeaIceDepth'
@@ -417,9 +417,9 @@ sys.exit(0)
 #field='field201'
 #get_monthly_data(expt,startyear,endyear,field)
 
-for expt in expts:
-    field='precip'
-    get_monthly_data(expt,startyear,endyear,field)
+#for expt in expts:
+#    field='precip'
+#    get_monthly_data(expt,startyear,endyear,field)
 ##sys.exit(0)
 
 

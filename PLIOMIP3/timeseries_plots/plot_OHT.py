@@ -20,7 +20,7 @@ timeseries_req='n'
 latreq=-20.0
 yearstart=3900
 yearend=4000
-basin='global'  # basin must be global / atlantic / pacific
+basin='atlantic'  # basin must be global / atlantic / pacific
 
 
 
@@ -107,7 +107,11 @@ if meanreq == 'y':
     fig, ax = plt.subplots(1, 1, figsize=(6, 5))  # 1 row, 2 columns
     for i,cube in enumerate(allexpts_cubes):
         mean_cube = cube.collapsed('t', iris.analysis.MEAN)
-
+        if i == 0:
+            cntl_cube = mean_cube.copy()
+        else:
+            diffcube = mean_cube - cntl_cube
+          
         # Extract latitude and data values
         latitudes = mean_cube.coord('latitude').points
         values = mean_cube.data
@@ -159,6 +163,12 @@ if meanreq == 'y':
     #sys.exit()
     plt.savefig('OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '.png')
     plt.close()
+
+
+    plt.plot(diffcube)
+    plt.show()
+    sys.exit(0)
+
     sys.exit(0)
 
 cubes_for_meaning = CubeList([])

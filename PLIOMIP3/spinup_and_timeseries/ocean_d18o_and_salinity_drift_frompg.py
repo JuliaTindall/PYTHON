@@ -5,7 +5,7 @@
 #    This program is loosely based on 
 #  IDLPRGS/HadGEM/analysis/temperature_timeseries_frompg.pro
 #
-#  It should do a timeseries of the average ocean d18o and salinity
+#  It should do a timeseries 1of the average ocean d18o and salinity
 #
 # search for 'main program' to find end of functions
 # Julia 22/11/2016
@@ -51,6 +51,7 @@ def get_avg(year,weights,incl18o):
               + yearuse + 'c1+.nc')
     cubelist = iris.load(filename)
     salratiocube = cubelist.extract('salinity')[0]
+    half_levels_cube = cubelist.extract('W')[0]
 
     if incl18o=='y':
         ratio18ocube = cubelist.extract('otracer1')[0]
@@ -61,14 +62,29 @@ def get_avg(year,weights,incl18o):
         salratiocube.coord('longitude').guess_bounds()
         weights = iris.analysis.cartography.area_weights(salratiocube)
         new_weights = np.zeros(np.shape(weights))
-        depths = salratiocube.coord('depth_1').points
+        
+        #orig way of calculating layer thickness
+        #depths = salratiocube.coord('depth_1').points
+        #layer_depths = np.zeros(20)
+        #layer_depths[0] = depths[0] * 2.0
+        #layer_depths[19] = depths[19] - depths[18]
+        #for k in range(1,19):
+       #     layer_depths[k]=((depths[k+1] - depths[k-1]) * 0.5) 
+        #for k in range(0,20):
+        #    new_weights[:,k,:,:] = weights[:,k,:,:] * layer_depths[k]
+        #print(layer_depths)
+        
+        # new way of calculating layer thickness
+        depths = half_levels_cube.coord('depth').points
         layer_depths = np.zeros(20)
-        layer_depths[0] = depths[0] * 2.0
-        layer_depths[19] = depths[19] - depths[18]
+        layer_depths[0]=depths[0]
         for k in range(1,19):
-            layer_depths[k]=((depths[k+1] - depths[k-1]) * 0.5) 
+            layer_depths[k] = depths[k]-depths[k-1]
+        layer_depths[19]=5500. - depths[18]
         for k in range(0,20):
             new_weights[:,k,:,:] = weights[:,k,:,:] * layer_depths[k]
+        print(layer_depths)
+    
     else:
         new_weights = weights
 
