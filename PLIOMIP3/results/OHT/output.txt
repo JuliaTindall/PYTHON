@@ -1,31 +1,25 @@
 nohup: ignoring input
-total ocean heat transport / (0.0001 Gy) (t: 1; latitude: 143)
-    Dimension coordinates:
-        t                                  x            -
-        latitude                           -            x
-    Scalar coordinates:
-        depth_1                          2598.725 m, bound=(5.0, 5192.45) m
-        longitude                        180.625 degrees, bound=(0.625, 360.625) degrees
-    Cell methods:
-        0                                depth_1: sum
-    Attributes:
-        date                             '01/12/01'
-        name                             'field704'
-        source                           'Unified Model Output (Vn 4.5):'
-        time                             '00:00'
-        title                            'TOTAL OCEAN V-VELOCITY      CM S**-1'
-total ocean heat transport / (0.0001 Gy) (t: 1; latitude: 143)
-    Dimension coordinates:
-        t                                  x            -
-        latitude                           -            x
-    Scalar coordinates:
-        depth_1                          2598.725 m, bound=(5.0, 5192.45) m
-        longitude                        180.625 degrees, bound=(0.625, 360.625) degrees
-    Cell methods:
-        0                                depth_1: sum
-    Attributes:
-        date                             '01/12/01'
-        name                             'field704'
-        source                           'Unified Model Output (Vn 4.5):'
-        time                             '00:00'
-        title                            'TOTAL OCEAN V-VELOCITY      CM S**-1'
+Traceback (most recent call last):
+  File "/uolstore/home/staff_lnxhome02/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/OHT/get_OHT_noTref.py", line 271, in <module>
+    Atlantic_cube, Pacific_cube, Indian_cube, Global_cube =get_mask(firstfile)
+                                                           ^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/home/staff_lnxhome02/earjcti/PYTHON/PROGRAMS/PLIOMIP3/results/OHT/get_OHT_noTref.py", line 90, in get_mask
+    cube_full = iris.load_cube(firstfile,'TEMPERATURE (OCEAN)  DEG.C')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/__init__.py", line 355, in load_cube
+    cubes = _load_collection(uris, constraints, callback).cubes()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/__init__.py", line 290, in _load_collection
+    result = _CubeFilterCollection.from_cubes(cubes, constraints)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/cube.py", line 106, in from_cubes
+    for cube in cubes:
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/__init__.py", line 271, in _generate_cubes
+    for cube in iris.io.load_files(part_names, callback, constraints):
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/io/__init__.py", line 221, in load_files
+    all_file_paths = expand_filespecs(filenames)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/uolstore/Research/a/hera1/earjcti/anaconda3/envs/overturning/lib/python3.12/site-packages/iris/io/__init__.py", line 200, in expand_filespecs
+    raise IOError(msg)
+OSError: One or more of the files specified did not exist:
+    * "/uolstore/Research/a/hera1/earjcti/um/xqbwj/pg/xqbwjo#pg000002000c1+.nc" didn't match any files

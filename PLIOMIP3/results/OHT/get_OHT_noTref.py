@@ -260,9 +260,9 @@ def calc_OHT(V_cube,dx,dz,coslats,T_cube,basin):
 
 # gets the basins over which we calculate
 filestart = '/uolstore/Research/a/hera1/earjcti/um/'
-expt = 'xpsic'
-yearstart=2000
-yearend=3000
+expt = 'xqbwj'
+yearstart=3001
+yearend=4000
 
 
 
