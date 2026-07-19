@@ -20,7 +20,7 @@ timeseries_req='n'
 latreq=-20.0
 yearstart=3900
 yearend=4000
-basin='atlantic'  # basin must be global / atlantic / pacific
+basin='global'  # basin must be global / atlantic / pacific
 
 
 
@@ -52,7 +52,9 @@ def get_data(filestart,yearstart,yearend):
         allcubes.append(cube)
 
     if yearstart== 3900 and yearend == 4000:
-        cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
+        #cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
+        #                      'Ocean heat transport ('+basin+')')
+        cube = iris.load_cube(filestart + '_3900_4000.nc',
                               'Ocean heat transport ('+basin+')')
         allcubes.append(cube)
 
@@ -104,7 +106,11 @@ for expt in exptnames:
     allexpts_cubes.append(expt_cube)
 
 if meanreq == 'y':
-    fig, ax = plt.subplots(1, 1, figsize=(6, 5))  # 1 row, 2 columns
+    if basin == 'global':
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))  
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))  
+  
     for i,cube in enumerate(allexpts_cubes):
         mean_cube = cube.collapsed('t', iris.analysis.MEAN)
         if i == 0:
@@ -129,45 +135,48 @@ if meanreq == 'y':
 
        
         # Plot latitude vs mean value
-        ax.plot(latitudes, values, label=period.get(exptnames[i]),linewidth=2)
+        ax.plot(values, latitudes, label=period.get(exptnames[i]),linewidth=2)
         #ax[1].plot(ddy_latitudes, value_differences,
         #             label=period.get(exptnames[i]))
         
-    ax.set_xlabel('Latitude',fontsize=16)
-    ax.set_ylabel('OHT (PW)',fontsize=16)
+    ax.set_ylabel('Latitude',fontsize=16)
+    ax.set_xlabel('OHT (PW)',fontsize=16)
     plt.tick_params(axis='both',which='major',labelsize=16)
 
     #ax[1].set_title('OHT diff from equ - to pole.  If this is > 0 this latitude warms')
 
-    ax.axhline(y=0, color='black', linewidth=2)
+    ax.axvline(x=0, color='black', linewidth=2)
     #ax[1].axhline(y=0, color='black', linewidth=2)
     ax.legend(fontsize=14)
     #ax[1].legend()
-    ax.set_ylim(-1.5,1.6)
+    ax.set_xlim(-1.5,1.6)
     #ax[1].set_ylim(-0.1,0.1)
     #ax.set_xlim(-30,90)
     ax.grid(True)
 
     if basin =='atlantic':  # basin must be global / atlantic / pacific
         ax.set_title('a) Atlantic Ocean Heat Transport',fontsize=16)
-        ax.set_xlim(-30,90)
+        ax.set_ylim(-30,90)
+        ax.set_yticks([-30, 0, 30, 60, 90])
     if basin =='pacific':  # basin must be global / atlantic / pacific
         ax.set_title('b) Pacific Ocean Heat Transport',fontsize=16)
-        ax.set_xlim(-30,90)
+        ax.set_ylim(-30,90)
+        ax.set_yticks([-30, 0, 30, 60, 90])
     if basin =='global':  # basin must be global / atlantic / pacific
         ax.set_title('c) Global Ocean Heat Transport',fontsize=16)
+        ax.set_yticks([-90, -60, -30, 0, 30, 60, 90])
        
-
+        
     plt.tight_layout() 
-    #plt.show()
-    #sys.exit()
+    plt.show()
+    sys.exit()
     plt.savefig('OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '.png')
     plt.close()
 
-
-    plt.plot(diffcube)
-    plt.show()
-    sys.exit(0)
+    #plt.subplot(111)
+    #plt.plot(diffcube.data)
+    #plt.show()
+    #sys.exit(0)
 
     sys.exit(0)
 

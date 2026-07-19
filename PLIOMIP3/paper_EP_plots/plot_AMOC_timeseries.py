@@ -112,11 +112,7 @@ for expt in exptnames:
     x_mean=x[window-1:]
 
     # Plot the data
-    if expt == 'xpsie':
-        plt.plot(x_mean, y_mean, label=period.get(expt),
-                 linewidth=3,linestyle='--')
-    else:
-        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.plot(x_mean, y_mean, label=period.get(expt))
     plt.title('Max AMOC strength (30 year running mean)',fontsize=18)
 
 plt.xlabel('year',fontsize=16)

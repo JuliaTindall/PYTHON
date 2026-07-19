@@ -182,3 +182,35 @@ print(masks_cubelist)
 
 iris.save(masks_cubelist,'masks.nc',fill_value = -99999.)
   
+##################################################
+# gets an alternative basin mask which has the Atlantic and Indo Pacific
+
+alt_in_pac = Indian_mask_T_cube + Pacific_mask_T_cube
+alt_in_pac.long_name = 'Indo_Pacific mask T_grid'
+alt_Atl = Atlantic_mask_T_cube
+
+# extend Atlantic down to southern ocean (use boundaries from 55.625 for ocean)
+lons_to_change = []
+
+# find the longitudes we need to change by using final atlantic coordinate
+for latix,lat in enumerate(Atlantic_mask_T_cube.coord('latitude').points):
+    if lat == -55.625:
+        #print('found',np.nanmax(Atlantic_mask_T_cube.data[latix,:]),
+        #                        np.nanmax(Atlantic_mask_T_cube.data[latix-1,:]))
+        latixreq = latix
+        # now find lon range where these are 1.
+        for lonix, lon in enumerate(Atlantic_mask_T_cube.coord('longitude').points):
+            if Atlantic_mask_T_cube.data[latixreq,lonix] == 1:
+                lons_to_change.append(lonix)
+
+
+# change them where appropriate
+print(lons_to_change)
+#southern ocean
+for latix in range(0,latixreq):
+    for lon in lons_to_change:
+        tempval = alt_in_pac.data[latix,lon]
+        alt_in_pac.data[latix,lon] = alt_Atl.data[latix,lon]
+        alt_Atl.data[latix,lon] = tempval
+    
+iris.save([alt_in_pac,alt_Atl],'alternative_mask.nc',fill_value = -99999.)
