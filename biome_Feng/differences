@@ -1,0 +1,67 @@
+147c147
+<                         'monthly mean temperature','p')
+---
+>                         'monthly mean temperature', EXPTNAME_CENTURY)
+173c173
+<                            'monthly mean temperature','p')
+---
+>                            'monthly mean temperature', PI_EXPT_CENTURY)
+198c198
+<                          'monthly total precipitation','p')
+---
+>                          'monthly total precipitation', EXPTNAME_CENTURY)
+204c204
+<                          'monthly total precipitation','p')
+---
+>                          'monthly total precipitation', PI_EXPT_CENTURY)
+226c226
+<                              'mean monthly percent of possible sunshine','p')
+---
+>                              'mean monthly percent of possible sunshine', EXPTNAME_CENTURY)
+237c237
+<                            'mean monthly percent of possible sunshine','p')
+---
+>                            'mean monthly percent of possible sunshine', PI_EXPT_CENTURY)
+291c291
+<     file_soils_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+---
+>     file_soils_PI = ('/home/earjcti/BIOME4-main/files/' +   # wanglin: change the directory same as mPWP
+295c295
+<     file_perc_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+---
+>     file_perc_PI = ('/home/earjcti/BIOME4-main/files/' +    # wanglin: change the directory same as mPWP
+372c372
+<     iris.save(allcubes_plio_land,OUTFILE + 'absolute.nc', 
+---
+>     iris.save(allcubes_plio_land,OUTFILE + 'absolute_' + EXPTNAME + '.nc',  # wanglin: add EXPTNAME
+381,389c381
+<         print(cube.coord('lon').var_name)
+<         sys.exit(0)
+<         #print(cube.coord('lat'))
+<         #print(cube.coord('time'))
+<         #print(cube)
+<         print(cube.var_name,cube.long_name)
+< 
+<     sys.exit(0)
+< 
+---
+>         print(cube)
+391c383
+<     iris.save(allcubes_land_anom,OUTFILE + 'anomaly.nc', 
+---
+>     iris.save(allcubes_land_anom,OUTFILE + 'anomaly_' + EXPTNAME + '.nc', # wanglin: add EXPTNAME
+399c391
+< 
+---
+> # First time, regrided, xozza, xozzb, xozzc, xozzf, tenvk, tenvl, tenvm, Julia and Steve's data, Julia helps with programing
+401c393,394
+< EXPTNAME = 'xozzb'
+---
+> EXPTNAME = 'tenvl'
+> EXPTNAME_CENTURY = 'o'
+402a396
+> PI_EXPT_CENTURY = 'p'
+404c398
+< ENDYEAR=73
+---
+> ENDYEAR= 100
