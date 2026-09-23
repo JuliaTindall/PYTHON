@@ -120,7 +120,8 @@ cbar.set_label('°C',fontsize=14)
 axt = fig.add_subplot(spec[2])
 axt.set_axis_off()
 axt.text(0.5, 1.0,'Effects of CAS opening',fontsize=14,va='top',
-           fontweight='bold',ha='center')
+         #  fontweight='bold',
+         ha='center')
 
 positions = [ax1.get_position(),axt.get_position()]
 
@@ -148,7 +149,8 @@ fig.add_artist(rect)
 axt3 = fig.add_subplot(spec[0])
 axt3.set_axis_off()
 axt3.text(0.5, 1.0,'Total EP - LP warming',fontsize=14,va='top',
-          fontweight='bold',ha='center')
+          #fontweight='bold',
+          ha='center')
 positions = [ax0.get_position(),axt3.get_position()]
 
 left   = min(p.x0 for p in positions)
@@ -173,7 +175,8 @@ fig.add_artist(rect)
 axt2 = fig.add_subplot(spec[4])
 axt2.set_axis_off()
 axt2.text(0.5, 1.0,'Effects of CO$_2$ increase',fontsize=14,va='top',
-           fontweight='bold',ha='center')
+          # fontweight='bold',
+          ha='center')
 positions = [ax2.get_position(),axt2.get_position()]
 
 left   = min(p.x0 for p in positions)

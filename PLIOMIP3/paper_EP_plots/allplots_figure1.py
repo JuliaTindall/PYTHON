@@ -131,7 +131,7 @@ plt.gca().coastlines()
 # EP400 - LP
 ax4=fig.add_subplot(spec[12],projection=ccrs.PlateCarree())
 
-cs=iplt.contourf(EP_LP_cube,cmap='RdBu_r',levels=vals,extend='both')
+cs=iplt.contourf(EP400_LP_cube,cmap='RdBu_r',levels=vals,extend='both')
 
 titlename = 'd) EP$_{400}$ - LP = ' + f'{EP400_LP_mean.data:.2f}' + '$^\circ$C'
 ax4.set_title(titlename,fontsize=13)
@@ -161,7 +161,7 @@ cbar.set_label('°C',fontsize=14)
 axt = fig.add_subplot(spec[2])
 axt.set_axis_off()
 axt.text(0.5, 1.0,'Effects of CAS opening',fontsize=14,va='top',
-           fontweight='bold',ha='center')
+           ha='center')
 
 positions = [ax1.get_position(),ax4.get_position(),axt.get_position()]
 
@@ -189,7 +189,8 @@ fig.add_artist(rect)
 axt3 = fig.add_subplot(spec[0])
 axt3.set_axis_off()
 axt3.text(0.5, 1.0,'Total EP - LP warming',fontsize=14,va='top',
-          fontweight='bold',ha='center')
+          #fontweight='bold',
+          ha='center')
 positions = [ax0.get_position(),axt3.get_position()]
 
 left   = min(p.x0 for p in positions)
@@ -214,7 +215,8 @@ fig.add_artist(rect)
 axt2 = fig.add_subplot(spec[4])
 axt2.set_axis_off()
 axt2.text(0.5, 1.0,'Effects of CO$_2$ increase',fontsize=14,va='top',
-           fontweight='bold',ha='center')
+          # fontweight='bold',
+          ha='center')
 positions = [ax2.get_position(),ax5.get_position(),axt2.get_position()]
 
 left   = min(p.x0 for p in positions)
