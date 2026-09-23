@@ -22,7 +22,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-def get_cube_avg(expt, long_name, units, long_name_req,century):
+def get_cube_avg(expt, long_name, units, long_name_req,
+                 startyear,endyear,century):
     """
     loads in renames and reformats that cube
     """
@@ -33,8 +34,8 @@ def get_cube_avg(expt, long_name, units, long_name_req,century):
     for i, month in enumerate(monthnames):
         cubes = iris.cube.CubeList([])
 
-        for year in range(STARTYEAR,ENDYEAR):
-            filename = (FILESTART + expt + '/pd/' + expt + 
+        for year in range(startyear,endyear):
+            filename = (FILESTART + expt + '/pcpd/' + expt + 
                         'a@pd' + century + str(year) + month + '.nc')
             indcube = iris.load_cube(filename, long_name)
             indcube.coord('t').points = year
@@ -86,11 +87,56 @@ def get_cube_avg(expt, long_name, units, long_name_req,century):
 
     return outcube_r
 
+
+def get_cube_avg_pi(expt, fieldname, units, fieldname_req,varname):
+    """
+    loads in renames and reformats that cube
+    """
+
+    monthnames = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December']
+    
+
+    cubes = iris.cube.CubeList([])
+
+    hera2start = '/uolstore/Research/a/hera2/apps/metadata/experiments/'
+    for month in monthnames:
+        month_cube = iris.load_cube(hera2start + expt + '/averages/' + expt 
+                                    + '_Monthly_Average_'
+                                    + month + '_a@pd_'+ fieldname + '.nc')
+        cubes.append(month_cube)
+      
+    iris.util.equalise_attributes(cubes)
+    iris.util.unify_time_units(cubes)
+    cube = cubes.concatenate_cube()
+
+    # setup missing data attribute
+    cube.attributes["missing_value"] = -9999.
+    cube.rename(fieldname_req)
+ 
+    # get rid of superflous dimensions
+    outcube = iris.util.squeeze(cube)
+
+    # regrid
+    outcube_r = outcube.regrid(GRID_CUBE,iris.analysis.Linear())
+
+    # change time coordinate to months
+    outcube_r.coord('time').attributes = None
+    outcube_r.coord('time').units = None
+    outcube_r.coord('time').points = np.arange(1,13,1)
+    try:
+        outcube_r.coord('time').rename('t')
+    except:
+        pass
+    outcube_r.var_name = varname
+
+    return outcube_r
+
 def get_anom(field, plio_cube, pi_cube):
     """
     gets the standard data from biome 4 and regrids it onto our grid
     """
-    filename = ('/home/earjcti/biome4/inputdata.nc')
+    filename = ('/uolstore/home/users/earjcti/BIOME4/biome4_pliomip2/inputdata.nc')
     cube = iris.load_cube(filename, field)
 
     if (field == 'monthly mean temperature'
@@ -144,7 +190,10 @@ def get_temp_precip():
 
     # temperature
     cube = get_cube_avg(EXPTNAME, 'TEMPERATURE AT 1.5M', 'degC', 
-                        'monthly mean temperature','p')
+                        'monthly mean temperature',EX_STARTYEAR,
+                        EX_ENDYEAR,EX_century)
+
+    
     cube.data = cube.data - 273.15 # convert to celcius
     
     
@@ -161,7 +210,7 @@ def get_temp_precip():
     jja_avg_cube.rename('average JJA temperature') 
    
     cubelist = [annual_mean_temp_cube, jja_avg_cube, jja_cube]
-    iris.save(cubelist,'/home/earjcti/temporary/'+ EXPTNAME + '_meanT.nc')
+    #iris.save(cubelist,'/home/earjcti/temporary/'+ EXPTNAME + '_meanT.nc')
 
     
   
@@ -169,8 +218,10 @@ def get_temp_precip():
     allcubes_plio.append(cube)
 
     # get the preindustrial temperature
-    pi_cube = get_cube_avg(PI_EXPT, 'TEMPERATURE AT 1.5M', 'degC', 
-                           'monthly mean temperature','p')
+
+    pi_cube = get_cube_avg_pi(PI_EXPT, 'Temperature', 'degC', 
+                              'monthly mean temperature','temp')
+    
     pi_cube.data = pi_cube.data - 273.15
     anom_cube = get_anom('monthly mean temperature', cube, pi_cube)
     allcubes_anom.append(anom_cube)
@@ -195,13 +246,15 @@ def get_temp_precip():
 
     # precipitation
     cube = get_cube_avg(EXPTNAME,'TOTAL PRECIPITATION RATE     KG/M2/S', 'mm',
-                         'monthly total precipitation','p')
+                         'monthly total precipitation',EX_STARTYEAR,
+                        EX_ENDYEAR,EX_century)
     # convert to mm/month multiply by (60. * 60. * 24. * 30)
     cube.data = cube.data * 60. * 60. * 24. * 30.
     allcubes_plio.append(cube)
 
-    pi_cube = get_cube_avg(PI_EXPT,'TOTAL PRECIPITATION RATE     KG/M2/S', 'mm',
-                         'monthly total precipitation','p')
+    pi_cube = get_cube_avg_pi(PI_EXPT,
+                              'TotalPrecipitationRate', 'mm',
+                              'monthly total precipitation','precip')
     pi_cube.data = pi_cube.data * 60. * 60. * 24. * 30.
 
     anom_cube = get_anom('monthly total precipitation', cube, pi_cube)
@@ -223,7 +276,8 @@ def get_sunshine():
     # mPWP
     cube_mPWP = get_cube_avg(EXPTNAME, 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
                              'percent', 
-                             'mean monthly percent of possible sunshine','p')
+                             'mean monthly percent of possible sunshine',
+                             EX_STARTYEAR,EX_ENDYEAR,EX_century)
     cube_mPWP.attributes["name"] = 'sun'
     cube_mPWP.long_name = 'cloud amount (inverse)'
     cube_mPWP.rename('sun')
@@ -232,9 +286,9 @@ def get_sunshine():
     #sys.exit(0)
 
     # PI
-    cube_PI = get_cube_avg(PI_EXPT, 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
+    cube_PI = get_cube_avg_pi(PI_EXPT, 'TotalCloud',
                            'percent', 
-                           'mean monthly percent of possible sunshine','p')
+                              'mean monthly percent of possible sunshine',None)
     cube_PI.data = (cube_PI.data * (-1.0) + 1.0) * 100.
     cube_PI.attributes["name"] = 'cld'
     cube_PI.long_name = 'cloud amount (inverse)'  
@@ -276,11 +330,11 @@ def get_soils():
     
     # get mPWP
 
-    file_soils_mPWP = ('/home/earjcti/BIOME4-main/files/' + 
+    file_soils_mPWP = ('/uolstore/Research/a/hera2/scripts/BIOME4/reference/' + 
                        'PRISM3_soil_alternative_whc.nc')
     soil_whc_cube_mPWP = process_soils(file_soils_mPWP)
 
-    file_perc_mPWP = ('/home/earjcti/BIOME4-main/files/' + 
+    file_perc_mPWP = ('/uolstore/Research/a/hera2/scripts/BIOME4/reference/' + 
                       'PRISM3_soil_alternative_perc.nc')
     soil_perc_cube_mPWP = process_soils(file_perc_mPWP)
   
@@ -288,11 +342,11 @@ def get_soils():
 
     # get PI
 
-    file_soils_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+    file_soils_PI = ('/uolstore/Research/a/hera2/scripts/BIOME4/reference/' + 
                        'MODERN_soil_alternative_whc.nc')
     soil_whc_cube_PI = process_soils(file_soils_mPWP)
 
-    file_perc_PI = ('/nfs/hera2/scripts/BIOME4/reference/' + 
+    file_perc_PI = ('/uolstore/Research/a/hera2/scripts/BIOME4/reference/' + 
                       'MODERN_soil_alternative_perc.nc')
     soil_perc_cube_PI = process_soils(file_perc_mPWP)
   
@@ -317,7 +371,7 @@ def apply_lsm(cubelist):
 # NOTE THE MASK IS NOT ON THE SAME GRID AS THE DATA
 
     masked_cubelist = iris.cube.CubeList([])
-    lsm = '/home/earjcti/BIOME4-main/files/Plio_enh_LSM_v1.0.nc'
+    lsm = '/uolstore/Research/a/hera1/earjcti/PlioMIP2_Boundary_conds/Plio_enh/Plio_enh/Plio_enh_LSM_v1.0.nc'
     lsmcube_temp = iris.load_cube(lsm)
 
     lsmcube = lsmcube_temp.regrid(GRID_CUBE, iris.analysis.Linear())
@@ -369,7 +423,7 @@ def main():
     for cube in allcubes_plio_land:
         cube.coord('longitude').rename('lon')
         cube.coord('latitude').rename('lat')
-    iris.save(allcubes_plio_land,OUTFILE + 'absolute.nc', 
+    iris.save(allcubes_plio_land,OUTFILE + 'absolute_'+EXPTNAME+'_.nc', 
               netcdf_format="NETCDF3_CLASSIC", fill_value = -9999)  
 
 
@@ -379,16 +433,14 @@ def main():
         cube.coord('longitude').rename('lon')
         cube.coord('latitude').rename('lat')
         print(cube.coord('lon').var_name)
-        sys.exit(0)
         #print(cube.coord('lat'))
         #print(cube.coord('time'))
         #print(cube)
         print(cube.var_name,cube.long_name)
 
-    sys.exit(0)
 
        
-    iris.save(allcubes_land_anom,OUTFILE + 'anomaly.nc', 
+    iris.save(allcubes_land_anom,OUTFILE + 'anomaly_'+EXPTNAME+'_.nc', 
               netcdf_format="NETCDF3_CLASSIC", fill_value = -9999)  
     print('saved anomaly')
     
@@ -397,11 +449,21 @@ def main():
 #####################################################################
 
 
-FILESTART = '/home/earjcti/umdata/'
-EXPTNAME = 'xozzb'  # for xqlne (modern) use years
-PI_EXPT = 'xozza'
-STARTYEAR = 70
-ENDYEAR=73
+#FILESTART = '/home/earjcti/umdata/'
+FILESTART = '/uolstore/Research/a/hera1/earjcti/um/'
+EXPTNAME = 'xqlnf'  # for xqlne (modern) use years v10-v40
+                    # for xqlnf (high southern hemisphere) use u70-100
+EX_STARTYEAR=70
+EX_ENDYEAR=100
+EX_century='u'
+                    
+#PI_EXPT = 'xozza' # need tdjxv
+#PI_STARTYEAR = 70
+#PI_ENDYEAR=72
+#PI_century='p'
+
+PI_EXPT = 'tdjxv'
+
 OUTFILE = FILESTART + EXPTNAME + '/biome4/inputdata_'
 GRID_CUBE = iris.load_cube('one_lev_one_deg_v2.nc')
 

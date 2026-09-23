@@ -6,7 +6,7 @@ This program will plot the annual mean difference between two models
 for a given field
 Note the data must have been preprocessed by CEMAC/PLIOMIP2/regrid_HCM3_50_year_avg.py
 """
-
+ 
 import os
 import sys
 import numpy as np
@@ -48,7 +48,8 @@ def diff_two_experiments():
     if type == 'PliominPi':
         V = np.arange(-10.0,11.0, 1.0)
     else:
-        V = [-30,-15.,-10., -5., -2., -1., -0.5, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.]
+        #V = [-30,-15.,-10., -5., -2., -1., -0.5, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.]
+        V= [-6., -4., -2., -1., -0.5, 0.5, 1.0, 2.0, 4.0, 6.0]
    
     #plt.subplot(2,1,1)
     
@@ -77,7 +78,7 @@ def diff_two_experiments():
    # plt.title(FIELDNAME + ':' + EXPT2 + '-' + EXPT1 + ' annmean')
    # plt.gca().coastlines()
 
-    fileout = ('/nfs/hera1/earjcti/HadCM3_plots/' + FIELDNAME + '/' + EXPT2 + '-' + EXPT1 + '_annmean')
+    fileout = ('/uolstore/Research/a/hera1/earjcti/HadCM3_plots/' + FIELDNAME + '/' + EXPT2 + '-' + EXPT1 + '_annmean')
     plt.savefig(fileout + '.eps')
     plt.savefig(fileout + '.png')
     plt.close()
@@ -100,14 +101,15 @@ def diff_two_anomalies():
     anom_cube = ((annmean_exp2e_cube - annmean_exp2c_cube) -
                  (annmean_exp1e_cube - annmean_exp1c_cube))
 
-    V = [-15.,-10., -5., -2. -1., -0.5, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0]
-
+    #V = [-15.,-10., -5., -2. -1., -0.5, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0]
+    V= [-10,-6., -4., -2., -1., -0.5, 0.5, 1.0, 2.0, 4.0, 6.0,10.0]
+   
     if FIELDNAME == 'TotalPrecipitation':
         for i,vind in enumerate(V):
             V[i] = vind / 10.
         mycmap = cm.get_cmap('rainbow_r', len(V)+2)
     else:
-        mycmap = cm.get_cmap('rainbow', len(V)+2)
+        mycmap = cm.get_cmap('RdBu_r', len(V)+2)
     newcolors = mycmap(np.linspace(0,1,len(V)+2))
     white = ([1,1,1,1])
     newcolors[int((len(V)/2)):int(len(V)/2+2),:] = white
@@ -117,11 +119,12 @@ def diff_two_anomalies():
     cs=iplt.contourf(anom_cube, levels=V, extend='both', cmap=mycmap,
                   norm=PiecewiseNorm(V))
     cbar = plt.colorbar(cs,orientation='horizontal',ticks=V)
+    cbar.ax.set_title(r'$^\circ$C')
    
     plt.title(FIELDNAME + ':' + EXPT2 + '-' + EXPT1 + ' annmean')
     plt.gca().coastlines()
 
-    fileout = ('/nfs/hera1/earjcti/HadCM3_plots/' + FIELDNAME + '/' + EXPT2 + '-' + EXPT1 + '_annmean')
+    fileout = ('/uolstore/Research/a/hera1/earjcti/HadCM3_plots/' + FIELDNAME + '/' + EXPT2 + '-' + EXPT1 + '_annmean')
     plt.savefig(fileout + '.eps')
     plt.savefig(fileout + '.png')
     plt.close()
@@ -130,13 +133,13 @@ def diff_two_anomalies():
 # main program
 
 EXPT1 = 'tenvj-xozzz'
-EXPT2 = 'xpkmc-xpkma'
+EXPT2 = 'xqbwd-xqbwc'
 #type = 'PliominPi' # type is PliominPi, PiminPi, PliominPlio
 type = 'PliominPi'
 
 FIELDNAME = 'NearSurfaceTemperature'
 
-FILESTART = '/nfs/hera1/earjcti/um/'
+FILESTART = '/uolstore/Research/a/hera1/earjcti/um/'
 FILEEND = '/' + FIELDNAME + '/means/allmean.nc'
 
 if len(EXPT1) > 10 and len(EXPT2) > 10:

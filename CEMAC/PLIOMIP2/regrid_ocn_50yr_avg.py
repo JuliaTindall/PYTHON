@@ -410,22 +410,22 @@ def get_cesm12(exptnamein):
         # we need to mask out the land
         if exptnamein == 'Eoi400' :
             if modelname == 'CESM2':
-               filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' + 
+               filelsm = ('/uolstore/Research/a/hera1/pliomip2/data/NCAR/' + 
                           'b.e21.B1850.f09_g17.' + 
                           'PMIP4-midPliocene-eoi400.001.'+
                           'cam.h0.LANDFRAC.1101.1200.nc')
             else:
-                filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' + 
+                filelsm = ('/uolstore/Research/a/hera1/pliomip2/data/NCAR/' + 
                            'b40.B1850.f09_g16.PMIP4-pliomip2.' + 
                            'LANDFRAC.1001.1100.nc')
         if exptnamein == 'E280' or exptnamein == 'E400':
           #  if modelname == 'CESM2':
-          #      filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' + 
+          #      filelsm = ('/uolstore/Research/a/hera1/pliomip2/data/NCAR/' + 
           #                 'b.e12.B1850.f09_g17.' +
           #                 'CMIP6-piControl.001.cam.h0.'+
           #                 'LANDFRAC.1100.1200.nc')
           #  else:
-                 filelsm = ('/nfs/hera1/pliomip2/data/NCAR/' + 
+                 filelsm = ('/uolstore/Research/a/hera1/pliomip2/data/NCAR/' + 
                            'b.e12.B1850.f09_g16.preind.' + 
                            'cam.h0.LANDFRAC.0701.0800.nc')
         lsmcube = get_cesm12_singlecube(filelsm, 'LANDFRAC')
@@ -448,7 +448,8 @@ def reduce_years(cube100yr, fieldnamein):
     """
     
     cubelist = CubeList([])
-    for i,  t_slice in enumerate(cube100yr.slices(['latitude', 'longitude'])):
+    print(cube100yr)
+    for i,  t_slice in enumerate(cube100yr.slices(['depth','latitude', 'longitude'])):
         if i >= 600:
             t_slice.coord('time').bounds = None
             t_slice2 = iris.util.new_axis(t_slice, 'time')
@@ -703,9 +704,9 @@ def regrid_data(fieldnamein, exptnamein):
     # outfile
     if linux_win  == 'l':
         print(regridded, modelname, exptnameout, fieldnameout)
-        outstart = ('/nfs/hera1/earjcti/'+ regridded +modelname+'/'+exptnameout+'.'+
+        outstart = ('/uolstore/Research/a/hera1/earjcti/'+ regridded +modelname+'/'+modelname + '/' + exptnameout+'.'+
         fieldnameout+'.')
-        lsmstart = '/nfs/hera1/earjcti/' + regridded
+        lsmstart = '/uolstore/Research/a/hera1/earjcti/' + regridded
     else:
         outstart = ('C:\\Users\\julia\\OneDrive\\WORK\\DATA\\' + regridded
               +modelname+'\\'+exptnameout+'.'+fieldnameout+'.')
@@ -775,11 +776,11 @@ def regrid_data(fieldnamein, exptnamein):
         or (modelname  == 'IPSLCM5A2' and fieldnamein  == 'tos')):
         regridded_cube = cube
     else:
-        cubegrid = iris.load_cube('/nfs/see-fs-02_users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
-        print(cube)
-        print(cubegrid)
-        regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
-
+        #cubegrid = iris.load_cube('/uolstore/home/users/earjcti/PYTHON/PROGRAMS/CEMAC/PLIOMIP2/one_lev_one_deg.nc')
+        #print(cube)
+        #print(cubegrid)
+        #regridded_cube = cube.regrid(cubegrid, iris.analysis.Linear())
+        regridded_cube = cube
 
 
     refdate = 'days since 0800-01-01 00:00:00'
@@ -1176,13 +1177,15 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
     #    "sic" : "sic",
          "sic" : "siconc",
         "tos" : "tos",
-        "clt" : "clt"
+                     "clt" : "clt",
+                     "otemp" : "to"
         }
 
     COSMOS_FIELDS  = {"pr" : "TotalPrecip",
         "tas" : "NearSurfaceAirTemp",
         "sic" : "SeaIceAreaFraction",
-        "tos" : "SeaSurfaceTemp"
+                      "tos" : "SeaSurfaceTemp",
+                      "otemp" :"temperature"
         }
 
     ECearth_FIELDS  = {"pr" : "totp",
@@ -1297,15 +1300,18 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
                  "pr": "Amon",
                  "tos":"Omon",
                  "sic":"Omon",
-                 "clt":"Amon"}
+                   "clt":"Amon",
+                 "otemp" : "Omon"  }
     cosmos_version = {"tas": "",
                  "pr": "",
                  "tos":"_remapbil",
+                 "otemp":"_remapbil_1X1deg",
                  "sic":"_remapbil"}
 
     # get names for each model
     if modelname   ==  'MIROC4m':
         filename = filestart+modelname+'/'
+        print(fieldnamein)
         fielduse = MIROC_FIELDS.get(fieldnamein)
         filename = (filename+fielduse+
                       '/MIROC4m_'+exptnamein+'_'+atm_ocn_ind.get(fieldnamein)+'_'+fielduse+'.nc')
@@ -1318,8 +1324,9 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
         else:
             filename = filestart+'/COSMOS/'
         fielduse = COSMOS_FIELDS.get(fieldnamein)
-        filename = (filename+exptnamein+'.'+fielduse+
-                      '_CMIP6_name_'+fieldnamein+
+        filename = (filename+exptnamein+'.'
+                   # +fielduse+'_CMIP6_name_'+fieldnamein+
+                    'thetao' + 
                       '_2650-2749_monthly_mean_time_series'+
                       cosmos_version.get(fieldnamein)+'.nc')
 
@@ -1513,7 +1520,7 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
                   CESM2_TIME.get(exptnamein) + '.nc')
             fielduse = CESM12_FIELDS.get(fieldnamein)
         if fieldnamein =='totcloud':
-            filestart='/nfs/hera1/earjcti/PLIOMIP2/CESM2/clt_Amon_CESM2_'
+            filestart='/uolstore/Research/a/hera1/earjcti/PLIOMIP2/CESM2/clt_Amon_CESM2_'
             fielduse = 'clt'
             if exptnamein == 'Eoi400':
                 filename = (filestart + 'midPliocene-eoi400_r1i1p1f1_'+
@@ -1563,7 +1570,7 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
                     
     if modelname == 'HadGEM3':
         filename = []
-        filestart = '/nfs/hera1/pliomip2/data/HadGEM3_new/timeseries/' 
+        filestart = '/uolstore/Research/a/hera1/pliomip2/data/HadGEM3_new/timeseries/' 
         if fieldnamein == 'tos':
             fielduse = 'sea_surface_temperature'
             filename = (filestart + exptnamein + '/ocean/sst_sal_temp' 
@@ -1585,7 +1592,7 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
 
 filename  =  ' '
 linux_win  =  'l'
-modelname  = "NorESM1-F" # MIROC4m  COSMOS CCSM4_UoT 
+modelname  = "COSMOS" # MIROC4m  COSMOS CCSM4_UoT 
                    # HadCM3 MRI-CGCM2.3
                    # IPSLCM5A,  IPSLCM5A2
                    # NorESM1-F NorESM-L
@@ -1622,25 +1629,27 @@ fieldname  =  {
         "tas" : "NearSurfaceTemperature",
         "sic" : "SeaIceConc",
         "tos": "SST",
-        "clt" : "totcloud"
+        "clt" : "totcloud",
+        "otemp" : "otemp"
         }
 
 
 # this is regridding where all results are in a single file
-#fieldnamein = ['pr','tas','tos']
+#fieldnamein = ['otemp']
 #exptnamein = ['Eoi450']
 avg100yr = 'n'
 
 #fieldnamein = ['tas']
-fieldnamein = ['tos'] # ocean tempeature or sst
-#exptnamein = ['Eoi400']
+fieldnamein = ['otemp'] # ocean tempeature all depths
+exptnamein = ['Eoi400']
+exptnamein = ['E280']
 
 #fieldnamein = ['sic']
 #exptnamein = ['E280','Eoi400']
-exptnamein = ['E400']
+#exptnamein = ['E400']
 if linux_win  == 'l':
-    #filestart = '/nfs/b0164/Data/'
-    filestart = '/nfs/hera1/pliomip2/data/'
+    filestart = '/uolstore/Research/b/b0164/Data/PlioMIP2/'
+    #filestart = '/uolstore/Research/a/hera1/pliomip2/data/'
 else:
     filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
 
@@ -1652,9 +1661,9 @@ for expt in range(0, len(exptnamein)):
 
         if ((modelname  == 'IPSLCM5A' or modelname  == 'IPSLCM5A2')
             and (fieldnamein[field]  == 'tos')):
-            filestart = '/nfs/hera1/earjcti/PLIOMIP2/'
+            filestart = '/uolstore/Research/a/hera1/earjcti/PLIOMIP2/'
         if (modelname  == 'IPSLCM6A' or modelname  == 'GISS2.1G'):
-            filestart = '/nfs/hera1/earjcti/PLIOMIP2/'
+            filestart = '/uolstore/Research/a/hera1/earjcti/PLIOMIP2/'
 
 
         # call program to get model dependent names

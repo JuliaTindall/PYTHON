@@ -107,7 +107,7 @@ def extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,
    
     for year in range(startyear,endyear):
         allcubes=CubeList([])
-        stringyear=np.str(year).zfill(2)
+        stringyear=str(year).zfill(2)
         for mon in range(0,len(monthnames)):
             print(mon)
             if format == '#':
@@ -156,8 +156,8 @@ def extract_fields(filestart,expt,filetype,extra,startyear,endyear,timeperiod,
             catcube.convert_units('celsius')
        
     
-#        stringyear=np.str(year).zfill(2)
-        stringyear=np.str(year).zfill(3)
+#        stringyear=str(year).zfill(2)
+        stringyear=str(year).zfill(3)
         print(timeperiod,extra,stringyear)
         #fileout=fileoutstart+varnameout+'/'+timeperiod+'.'+varnameout+'.'+yearextra.get(extra) + stringyear+'.nc'        
         fileout=fileoutstart+varnameout+'/'+timeperiod+'.'+varnameout+'.'+ stringyear+'.nc'        
@@ -290,8 +290,8 @@ extraname = {
 #           ]
 fieldname = [#"SURFACE TEMPERATURE AFTER TIMESTEP",
 #         "TOTAL PRECIPITATION RATE     KG/M2/S",
-#        "TEMPERATURE AT 1.5M",
-       #  "OCN TOP-LEVEL TEMPERATURE          K",
+        "TEMPERATURE AT 1.5M"
+       #  ,"OCN TOP-LEVEL TEMPERATURE          K",
       #  "TEMPERATURE (OCEAN)  DEG.C",
        #  "AICE : ICE CONCENTRATION", 
 #          "TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
@@ -317,33 +317,33 @@ fieldname = [#"SURFACE TEMPERATURE AFTER TIMESTEP",
 #        "SURFACE & B.LAYER HEAT FLUXES   W/M2",
 #		"PRESSURE AT MEAN SEA LEVEL",
 #		"PSTAR AFTER TIMESTEP",
-		"TOTAL EVAPORATION",
+#		"TOTAL EVAPORATION",
 #		"X-COMP OF SURF & BL WIND STRESS N/M2",
 #                "Y-COMP OF SURF & BL WIND STRESS N/M2",
 #		"TOTAL OCEAN U-VELOCITY      CM S**-1",
 #		"TOTAL OCEAN V-VELOCITY      CM S**-1",
 #		"VERT.VEL. ON OCEAN HALF LEVELS  CM/S",
-          "POTENTIAL TEMPERATURE (OCEAN)  DEG.C",
-            "SALINITY (OCEAN)       (PSU-35)/1000" 
+#          "POTENTIAL TEMPERATURE (OCEAN)  DEG.C",
+#            "SALINITY (OCEAN)       (PSU-35)/1000" 
 	]
 	       
 #fieldname=["V COMPNT OF WIND ON PRESSURE LEVELS"]
 
 linux_win='l'
-startyear=0
-endyear=100
-timeperiod='tenvm'   
+startyear=3950
+endyear=4001
+timeperiod='xqbwc'   
 expt=exptname.get(timeperiod,timeperiod)
 extra=extraname.get(timeperiod,'00000')
-format = '@'  # is the filename xxxxx#pd or xxxxx@pd
+format = '#'  # is the filename xxxxx#pd or xxxxx@pd
 
 if linux_win=='w':
     filestart='C:\\Users\\julia\\OneDrive\\WORK\\DATA\\HadCM3\\'+exptname.get(timeperiod)+'/'
     fileoutstart='C:\\Users\\julia\\OneDrive\\WORK\\DATA\\HadCM3_UPLOAD\\'+timeperiod+'/'
 else:
-    filestart='/nfs/hera1/earjcti/um/'+expt+'/pd/'
-    fileoutstart='/nfs/hera1/earjcti/um/'+expt + '/'
-    #fileoutstart='/nfs/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/'+timeperiod+'/'
+    filestart='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pcpd/'
+    fileoutstart='/uolstore/Research/a/hera1/earjcti/um/'+expt + '/'
+    #fileoutstart='/uolstore/Research/a/hera1/earjcti/PLIOMIP2/LEEDS/HadCM3/'+timeperiod+'/'
 
 for i in range(0,len(fieldname)):
     varnamein=fieldname[i]

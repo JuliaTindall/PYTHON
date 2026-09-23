@@ -307,7 +307,7 @@ def regrid_data(fieldnamein, exptnamein):
             outstart = (filename + fieldnameout + '/means/' )
         if REGRID == 'y':
             outstart = (filename + fieldnameout + '/regriddedmeans/' )
-        lsmstart = '/nfs/hera1/earjcti/' + regridded
+        lsmstart = '/uolstore/Research/a/hera1/earjcti/' + regridded
     else:
         outstart = ('C:\\Users\\julia\\OneDrive\\WORK\\DATA\\' + regridded
               +modelname+'\\'+exptnameout+'.'+fieldnameout+'.')
@@ -470,9 +470,9 @@ def regrid_data(fieldnamein, exptnamein):
     file1.write('global annual mean and standard deviation\n')
     file1.write('------------------------------------------\n')
     if ndim>= 4:
-        file1.write(np.str(np.round(meanann[0], 2))+', '+np.str(np.round(stdevann[0], 3))+'\n')
+        file1.write(str(np.round(meanann[0], 2))+', '+str(np.round(stdevann[0], 3))+'\n')
     else:
-        file1.write(np.str(np.round(meanann, 2))+', '+np.str(np.round(stdevann, 3))+'\n')
+        file1.write(str(np.round(meanann, 2))+', '+str(np.round(stdevann, 3))+'\n')
 
     # get monthly means and standard deviation
     file1.write('monthly means and standard deviations \n')
@@ -543,16 +543,16 @@ def regrid_data(fieldnamein, exptnamein):
 
     for i in range(0, 12):
         if ndim>= 4:
-            file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i].data[0], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+            file1.write(str(i+1)+', '+str(np.round(meanmon[i].data[0], 2))+', '+str(np.round(stdevmon[i], 3))+'\n')
         else:
-            file1.write(np.str(i+1)+', '+np.str(np.round(meanmon[i], 2))+', '+np.str(np.round(stdevmon[i], 3))+'\n')
+            file1.write(str(i+1)+', '+str(np.round(meanmon[i], 2))+', '+str(np.round(stdevmon[i], 3))+'\n')
 
     # get latitudinal means and standard deviation
     file1.write('zonal means and standard deviations \n')
     file1.write('----------------------------------------\n')
     file1.write('latitude    mean    sd  \n')
     for i in range(0, len(meanlat)):
-        file1.write(np.str(mean_data.coord('latitude').points[i])+', '+np.str(np.round(meanlat[i], 2))+', '+np.str(np.round(stdevlat[i], 3))+'\n')
+        file1.write(str(mean_data.coord('latitude').points[i])+', '+str(np.round(meanlat[i], 2))+', '+str(np.round(stdevlat[i], 3))+'\n')
 
     file1.close()
 
@@ -650,18 +650,18 @@ avgallyears = 'y'
 
 fieldnamein = 'NearSurfaceTemperature'  # if you are doing d18op do 18o and 16o seperately
                            # call them d18op_18o and d18op_16o
-exptnamein = 'xpsid'
+exptnamein = 'xqbwc'
 REGRID = 'n'
-startyear = 2950
-endyear = 3000
+startyear = 3950
+endyear = 4000
   
 MIPname = {'tenvs' : 'e560',
            'tenvo' : 'e280',
            'tenvq' : 'e400'}
  
 if linux_win  == 'l':
-    filestart = '/nfs/hera1/earjcti/um/' + exptnamein + '/' 
-    #filestart = '/nfs/hera1/earjcti/PLIOMIP2/'
+    filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptnamein + '/' 
+    #filestart = '/uolstore/Research/a/hera1/earjcti/PLIOMIP2/'
 else:
     filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\'
 

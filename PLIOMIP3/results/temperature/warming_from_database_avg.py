@@ -147,12 +147,12 @@ NYEARS = 100
 SEASON = 'ann'
 
 filestart = '/uolstore/Research/a/hera1/earjcti/um/'
-filestart = '/home/earjcti/um/'
+#filestart = '/home/earjcti/um/'
 # data from new experiemnt
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
-EXPT = 'xqbwk'  # xsic PI,  xpsij-lp490  xpsik - lp560
-CNTL = 'xqbwi'  # xpsic pi, xpsid lp400
+EXPT = 'xqbwl'  # xsic PI,  xpsij-lp490  xpsik - lp560
+CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
 STARTYEAR='3900'
 ENDYEAR='4000'
 
@@ -199,7 +199,7 @@ cbar.set_label('degC')
 titlename = EXPTNAMES.get(EXPT) + '-' +  EXPTNAMES.get(CNTL) + '. Years:' + str(STARTYEAR) + '-' + str(ENDYEAR) + '. ANN. Meandiff =' +  diffchar
 plt.title(titlename, fontsize=10)
 plt.gca().coastlines()
-plt.show()
+#plt.show()
 print('about to write to file')
 plt.savefig(filestart + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + FIELD + '_shiftedscale..eps')
 plt.savefig(filestart + EXPT +  '/avgplots/' + EXPT + '-' + CNTL + '_' + FIELD + '_shiftedscale.png')

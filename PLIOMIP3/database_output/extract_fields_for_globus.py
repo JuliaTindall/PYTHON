@@ -110,7 +110,7 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwd'
+expt = 'xqbwo'
 fields = ["U COMPNT OF WIND ON PRESSURE LEVELS",
           "V COMPNT OF WIND ON PRESSURE LEVELS",
           "OMEGA ON PRESSURE LEVELS",
@@ -123,7 +123,7 @@ fields = ["U COMPNT OF WIND ON PRESSURE LEVELS",
           "HICE: MEAN ICE DEPTH OVER GRIDBOX  M"
           ]
 
-fields = ["AICE : ICE CONCENTRATION"]
+#fields = ["AICE : ICE CONCENTRATION"]
          
 
 #expt = 'xqfmg'
@@ -139,7 +139,10 @@ alt_expt = {'xqfmg': 'F_EP280',
             'xqfmb' : 'F_PI280',
             'xqfmc' : 'F_PI400',
             'xqfmd' : 'F_PI490',
-            'xqbwc' : 'PI', 'xqbwd' : 'LP'}
+            'xqbwc' : 'PI', 'xqbwd' : 'LP',
+            'xqbwg':'EP',
+            'xqbwn':'high_NH',
+            'xqbwo':'high_SH'}
 
 # CMIP name  ; this is from fernandas spreadsheet
 
@@ -173,7 +176,7 @@ for field in fields:
         cubes = monocn_data_single_level(field,shortname)
 
         
-    fileout = ('/uolstore/Research/a//hera1/earjcti/um/' + expt + '/globus/')
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/globus/')
     fileout = (fileout + alt_expt.get(expt) + '_' + expt + '_' + 
                cmip_name.get(field) + '_monthly.nc')
     if ocn == 'y':
