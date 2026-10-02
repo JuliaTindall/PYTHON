@@ -6,7 +6,8 @@
 #@author: earjcti1
 #
 #  This program will extract fileds and put in a timeseries file
-#  this is what we will upload to globus for PlioMIP2
+#  this is what we will upload to globus for PlioMIP3
+#  it is daily variables so we need core only
 #
 
 import os
@@ -22,6 +23,7 @@ import netCDF4
 from netCDF4 import Dataset, MFDataset
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 import iris.analysis.cartography
+import iris.coord_categorisation
 import sys
 import warnings
 
@@ -31,51 +33,19 @@ def monthly_data_single_level(field,shortname):
     this will get the database averages for the monthly data on a single level
     """
 
-    if shortname == 'prsn':  # snowfall
-        
-        cubes1 = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*','LARGE SCALE SNOWFALL RATE    KG/M2/S')
-        iris.util.equalise_attributes(cubes1)
-        snow_ls = cubes1.concatenate_cube()
-        
-        cubes2 = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*','CONVECTIVE SNOWFALL RATE     KG/M2/S')
-        iris.util.equalise_attributes(cubes2)
-        snow_conv = cubes2.concatenate_cube()
-
-        print(snow_ls.data[0,0,10,0])
-        print(snow_conv.data[0,0,10,0])
-        cubes = snow_ls + snow_conv
-        print(cubes.data[0,0,10,0])
-        print(cubes.data[0,0,10,0]*24.*60.*60.)
-        #sys.exit(0)
-        
-    else:
-        allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*',field)
-        iris.util.equalise_attributes(allcubes)
-        cubes = allcubes.concatenate_cube()
+    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*',field)
+    iris.util.equalise_attributes(allcubes)
+    cubes = allcubes.concatenate_cube()
     cubes.var_name = shortname
 
-    if shortname == 'pr' or shortname == 'prsn':
-        # precipitation need to convert from kg/m2/s to mm/day
-        cubes.units = "mm day-1"
-        cubes.data = cubes.data * 24. * 60. * 60.
-        if shortname == 'pr':
-            cubes.long_name = "TOTAL PRECIPITATION RATE"
-        if shortname == 'prsn':
-            cubes.long_name = "TOTAL SNOWFALL RATE"
+    
 
-        cubes.attributes["title"] = cubes.long_name
-
-    if shortname == 'tas' or shortname == 'ts':
-        # convert to deg
-        cubes.convert_units("degC")
-        print(cubes)
-
-    if shortname == 'clt':
+    #if shortname == 'clt':
         # convert from cloud fraction to percent
-        cubes.data = cubes.data * 100.
-        cubes.units = "%"
+    #    cubes.data = cubes.data * 100.
+    #    cubes.units = "%"
 
-        print(cubes)
+    #    print(cubes)
 
     return cubes
    
@@ -138,25 +108,27 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwd'
-fields = [#"U COMPNT OF WIND ON PRESSURE LEVELS",
-          #"V COMPNT OF WIND ON PRESSURE LEVELS",
-          #"OMEGA ON PRESSURE LEVELS",
-          #"TEMPERATURE ON PRESSURE LEVELS",
-          #"TOTAL PRECIPITATION RATE     KG/M2/S",
-          #"SURFACE TEMPERATURE AFTER TIMESTEP",
-          #"TEMPERATURE AT 1.5M",
-          #"OCN TOP-LEVEL TEMPERATURE          K",
-          #"AICE : ICE CONCENTRATION",
-          #"HICE: MEAN ICE DEPTH OVER GRIDBOX  M",
-          #"TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
-         # "SNOWFALL",
-          "X-COMP OF SURF & BL WIND STRESS N/M2",
-          "Y-COMP OF SURF & BL WIND STRESS N/M2",
-          "PRESSURE AT MEAN SEA LEVEL",
-          "PSTAR AFTER TIMESTEP",
-          "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS",
-          "SPECIF HUM;P LEVS;U GRID.  USE MACRO"]
+expt = 'xqbwg'
+
+
+fields = [ "SNOW AMOUNT AFTER TIMESTEP     KG/M2",
+          "SURFACE RUNOFF RATE          KG/M2/S",
+          "SUB-SURFACE RUNOFF RATE      KG/M2/S",
+          "SOIL MOISTURE CONTENT"
+           "INCOMING SW RAD FLUX (TOA): ALL TSS",
+           "OUTGOING SW RAD FLUX (TOA)",
+           "OUTGOING LW RAD FLUX (TOA)",
+           "CLEAR-SKY (II) UPWARD LW FLUX (TOA)",
+           "DOWNWARD LW RAD FLUX: SURFACE",
+           "TOTAL DOWNWARD SURFACE SW FLUX",
+           "NET DOWN SURFACE LW RAD FLUX",
+           "NET DOWN SURFACE SW FLUX: SW TS ONLY",
+           "CLEAR-SKY (II) UP SURFACE SW FLUX",
+           "CLEAR-SKY (II) DOWN SURFACE SW FLUX",
+           "CLEAR-SKY (II) DOWN SURFACE LW FLUX",
+           "CLEAR-SKY (II) UPWARD SW FLUX (TOA)",
+           "SURFACE LATENT HEAT FLUX        W/M2",
+           "SURFACE & B.LAYER HEAT FLUXES   W/M2"]
 
 #expt = 'xqfmg'
 
@@ -178,31 +150,31 @@ alt_expt = {'xqfmg': 'F_EP280',
 
 # CMIP name  ; this is from fernandas spreadsheet
 
-cmip_name = {"TEMPERATURE AT 1.5M" : "tas",
-             "SURFACE TEMPERATURE AFTER TIMESTEP" : "ts",
-             "TOTAL PRECIPITATION RATE     KG/M2/S" : "pr",
-             "U COMPNT OF WIND ON PRESSURE LEVELS" : "ua",
-             "V COMPNT OF WIND ON PRESSURE LEVELS" : "va",
-             "OMEGA ON PRESSURE LEVELS" : "wa",
-             "TEMPERATURE ON PRESSURE LEVELS" : "ta",
-             "OCN TOP-LEVEL TEMPERATURE          K" : "tos",
-             "AICE : ICE CONCENTRATION" : "siconc",
-             "HICE: MEAN ICE DEPTH OVER GRIDBOX  M" : "sithick",
-             "TOTAL CLOUD AMOUNT - RANDOM OVERLAP" : "clt",
-             "SNOWFALL" : "prsn",
-             "X-COMP OF SURF & BL WIND STRESS N/M2" : "tauu",
-             "Y-COMP OF SURF & BL WIND STRESS N/M2" : "tauv",
-             "PRESSURE AT MEAN SEA LEVEL":"psl",
-             "PSTAR AFTER TIMESTEP":"ps",
-             "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS":"zg",
-             "SPECIF HUM;P LEVS;U GRID.  USE MACRO":"hus" } 
+cmip_name = {"SNOW AMOUNT AFTER TIMESTEP     KG/M2" : "snw",
+             "SURFACE RUNOFF RATE          KG/M2/S" : "mrros",
+             "SUB-SURFACE RUNOFF RATE      KG/M2/S": "mrrob",
+             "SOIL MOISTURE CONTENT" : "mrso",
+             "INCOMING SW RAD FLUX (TOA): ALL TSS" : "rsdt",
+             "OUTGOING SW RAD FLUX (TOA)": "rsut",
+             "OUTGOING LW RAD FLUX (TOA)":"rlut",
+             "CLEAR-SKY (II) UPWARD LW FLUX (TOA)" : "rlutcs",
+             "DOWNWARD LW RAD FLUX: SURFACE":"rlds",
+             "TOTAL DOWNWARD SURFACE SW FLUX":"rsds",
+             "NET DOWN SURFACE LW RAD FLUX":"rlntds",
+             "NET DOWN SURFACE SW FLUX: SW TS ONLY":"rsntds",
+             "CLEAR-SKY (II) UP SURFACE SW FLUX":"rsuscs",
+             "CLEAR-SKY (II) DOWN SURFACE SW FLUX":"rsdscs",
+             "CLEAR-SKY (II) DOWN SURFACE LW FLUX":"rldscs",
+             "CLEAR-SKY (II) UPWARD SW FLUX (TOA)":"rsutcs",
+             "SURFACE LATENT HEAT FLUX        W/M2":"hfls",
+             "SURFACE & B.LAYER HEAT FLUXES   W/M2":"hfss"}
+
 levels_req = {'ua':'y','va':'y','ta':'y','wa':'y','zg':'y','hus':'y'}
 ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}
             
 
 for field in fields:
     shortname = cmip_name.get(field)
-    print(field,shortname)
     ocn = ocean_req.get(shortname,'n')
     multlev = levels_req.get(shortname,'n')
     
@@ -215,13 +187,22 @@ for field in fields:
     if  multlev == 'n' and ocn == 'y': #single level ocean
         cubes = monocn_data_single_level(field,shortname)
 
+    # find climatological mean
+    iris.coord_categorisation.add_month_number(cubes,  't',  name = 'month')
+    iris.coord_categorisation.add_year(cubes,  't',  name = 'year')
+    meanmonthcube = cubes.aggregated_by('month', iris.analysis.MEAN)
+    iris.util.promote_aux_coord_to_dim_coord(meanmonthcube,'month')
+  
+  
         
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/globus/HadCM3_')
     fileout = (fileout + alt_expt.get(expt) + '_' + expt + '_' + 
-               cmip_name.get(field) + '_monthly_timeseries.nc')
+               cmip_name.get(field) + '_monthly_clim_3800_4000.nc')
     if ocn == 'y':
-        iris.save(cubes,fileout,fill_value=-999.999)
+        iris.save(meanmonthcube,fileout,fill_value=-999.999)
     else:
-        iris.save(cubes,fileout)
+        iris.save(meanmonthcube,fileout)
+    sys.exit(0)
+
 
 

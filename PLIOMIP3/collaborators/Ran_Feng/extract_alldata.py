@@ -38,8 +38,9 @@ import warnings
 # when rerunning
             
 
-expts = ['xqfmf','xqfmb','xqfmc','xqfmd']
-#expt = 'xqfmg'
+#expts = ['xqfmf','xqfmb','xqfmc','xqfmd','xqfme','xqfmg','xqfmh']
+#expts = ['xqfmc','xqfmd','xqfme','xqfmg','xqfmh']
+expts = ['xqfmb']
 alt_expt = {'xqfmg': 'F_EP280',
             'xqfmh': 'F_EP',
             'xqfme' : 'F_LP280',
@@ -48,7 +49,7 @@ alt_expt = {'xqfmg': 'F_EP280',
             'xqfmc' : 'F_PI400',
             'xqfmd' : 'F_PI490'}
             
-field = "OUTGOING SW RAD FLUX (TOA)"
+field = "PSTAR AFTER TIMESTEP"
 
 for expt in expts:
     print(field)
@@ -59,4 +60,5 @@ for expt in expts:
     print(cubes)
     
 
-    iris.save(cubes,alt_expt.get(expt) + '_' + expt + '_' + field + '.nc')
+    iris.save(cubes,alt_expt.get(expt) + '_' + expt + '_' + field.replace(" ", "_") + '.nc')
+ 

@@ -31,22 +31,17 @@ def monthly_data_single_level(field,shortname):
     this will get the database averages for the monthly data on a single level
     """
 
-    if shortname == 'prsn':  # snowfall
+    if shortname = 'prsn':  # snowfall
         
         cubes1 = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*','LARGE SCALE SNOWFALL RATE    KG/M2/S')
         iris.util.equalise_attributes(cubes1)
         snow_ls = cubes1.concatenate_cube()
         
-        cubes2 = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*','CONVECTIVE SNOWFALL RATE     KG/M2/S')
+        cubes2 = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*','CONVECTIVE SNOWFALL RATE    KG/M2/S')
         iris.util.equalise_attributes(cubes2)
         snow_conv = cubes2.concatenate_cube()
 
-        print(snow_ls.data[0,0,10,0])
-        print(snow_conv.data[0,0,10,0])
         cubes = snow_ls + snow_conv
-        print(cubes.data[0,0,10,0])
-        print(cubes.data[0,0,10,0]*24.*60.*60.)
-        #sys.exit(0)
         
     else:
         allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pd000003[8-9]*',field)
@@ -54,7 +49,7 @@ def monthly_data_single_level(field,shortname):
         cubes = allcubes.concatenate_cube()
     cubes.var_name = shortname
 
-    if shortname == 'pr' or shortname == 'prsn':
+    if shortname == 'pr' or shortname = 'prsn':
         # precipitation need to convert from kg/m2/s to mm/day
         cubes.units = "mm day-1"
         cubes.data = cubes.data * 24. * 60. * 60.
@@ -138,25 +133,32 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwd'
-fields = [#"U COMPNT OF WIND ON PRESSURE LEVELS",
-          #"V COMPNT OF WIND ON PRESSURE LEVELS",
-          #"OMEGA ON PRESSURE LEVELS",
-          #"TEMPERATURE ON PRESSURE LEVELS",
-          #"TOTAL PRECIPITATION RATE     KG/M2/S",
-          #"SURFACE TEMPERATURE AFTER TIMESTEP",
-          #"TEMPERATURE AT 1.5M",
-          #"OCN TOP-LEVEL TEMPERATURE          K",
-          #"AICE : ICE CONCENTRATION",
-          #"HICE: MEAN ICE DEPTH OVER GRIDBOX  M",
-          #"TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
-         # "SNOWFALL",
+expt = 'xqbwc'
+fields = ["U COMPNT OF WIND ON PRESSURE LEVELS",
+          "V COMPNT OF WIND ON PRESSURE LEVELS",
+          "OMEGA ON PRESSURE LEVELS",
+          "TEMPERATURE ON PRESSURE LEVELS",
+          "TOTAL PRECIPITATION RATE     KG/M2/S",
+          "SURFACE TEMPERATURE AFTER TIMESTEP",
+          "TEMPERATURE AT 1.5M",
+          "OCN TOP-LEVEL TEMPERATURE          K",
+          "AICE : ICE CONCENTRATION",
+          "HICE: MEAN ICE DEPTH OVER GRIDBOX  M"
+          ]
+
+fields = ["TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
+          "SNOWFALL",
           "X-COMP OF SURF & BL WIND STRESS N/M2",
           "Y-COMP OF SURF & BL WIND STRESS N/M2",
           "PRESSURE AT MEAN SEA LEVEL",
           "PSTAR AFTER TIMESTEP",
           "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS",
           "SPECIF HUM;P LEVS;U GRID.  USE MACRO"]
+#   these are average fields
+#          "SNOW AMOUNT AFTER TIMESTEP     KG/M2",
+#          "SURFACE RUNOFF RATE          KG/M2/S",
+#          "SUB-SURFACE RUNOFF RATE      KG/M2/S",
+#          "SOIL MOISTURE CONTENT"
 
 #expt = 'xqfmg'
 
@@ -187,11 +189,11 @@ cmip_name = {"TEMPERATURE AT 1.5M" : "tas",
              "TEMPERATURE ON PRESSURE LEVELS" : "ta",
              "OCN TOP-LEVEL TEMPERATURE          K" : "tos",
              "AICE : ICE CONCENTRATION" : "siconc",
-             "HICE: MEAN ICE DEPTH OVER GRIDBOX  M" : "sithick",
-             "TOTAL CLOUD AMOUNT - RANDOM OVERLAP" : "clt",
-             "SNOWFALL" : "prsn",
+             "HICE: MEAN ICE DEPTH OVER GRIDBOX  M" : "sithick"
+             "TOTAL CLOUD AMOUNT - RANDOM OVERLAP" : "clt"
+             "SNOWFALL" : "prsn"
              "X-COMP OF SURF & BL WIND STRESS N/M2" : "tauu",
-             "Y-COMP OF SURF & BL WIND STRESS N/M2" : "tauv",
+             "Y-COMP OF SURF & BL WIND STRESS N/M2" : "tauv"
              "PRESSURE AT MEAN SEA LEVEL":"psl",
              "PSTAR AFTER TIMESTEP":"ps",
              "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS":"zg",
@@ -202,7 +204,6 @@ ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}
 
 for field in fields:
     shortname = cmip_name.get(field)
-    print(field,shortname)
     ocn = ocean_req.get(shortname,'n')
     multlev = levels_req.get(shortname,'n')
     
@@ -223,5 +224,6 @@ for field in fields:
         iris.save(cubes,fileout,fill_value=-999.999)
     else:
         iris.save(cubes,fileout)
+
 
 
