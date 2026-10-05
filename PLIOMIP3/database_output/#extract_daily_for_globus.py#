@@ -185,8 +185,9 @@ filestart = '/home/earjcti/'
 
 expt = 'xqbwc'
 
-
 fields = [ "ALLTEMPS",
+          "SURF & BL TOTL MOISTURE FLUX KG/M2/S"
+
            "TEMPERATURE AT 1.5M MIN",
            "TEMPERATURE AT 1.5M MEAN"]
 
@@ -210,7 +211,8 @@ alt_expt = {'xqfmg': 'F_EP280',
 
 # CMIP name  ; this is from fernandas spreadsheet
 
-cmip_name = {"TEMEPERATURE AT 1.5M MAX" : "tas",
+cmip_name = {"SURF & BL TOTL MOISTURE FLUX KG/M2/S" : 'e'
+"TEMEPERATURE AT 1.5M MAX" : "tas",
            "TEMPERATURE AT 1.5M MIN": "tasmin",
              "TEMPERATURE AT 1.5M MEAN" : "tas"}
 
@@ -234,11 +236,13 @@ for field in fields:
         iris.save(meancubes,filemean)
         iris.save(maxcubes,filemax)
         iris.save(mincubes,filemin)
-    elif multlev == 'n': # easy stuff like precipitaiton
-        
+    elif multlev == 'n': # easy stuff like winds and pressure
+        cubes = daily_data_single_level(field,shortname)
+
+
+    #precipitation there are two fields so more complicated.
 
     if multlev == 'y' and ocn == 'n':  # multiple level atm
-        cubes = daily_data_single_level(field,shortname)
 
     if  multlev == 'n' and ocn == 'y': #single level ocean
         cubes = monocn_data_single_level(field,shortname)
