@@ -1,249 +1,1 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
-
-#Created on Thu Mar 18 14:13:50 2019
-
-#@author: earjcti1
-#
-#  This program will extract fileds and put in a timeseries file
-#  this is what we will upload to globus for PlioMIP3
-#  it is daily variables so we need core only
-#
-
-import os
-import numpy as np
-import scipy as sp
-#import cf
-import iris
-from iris.cube import CubeList
-import matplotlib as mp
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import netCDF4
-from netCDF4 import Dataset, MFDataset
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-import iris.analysis.cartography
-import iris.coord_categorisation
-import sys
-import warnings
-
-     
-def daily_data_temperatures(field,shortname):
-    """
-    this will get the database averages for the monthly data on a single level
-    """
-
-    filenames = filestart + 'um/' + expt + '/pb/' + expt + 'a#pb00000*'
-
-    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
-
-    maxtemp_cubes = CubeList([])
-    mintemp_cubes = CubeList([])
-    meantemp_cubes = CubeList([])
-
-    tempcube = None
-    temp1cube = None
-    temp2cube = None
-    
-    for year in range(3998,4000):
-        for month in months:
-            file = filenames + str(year) + month + '+.nc'
-            cubes = iris.load(file)
-            for cube in cubes:
-                if cube.var_name == 'temp':
-                    tempcube = cube
-                    temp_maxval = np.max(tempcube.data)
-                if cube.var_name == 'temp_1':
-                    temp1cube = cube
-                    temp1_maxval = np.max(temp1cube.data)
-                if cube.var_name == 'temp_2':
-                    temp2cube = cube
-                    temp2_maxval = np.max(temp2cube.data)
-            if temp_maxval > temp1_maxval and temp_maxval > temp2_maxval:
-                # temp_maxval is maximum
-                maxtemp_cubes.append(tempcube)
-            else:
-                print('ordering error 1')
-                sys.exit(0)
-            if temp2_maxval > temp1_maxval: # temp2 is mean temp1 is minimum
-                mintemp_cubes.append(temp1cube)
-                meantemp_cubes.append(temp2cube)
-            else:
-                print('ordering error 2')
-                sys.exit(0)
-  
-    # ju note  temp looks like max; temp_1 looks like min; temp_2 looks like mean,  temp_1 looks like min
-        
-    iris.util.equalise_attributes(meantemp_cubes)
-    iris.util.equalise_attributes(maxtemp_cubes)
-    iris.util.equalise_attributes(mintemp_cubes)
-    meancubes = meantemp_cubes.concatenate_cube()
-    maxcubes = maxtemp_cubes.concatenate_cube()
-    mincubes = mintemp_cubes.concatenate_cube()
-    meancubes.var_name = 'tas'
-    maxcubes.var_name = 'tasmax'
-    mincubes.var_name = 'tasmin'
-    meancubes.convert_units("degC")
-    maxcubes.convert_units("degC")
-    mincubes.convert_units("degC")
-    
-    return [meancubes,maxcubes,mincubes]
-
-
-def daily_data_single_level(field,shortname):
-    """
-    this will get the database averages for the daily data on a single level
-    """
-
-    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pb/' + expt + 'a#pb000003[8-9]*',field)
-    iris.util.equalise_attributes(allcubes)
-    cubes = allcubes.concatenate_cube()
-    cubes.var_name = shortname
-
-    if shortname == 'pr':
-        # precipitation need to convert from kg/m2/s to mm/day
-        cubes.units = "mm day-1"
-        cubes.data = cubes.data * 24. * 60. * 60.
-        cubes.long_name = "TOTAL PRECIPITATION RATE"
-        cubes.attributes["title"] = cubes.long_name
-
-    if shortname == 'tas' or shortname == 'ts':
-        # convert to deg
-        cubes.convert_units("degC")
-        print(cubes)
-
-    if shortname == 'clt':
-        # convert from cloud fraction to percent
-        cubes.data = cubes.data * 100.
-        cubes.units = "%"
-
-        print(cubes)
-
-    return cubes
-   
-
-
-
-def monthly_data_all_levels(field,shortname):
-    """
-    this will get the database averages for the monthly data on all levels
-    (we will keep them all)
-    """
-
-    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pcpd/' + expt + 'a#pc000003[8-9]*',field)
-    #print('allcubes',allcubes,field)
-    iris.util.equalise_attributes(allcubes)
-    cubes = allcubes.concatenate_cube()
-    cubes.var_name = shortname
-
-    if shortname == 'ta':
-        # convert to degC
-        cubes.convert_units("degC")
-        print(cubes)
-
-
-    return cubes
-
-def monocn_data_single_level(field,shortname):
-    """
-    this will get the database averages for the monthly data on a single level
-    for the ocean
-    """
-
-    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pf/' + expt + 'o#pf000003[8-9]*',field)
-    print('allcubes',allcubes,field)
-    iris.util.equalise_attributes(allcubes)
-    cubes = allcubes.concatenate_cube()
-    cubes.var_name = shortname
-
-    cubes.data = np.ma.where(cubes.data.mask == 1.0, -999.999, cubes.data)
-
-    if shortname == 'tos':
-        cubes.long_name = "OCN TOP-LEVEL TEMPERATURE"
-        cubes.attributes["title"] = cubes.long_name
-
-    if shortname == 'siconc':
-        cubes.units = "%"
-        cubes.data = cubes.data * 100.
-
-    #    print(cubes)
-
-    return cubes
-   
-
-
-##########################################################
-# main program
-
-# this is regridding where all results are in a single file
-# create a dictionary with the long field names in and the field names we want
-# we are also using dictionaries so that we only have to change timeperiod name
-# when rerunning
-filestart = '/uolstore/home/users/earjcti/hera1/'
-filestart = '/home/earjcti/'
-              
-
-expt = 'xqbwc'
-
-
-fields = [ "ALLTEMPS",
-           "TEMPERATURE AT 1.5M MIN",
-           "TEMPERATURE AT 1.5M MEAN"]
-
-#expt = 'xqfmg'
-
-
-###############################
-### DICTIONARIES FOR NAMING
-# expt name
-alt_expt = {'xqfmg': 'F_EP280',
-            'xqfmh': 'F_EP',
-            'xqfme' : 'F_LP280',
-            'xqfmf' : 'F_LP',
-            'xqfmb' : 'F_PI280',
-            'xqfmc' : 'F_PI400',
-            'xqfmd' : 'F_PI490',
-            'xqbwc' : 'PI', 'xqbwd' : 'LP',
-            'xqbwg':'EP',
-            'xqbwn':'high_NH',
-            'xqbwo':'high_SH'}
-
-# CMIP name  ; this is from fernandas spreadsheet
-
-cmip_name = {"TEMEPERATURE AT 1.5M MAX" : "tas",
-           "TEMPERATURE AT 1.5M MIN": "tasmin",
-             "TEMPERATURE AT 1.5M MEAN" : "tas"}
-
-levels_req = {'ua':'y','va':'y','ta':'y','wa':'y','zg':'y','hus':'y'}
-ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}
-
-fileout = (filestart + '/um/' + expt + '/globus/HadCM3_' + alt_expt.get(expt) + '_' + expt + '_')
-
-
-for field in fields:
-    shortname = cmip_name.get(field)
-    ocn = ocean_req.get(shortname,'n')
-    multlev = levels_req.get(shortname,'n')
-    
-    if field == 'ALLTEMPS':  # get max min and mean temperatures
-        (meancubes,maxcubes,
-         mincubes)  = daily_data_temperatures(field,shortname)
-        filemean = (fileout + 'tas_daily_timeseries.nc')
-        filemax = (fileout + 'tasmax_daily_timeseries.nc')
-        filemin = (fileout + 'tasmin_daily_timeseries.nc')
-        iris.save(meancubes,filemean)
-        iris.save(maxcubes,filemax)
-        iris.save(mincubes,filemin)
-    elif multlev == 'n': # easy stuff like precipitaiton
-        
-
-    if multlev == 'y' and ocn == 'n':  # multiple level atm
-        cubes = daily_data_single_level(field,shortname)
-
-    if  multlev == 'n' and ocn == 'y': #single level ocean
-        cubes = monocn_data_single_level(field,shortname)
-
-  
-  
-
-
+#!/usr/bin/env python2# -*- coding: utf-8 -*-#Created on Thu Mar 18 14:13:50 2019#@author: earjcti1##  This program will extract fileds and put in a timeseries file#  this is what we will upload to globus for PlioMIP3#  it is daily variables so we need core only#import osimport numpy as npimport scipy as sp#import cfimport irisfrom iris.cube import CubeListimport matplotlib as mpimport matplotlib.pyplot as pltfrom mpl_toolkits.axes_grid1 import make_axes_locatableimport netCDF4from netCDF4 import Dataset, MFDatasetfrom matplotlib.colors import ListedColormap, LinearSegmentedColormapimport iris.analysis.cartographyimport iris.coord_categorisationimport sysimport warnings     def daily_data_temperatures(field,shortname):    """    this will get the database daily temperature min/max/mean    """    filenames = filestart + 'um/' + expt + '/pb/' + expt + 'a#pb00000*'    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']    maxtemp_cubes = CubeList([])    mintemp_cubes = CubeList([])    meantemp_cubes = CubeList([])    tempcube = None    temp1cube = None    temp2cube = None        for year in range(3900,4000):        for month in months:            file = filenames + str(year) + month + '+.nc'            cubes = iris.load(file)            for cube in cubes:                if cube.var_name == 'temp':                    tempcube = cube                    temp_maxval = np.max(tempcube.data)                if cube.var_name == 'temp_1':                    temp1cube = cube                    temp1_maxval = np.max(temp1cube.data)                if cube.var_name == 'temp_2':                    temp2cube = cube                    temp2_maxval = np.max(temp2cube.data)            if temp_maxval > temp1_maxval and temp_maxval > temp2_maxval:                # temp_maxval is maximum                maxtemp_cubes.append(tempcube)            else:                print('ordering error 1')                sys.exit(0)            if temp2_maxval > temp1_maxval: # temp2 is mean temp1 is minimum                mintemp_cubes.append(temp1cube)                meantemp_cubes.append(temp2cube)            else:                print('ordering error 2')                sys.exit(0)      # ju note  temp looks like max; temp_1 looks like min; temp_2 looks like mean,  temp_1 looks like min            iris.util.equalise_attributes(meantemp_cubes)    iris.util.equalise_attributes(maxtemp_cubes)    iris.util.equalise_attributes(mintemp_cubes)    meancubes = meantemp_cubes.concatenate_cube()    maxcubes = maxtemp_cubes.concatenate_cube()    mincubes = mintemp_cubes.concatenate_cube()    meancubes.var_name = 'tas'    maxcubes.var_name = 'tasmax'    mincubes.var_name = 'tasmin'    meancubes.convert_units("degC")    maxcubes.convert_units("degC")    mincubes.convert_units("degC")        return [meancubes,maxcubes,mincubes]def daily_data_precip(field,shortname):    """    this will get the database average precipitation    """    filenames = filestart + 'um/' + expt + '/pb/' + expt + 'a#pb00000*'    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']    precip_cubes = CubeList([])    mintemp_cubes = CubeList([])    meantemp_cubes = CubeList([])        for year in range(3900,4000):        for month in months:            file = filenames + str(year) + month + '+.nc'            precipcube = None            precip1cube=None            cubes = iris.load(file)            for cube in cubes:                if cube.var_name == 'precip':                    precipcube = cube                    precip_maxval = np.max(precipcube.data)                if cube.var_name == 'precip_1':                    precip1cube = cube                    precip1_maxval = np.max(precip1cube.data)            if precip_maxval > precip1_maxval: # precip is max, precip1 is mean                # temp_maxval is maximum                precip_cubes.append(precip1cube)            else:                print('precip ordering error 1')                sys.exit(0)      # ju note  temp looks like max; temp_1 looks like min; temp_2 looks like mean,  temp_1 looks like min            iris.util.equalise_attributes(precip_cubes)    meancubes = precip_cubes.concatenate_cube()    meancubes.var_name = 'pr'    meancubes.units = "mm day-1"    meancubes.data = meancubes.data * 24. * 60. * 60.    meancubes.long_name = "TOTAL PRECIPITATION RATE"    meancubes.attributes["title"] = meancubes.long_name        return meancubesdef daily_data_zg500(field,shortname):    """    this will get the geopotential height at 500mb    """    filenames = filestart + 'um/' + expt + '/pa/' + expt + 'a#pa00000*'    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']    zg500_cubes = CubeList([])        for year in range(3900,4000):        print(year)        for month in months:            file = filenames + str(year) + month + '+.nc'            levscube = None            cube = None            levscube = iris.load_cube(file,                                      'GEOPOTENTIAL HEIGHT: PRESSURE LEVELS')            cube = levscube.extract(iris.Constraint(p=500.))            zg500_cubes.append(cube)                                                iris.util.equalise_attributes(zg500_cubes)    allcubes = zg500_cubes.concatenate_cube()        return allcubes    def daily_data_single_level(field,shortname):    """    this will get the database averages for the daily data on a single level    """    #temporary = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pb/' + expt + 'a#pb000003900ja+.nc')    #print(temporary)    #sys.exit(0)    print(expt,field)    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pb/' + expt + 'a#pb000003[8-9]*',field)    iris.util.equalise_attributes(allcubes)    cubes = allcubes.concatenate_cube()    cubes.var_name = shortname    if shortname == 'e':        # evaporation need to convert from kg/m2/s to mm/day        cubes.units = "mm day-1"        cubes.data = cubes.data * 24. * 60. * 60.        cubes.long_name =   "SURF & BL TOTL MOISTURE FLUX"        cubes.attributes["title"] = cubes.long_name       return cubes   def daily_data_levels(field,shortname):    """    this will get the data on levels    """    filenames = filestart + 'um/' + expt + '/pa/' + expt + 'a#pa00000*'    months = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']    cubes_850 = CubeList([])    cubes_500 = CubeList([])    cubes_200 = CubeList([])        for year in range(3900,4000):        print(year)        for month in months:            file = filenames + str(year) + month + '+.nc'            levscube = None            cube = None            levscube = iris.load_cube(file,field)            cube850 = levscube.extract(iris.Constraint(p=850.))            cube500 = levscube.extract(iris.Constraint(p=500.))            cube200 = levscube.extract(iris.Constraint(p=200.))            cubes_850.append(cube850)            cubes_500.append(cube500)            cubes_200.append(cube200)                                        iris.util.equalise_attributes(cubes_850)    iris.util.equalise_attributes(cubes_500)    iris.util.equalise_attributes(cubes_200)    allcubes_850 = cubes_850.concatenate_cube()    allcubes_500 = cubes_500.concatenate_cube()    allcubes_200 = cubes_200.concatenate_cube()        return [allcubes_850,allcubes_500,allcubes_200]def monocn_data_single_level(field,shortname):    """    this will get the database averages for the monthly data on a single level    for the ocean    """    allcubes = iris.load('/uolstore/home/users/earjcti/hera1/um/' + expt + '/pf/' + expt + 'o#pf000003[8-9]*',field)    print('allcubes',allcubes,field)    iris.util.equalise_attributes(allcubes)    cubes = allcubes.concatenate_cube()    cubes.var_name = shortname    cubes.data = np.ma.where(cubes.data.mask == 1.0, -999.999, cubes.data)    if shortname == 'tos':        cubes.long_name = "OCN TOP-LEVEL TEMPERATURE"        cubes.attributes["title"] = cubes.long_name    if shortname == 'siconc':        cubes.units = "%"        cubes.data = cubes.data * 100.    #    print(cubes)    return cubes   ########################################################### main program# this is regridding where all results are in a single file# create a dictionary with the long field names in and the field names we want# we are also using dictionaries so that we only have to change timeperiod name# when rerunningfilestart = '/uolstore/home/users/earjcti/hera1/'#filestart = '/home/earjcti/'              expt = 'xqbwd'fields = [ #"ALLTEMPS",           "PRECIP",           # "PRESSURE AT MEAN SEA LEVEL",           # "10 METRE WIND U-COMP",           #  "SURF & BL TOTL MOISTURE FLUX KG/M2/S",           #  "10 METRE WIND V-COMP",           #  "GEOPOTENTIAL500",           #  "U COMPNT OF WIND ON PRESSURE LEVELS",             "V COMPNT OF WIND ON PRESSURE LEVELS",             "TEMPERATURE ON PRESSURE LEVELS"]#expt = 'xqfmg'################################## DICTIONARIES FOR NAMING# expt namealt_expt = {'xqfmg': 'F_EP280',            'xqfmh': 'F_EP',            'xqfme' : 'F_LP280',            'xqfmf' : 'F_LP',            'xqfmb' : 'F_PI280',            'xqfmc' : 'F_PI400',            'xqfmd' : 'F_PI490',            'xqbwc' : 'PI', 'xqbwd' : 'LP',            'xqbwg':'EP',            'xqbwn':'high_NH',            'xqbwo':'high_SH'}# CMIP name  ; this is from fernandas spreadsheetcmip_name = {"TEMEPERATURE AT 1.5M MAX" : "tas",           "TEMPERATURE AT 1.5M MIN": "tasmin",             "TEMPERATURE AT 1.5M MEAN" : "tas",                "PRESSURE AT MEAN SEA LEVEL":"psl",            "10 METRE WIND U-COMP":"uas",             "SURF & BL TOTL MOISTURE FLUX KG/M2/S":"e",             "10 METRE WIND V-COMP": "vas",             "GEOPOTENTIAL500" : "zg500",             "U COMPNT OF WIND ON PRESSURE LEVELS" : "ua",             "V COMPNT OF WIND ON PRESSURE LEVELS" : "va",             "TEMPERATURE ON PRESSURE LEVELS" : "ta"}levels_req = {'ua':'y','va':'y','ta':'y','wa':'y','zg':'y','hus':'y'}ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}fileout = (filestart + '/um/' + expt + '/globus/HadCM3_' + alt_expt.get(expt) + '_' + expt + '_')for field in fields:    shortname = cmip_name.get(field)    ocn = ocean_req.get(shortname,'n')    multlev = levels_req.get(shortname,'n')        if field == 'ALLTEMPS':  # get max min and mean temperatures        (meancubes,maxcubes,         mincubes)  = daily_data_temperatures(field,shortname)        filemean = (fileout + 'tas_daily_timeseries.nc')        filemax = (fileout + 'tasmax_daily_timeseries.nc')        filemin = (fileout + 'tasmin_daily_timeseries.nc')        iris.save(meancubes,filemean)        iris.save(maxcubes,filemax)        iris.save(mincubes,filemin)    elif field == 'PRECIP': # there are 2 precips so get correct one        meancubes = daily_data_precip(field,shortname)        iris.save(meancubes,fileout + 'pr_daily_timeseries.nc')    elif field == 'GEOPOTENTIAL500':        meancubes = daily_data_zg500(field,shortname)        iris.save(meancubes,fileout + 'zg500_daily_timeseries.nc')    elif multlev == 'y':        (cube850,cube500,         cube200) = daily_data_levels(field,shortname)        iris.save(cube850,fileout + shortname +  '850_daily_timeseries.nc')        iris.save(cube500,fileout + shortname +  '500_daily_timeseries.nc')        iris.save(cube200,fileout + shortname +  '200_daily_timeseries.nc')    else:        meancubes = daily_data_single_level(field,shortname)        iris.save(meancubes,fileout + shortname + '_daily_timeseries.nc')       # START HERE       # multlev == 'n': # easy stuff like precipitaiton       # print('not set up')       # sys.exit(0)    

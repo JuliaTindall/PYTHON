@@ -107,21 +107,21 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwg'
+expt = 'xqbwc'
 
 
-fields = [ "SNOW AMOUNT AFTER TIMESTEP     KG/M2",
-          "SURFACE RUNOFF RATE          KG/M2/S",
-          "SUB-SURFACE RUNOFF RATE      KG/M2/S",
-          "SOIL MOISTURE CONTENT"
-           "INCOMING SW RAD FLUX (TOA): ALL TSS",
-           "OUTGOING SW RAD FLUX (TOA)",
-           "OUTGOING LW RAD FLUX (TOA)",
-           "CLEAR-SKY (II) UPWARD LW FLUX (TOA)",
-           "DOWNWARD LW RAD FLUX: SURFACE",
-           "TOTAL DOWNWARD SURFACE SW FLUX",
-           "NET DOWN SURFACE LW RAD FLUX",
-           "NET DOWN SURFACE SW FLUX: SW TS ONLY",
+fields = [# "SNOW AMOUNT AFTER TIMESTEP     KG/M2",
+          #"SURFACE RUNOFF RATE          KG/M2/S",
+          #"SUB-SURFACE RUNOFF RATE      KG/M2/S",
+          #"SOIL MOISTURE CONTENT",
+          # "INCOMING SW RAD FLUX (TOA): ALL TSS",
+          # "OUTGOING SW RAD FLUX (TOA)",
+          # "OUTGOING LW RAD FLUX (TOA)",
+          # "CLEAR-SKY (II) UPWARD LW FLUX (TOA)",
+          # "DOWNWARD LW RAD FLUX: SURFACE",
+          # "TOTAL DOWNWARD SURFACE SW FLUX",
+          # "NET DOWN SURFACE LW RAD FLUX",
+          # "NET DOWN SURFACE SW FLUX: SW TS ONLY",
            "CLEAR-SKY (II) UP SURFACE SW FLUX",
            "CLEAR-SKY (II) DOWN SURFACE SW FLUX",
            "CLEAR-SKY (II) DOWN SURFACE LW FLUX",
@@ -173,6 +173,7 @@ ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}
             
 
 for field in fields:
+    print(field)
     shortname = cmip_name.get(field)
     ocn = ocean_req.get(shortname,'n')
     multlev = levels_req.get(shortname,'n')
@@ -197,11 +198,10 @@ for field in fields:
     fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/globus/HadCM3_')
     fileout = (fileout + alt_expt.get(expt) + '_' + expt + '_' + 
                cmip_name.get(field) + '_monthly_clim_3800_4000.nc')
-    if ocn == 'y':
-        iris.save(meanmonthcube,fileout,fill_value=-999.999)
-    else:
-        iris.save(meanmonthcube,fileout)
-    sys.exit(0)
+    #if ocn == 'y':
+    iris.save(meanmonthcube,fileout,fill_value=-999.999)
+    #else:
+    #    iris.save(meanmonthcube,fileout)
 
 
 
