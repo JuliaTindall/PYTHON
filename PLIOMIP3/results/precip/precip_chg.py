@@ -160,7 +160,8 @@ def get_avg(jobid, startyear):
     mean_long = np.average(alltemps[mask, :], axis=0,weights=weights)
 
 
-    print('mean',jobid,mean_long.mean())
+    print('mean precip mm month',jobid,mean_long.mean())
+    #sys.exit(0)
      ####### end of temporary code
     
     avgtempcube=cube.copy(data=alltemps)
@@ -176,7 +177,7 @@ def get_avg(jobid, startyear):
 
 LINUX_WIN='l'
 filestart = '/uolstore/Research/a/hera1/earjcti/'
-NYEARS = 100
+NYEARS = 30
 #NYEARS=5
 SEASON = 'ann'
 
@@ -184,12 +185,12 @@ SEASON = 'ann'
 MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
 
 #EXPTS = ['xqbwk','xqbwi','xqbwj']  # xpsic PI,  xpsij-lp490  xpsik - lp560
-EXPTS=['xqbwi']
-EXPT_STARTYEAR = 3900
+EXPTS=['xpsig']
+EXPT_STARTYEAR = 12
 #EXPT = 'Eoi400_ARC4_2450-2499'
 
 # data from good experiment
-CNTL = 'xqbwc'  # xpsic pi, xpsid lp400
+CNTL = 'xpsid'  # xpsic pi, xpsid lp400
 CNTL_STARTYEAR = EXPT_STARTYEAR
 
 #FIELDS  = ['temp1.5','precip','cloud_cover','mslp',

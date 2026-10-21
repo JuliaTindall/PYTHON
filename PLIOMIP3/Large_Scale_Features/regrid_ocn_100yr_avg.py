@@ -382,10 +382,12 @@ def regrid_data(fieldnamein, exptnamein):
     if modelname == 'ACCESS':
         cube.coord('latitude').coord_system = None
         cube.coord('longitude').coord_system = None
-    ndim = cube.ndim
     if modelname == 'HadCM3':
         cube.coord('t').rename('time')
-
+        cube =iris.util.squeeze(cube)
+        
+    ndim = cube.ndim
+   
 
 
     # now regrid the cube onto a 1X1 grid (we will first try regridding the raw data)
@@ -409,7 +411,7 @@ def regrid_data(fieldnamein, exptnamein):
     # we need to convert it to days since reference time
   
     if (modelname  == 'COSMOS' or modelname == 'AWI-CM2'
-        or modelname =='AWI-ESM2'):
+        or modelname =='AWI-ESM2') and (fieldnamein !='tos'):
         # cosmos data is in a strange time coordinate line yyyymmdd
         # we need to convert it to days since reference time
         origpoints = regridded_cube.coord('time').points
@@ -806,6 +808,7 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
                       "tos" : "SeaSurfaceTemp"
                       }
     ACCESS_FIELDS = {"tas": "TEMPERATURE AT 1.5M",
+                     "tos": "Conservative temperature",
                      "pr": "TOTAL PRECIPITATION RATE     KG/M2/S"}
     HadCM3_FIELDS = {"tas": "TEMPERATURE AT 1.5M",
                      "pr": "TOTAL PRECIPITATION RATE"}
@@ -874,27 +877,42 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
    
     # get names for each model
     if modelname == 'ACCESS':
-        filename = (filestart + modelname + '/' + exptnamein + '/' + fieldnamein +
-                    '_Amon_ACCESS-ESM1-5_')
+        filename = (filestart + modelname + '/' + exptnamein + '/' +
+                    fieldnamein)
+        #print(fieldname)
+        if fieldnamein == 'tos':
+            filename = filename + '_Omon_ACCESS-ESM1-5_'
+        else:
+            filename = filename +  '_Amon_ACCESS-ESM1-5_'
         if exptnamein == 'LP':
-            filename = filename + 'LP_09020116-10011216.nc'
+            #filename = filename + 'LP_09020116-10011216.nc'
+            filename = filename + 'LP_09021231-10011231.nc'
         if exptnamein == 'PI':
             filename = filename + 'pre-industrial_01010116-02001216.nc'
         fielduse = ACCESS_FIELDS.get(fieldnamein)
 
     if modelname == 'AWI-CM2':
+        
         filename = (filestart + 'AWI/AWI-CM2/' + exptnamein +
                     '/AWI-CM2_' + exptnamein + '_' +
-                    AWI_FILE_FIELDS.get(fieldnamein,fieldnamein) +
-                    '_monthly_timeseries_native_')
+                    AWI_FILE_FIELDS.get(fieldnamein,fieldnamein))
+        if fieldnamein == 'tos':
+            filename = filename + '_monthly_timeseries_r360x181_'
+        else:            
+            filename = filename + '_monthly_timeseries_native_'
+
         filename = filename + '580001-589912.nc'
         fielduse = AWI_FIELDS.get(fieldnamein)
                     
     if modelname == 'AWI-ESM2':
         filename = (filestart + 'AWI/AWI-ESM2/' + exptnamein +
                     '/AWI-ESM2_' + exptnamein + '_' +
-                    AWI_FILE_FIELDS.get(fieldnamein,fieldnamein) +
-                    '_monthly_timeseries_native_')
+                    AWI_FILE_FIELDS.get(fieldnamein,fieldnamein))
+        if fieldnamein == 'tos':
+            filename = filename + '_monthly_timeseries_r360x180_'
+        else:            
+            filename = filename + '_monthly_timeseries_native_'
+
         if exptnamein == 'LP':
             filename = filename + '603201-654912.nc'
         if exptnamein == 'PI':
@@ -905,12 +923,22 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
     if modelname == 'COSMOS':
         filename = (filestart + 'AWI/COSMOS/' + exptnamein +
                     '/COSMOS_' + exptnamein + '_' +
-                    AWI_FILE_FIELDS.get(fieldnamein,fieldnamein) +
-                    '_monthly_timeseries_native_')
-        if exptnamein == 'LP':
-            filename = filename + '280001-289912.nc'
-        if exptnamein == 'PI':
-            filename = filename + '280001-289912.nc'
+                    AWI_FILE_FIELDS.get(fieldnamein,fieldnamein))
+        if fieldnamein == 'tos':
+            filename = filename + '_monthly_timeseries_r360x180_'
+            if exptnamein == 'LP':
+                filename = filename + '2800-2899.nc'
+            if exptnamein == 'PI':
+                filename = filename + '2800-2899.nc'
+
+        else:            
+            filename = filename + '_monthly_timeseries_native_'
+            if exptnamein == 'LP':
+                filename = filename + '280001-289912.nc'
+            if exptnamein == 'PI':
+                filename = filename + '280001-289912.nc'
+      
+
        
         fielduse = AWI_FIELDS.get(fieldnamein)
                     
@@ -1056,14 +1084,14 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
       
     retdata = [fielduse, filename]
     return(retdata)
-
+ 
 
 ##########################################################
 # main program
 
 filename  =  ' '
 linux_win  =  'l'
-modelname  = "MIROC4m"  # 'ACCESS' 'AWI-CM2' 'AWI-ESM2' 'COSMOS'
+modelname  = "COSMOS"  # 'ACCESS' 'AWI-CM2' 'AWI-ESM2' 'COSMOS' 'MIROC4m'
 exptname  =  {
         "E280" : "E280",
         "Eoi400" : "EOI400",
@@ -1089,10 +1117,10 @@ fieldname  =  {
 #exptnamein = ['Eoi400']
 
 #fieldnamein = ['pr']
-#fieldnamein = ['tos'] # ocean tempeature or sst
+fieldnamein = ['tos'] # ocean tempeature or sst
 #exptnamein = ['Eoi400']
 
-fieldnamein = ['tas','pr']
+#fieldnamein = ['tas','pr']
 exptnamein = ['LP','PI']
 #exptnamein = ['E560']
 if linux_win  == 'l':

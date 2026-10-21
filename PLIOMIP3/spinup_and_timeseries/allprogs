@@ -1,0 +1,5216 @@
+::::::::::::::
+benchmarking.py
+::::::::::::::
+"""
+#NAME
+#    benchmarking.py
+#PURPOSE 
+#
+#  This program will create a t-test to see whether the means from
+# our climate runs are significantly different at various times in the 
+# simulation.  
+#  We are doing this to see how well the climate is spun up.
+#
+#NOTES
+#  what is a t-test
+#  1.  Our sample has 100 years so our data has 99degrees of freedom
+#  2.  If our |t-value| >2  then our Null hypothesis (that the distributions are the same)
+#                           is rejected at the 95% confidence level/
+#  3.  So we are looking for |t-value| < 2
+#  4.  t-value = (mean_expt - mean_climate) / s
+#      I can't figure out whether s=standard dev or s=standard-dev / sqrt(n)
+
+"""
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import math
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import iris.quickplot as qplt
+import iris.plot as iplt
+import sys
+#from netCDF4 import Dataset, MFDataset
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+def round_to_n(x, n):
+    """
+    rounds x to n significant figures
+    """
+    if not x: return 0
+    power = -int(math.floor(math.log10(abs(x)))) + (n - 1)
+    factor = (10 ** power)
+    return round(x * factor) / factor
+
+def get_plot_limits(cube, ndiv, nsig):
+    """
+    gets the limit for the plot
+    imput: a cube and the number of divisions on the plot
+    nsig is the number of significant figures to round the difference to
+    """
+
+   
+    valmin = round_to_n(np.min(cube.data), 2)
+    valmax = round_to_n(np.max(cube.data), 2)
+        
+    valmax = np.min([valmin * -1.0, valmax])
+    valmin = valmax * -1.0
+    valdiff = round_to_n((valmax - valmin) / ndiv, nsig)
+    
+    # adjust valmax and valmin so that the difference is an exact multiple
+    # of valdiff
+    valmax = valdiff * (ndiv / 2.0)
+    valmin = -1.0 * valmax
+    
+       
+    return valmin, valmax, valdiff
+
+def fix_mask(cube):
+    """
+    this is for if the valid min and valid max was wrong and the data has 
+    ended up being masked everywhere 
+    """
+    #1. check if data is masked everywhere
+   
+    nmask = np.ma.count_masked(cube.data)
+    nsize = cube.data.size
+    
+    if nmask > 0.9 * nsize:  # too much masking unmask everything
+        cube.data.mask = False
+        
+    
+        cube.attributes['valid_min'] = -100000.
+        cube.attributes['valid_max'] = -100000.
+        cube.attributes['fill_value'] = 2.0E20
+        
+    newcube = cube.copy()
+    
+    
+    return newcube
+
+class main():
+    """
+    this class will basically run the program
+    """
+    def __init__(self, field):
+        """
+        input: field # a short field name
+        
+        gets data such as the list of the filenames we need
+        and the longfieldname and also which type of file it is
+        """
+ 
+        if LINUX_WIN == 'w':
+            startfname = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\"
+            startout = "C:\\Users\\julia\\OneDrive\\WORK\\DATA\\"
+        else:
+            startout = "/nfs/see-fs-02_users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/benchmarking/"
+            if EXPT_TYPE == 'S':
+                startfnamee = "/nfs/hera3/palaeo_share/PlioMIP2/processed/"
+            else:
+                startfnamee = "/nfs/hera1/earjcti/um/"
+            if CNTL_TYPE == 'S':
+                startfnamec = "/nfs/hera3/palaeo_share/PlioMIP2/processed/"
+            else:
+                startfnamec = "/nfs/hera1/earjcti/um/"
+            
+        longfield = {'temp1.5' : 'TEMPERATURE AT 1.5M',
+                     'precip' : 'TOTAL PRECIPITATION RATE     KG/M2/S',
+                     'precipmm' : 'TOTAL PRECIPITATION RATE MM/DAY',
+                     'cloud_cover' : 'TOTAL CLOUD AMOUNT - RANDOM OVERLAP',
+                     'mslp' : 'PRESSURE AT MEAN SEA LEVEL',
+                     'mslp_hPa' : 'PRESSURE AT MEAN SEA LEVEL hPa',
+                     'evapsea' : 'EVAPORATION FROM SEA (GBM)   KG/M2/S',
+                     'seaiceconc' : 'AICE : ICE CONCENTRATION',
+                     'icefrac' : 'SEA ICE FRACTION AFTER TIMESTEP',
+                     'oceansurftemp' : 'OCN TOP-LEVEL TEMPERATURE          K',
+                     'oceansurftempK' : 'OCN TOP-LEVEL TEMPERATURE K',
+                     'surfsalinity': 'SALINITY (OCEAN)       (PSU-35)/1000',
+                     'surfsalinitypsu': 'SALINITY (OCEAN) (PSU)',
+                     'MLD' : 'MIXED LAYER DEPTH (OCEAN)          M',
+                     'MLDm' : 'MIXED LAYER DEPTH (OCEAN) M',
+                     'AMOC' : 'Meridional Overturning Stream Function (Atlantic)'
+                    
+                     }
+        atm_ocn_ind = {'temp1.5' : 'a',
+                       'precip' : 'a',
+                       'cloud_cover' : 'a',
+                       'mslp' : 'a',
+                       'evapsea' : 'a',
+                       'seaiceconc' : 'o',
+                       'oceansurftemp' :  'o',
+                       'surfsalinity': 'o',
+                       'MLD' : 'o',
+                       'AMOC' : 'o'
+                       }
+      
+        fileletter = {'temp1.5' : 'pd',
+                      'precip' : 'pd',  
+                      'cloud_cover' : 'pd',
+                      'mslp' : 'pd',
+                      'evapsea' : 'pd',
+                      'seaiceconc' : 'pf',
+                      'oceansurftemp' : 'pf',
+                      'surfsalinity': 'pf',
+                      'MLD' : 'pf'}
+        
+        if EXPT_TYPE == 'S':
+            self.meanfile = startfnamee + EXPT + '_Annual.nc'
+            self.stdevfile = startfnamee + EXPT + '_Annual_std.nc'
+        else:
+            self.meanfile = (startfnamee + EXPT + '/average/' + EXPT + 
+                         '_' + field + '_' + SEASON + '_mean_' + 
+                         np.str(EXPT_STARTYEAR) + '_' +  
+                         np.str(EXPT_STARTYEAR + NYEARS) + '.nc')
+            self.stdevfile = (startfnamee + EXPT + '/stdev/' + EXPT + 
+                          '_' + field + '_' + SEASON + '_stdev_' +
+                          np.str(EXPT_STARTYEAR) + '_' +  
+                          np.str(EXPT_STARTYEAR + NYEARS) + '.nc')
+        print(self.meanfile)
+       
+        
+        # get benchmarking data
+        if CNTL_TYPE == 'B':
+            self.meanbench = (startfnamec +  'Benchmarking/' + 
+                              CNTL + atm_ocn_ind.get(field) + 
+                              '.' +  fileletter.get(field) + 'cl' + 
+                              SEASON + '.nc')
+            self.sdbench = (startfnamec + 'Benchmarking/' + 
+                              CNTL + atm_ocn_ind.get(field) + 
+                              '.' +  fileletter.get(field) + 'sd' + 
+                              SEASON + '.nc')
+            
+        elif CNTL_TYPE == 'S':
+            self.meanbench = startfnamec + CNTL + '_Annual.nc'
+            self.sdbench = startfnamec + CNTL + '_Annual_std.nc'
+            
+        else:
+            self.meanbench = (startfnamec + CNTL + '/average/' + CNTL + 
+                              '_' + field + '_' + SEASON +'_mean_' +
+                               np.str(CNTL_STARTYEAR) + '_' +  
+                               np.str(CNTL_STARTYEAR + NYEARS) + '.nc')
+            self.sdbench = (startfnamec + CNTL + '/stdev/' + CNTL + 
+                            '_' + field + '_' + SEASON +'_stdev_' +
+                            np.str(CNTL_STARTYEAR) + '_' +  
+                            np.str(CNTL_STARTYEAR + NYEARS) + '.nc')
+                           
+            
+        self.fieldname = longfield.get(field)
+        if CNTL_TYPE=='S':
+            cntl_out=CNTL
+        else:
+            cntl_out = (CNTL + '_' + np.str(CNTL_STARTYEAR) + 
+                     '_' +  np.str(CNTL_STARTYEAR + NYEARS) + '_')
+        if EXPT_TYPE=='S':
+            expt_out=EXPT
+        else:
+            expt_out = (EXPT + '_' + np.str(EXPT_STARTYEAR) + 
+                     '_' +  np.str(EXPT_STARTYEAR + NYEARS) + '_')
+                       
+        self.outstart = (startout + expt_out +'_' + cntl_out + 
+                         '_' + field  + '_' + SEASON)
+        self.field = field
+        
+      
+           
+    def main_benchmark_field(self):
+        """
+        this will compare the field with the benchmarked field and
+        plot to a file
+        """
+        
+        cube_exptmean = iris.load_cube(self.meanfile, self.fieldname)
+        cube_exptsd = iris.load_cube(self.stdevfile, self.fieldname)
+      
+        if CNTL_TYPE == 'B':
+            variable_constraint = iris.Constraint(cube_func=(lambda c: c.long_name == self.fieldname))
+            cube_cntlmean = iris.load_cube(self.meanbench, variable_constraint)
+            cube_temp = iris.load_cube(self.sdbench, variable_constraint)
+            cube_cntlsd = fix_mask(cube_temp)
+        else:
+            cube_cntlmean = iris.load_cube(self.meanbench, self.fieldname)
+            cube_cntlsd = iris.load_cube(self.sdbench, self.fieldname)
+        
+        # if steve#s salinity we just need two levels
+        if self.field ==  'surfsalinitypsu':
+            #cube_exptmean.coord('z2').var_name = 'depth'
+            #cube_exptmean.coord('depth').standard_name = 'depth'
+            #print(cube_exptmean.coords())
+            cube_exptmean = cube_exptmean.extract(iris.Constraint(depth=0.0))
+            print(cube_exptmean)
+            sys.exit(0)
+            cube_exptsd = cube_exptsd.extract(iris.Constraint(z2=0.0))
+            cube_cntlmean = cube_cntlmean.extract(iris.Constraint(z2=0.0))
+            cube_cntlsd = cube_cntlsd.extract(iris.Constraint(z2=0.0))
+            
+            
+       
+        # makes the exptmean, exptsd, cntlmean and cntlsd cubes all look the 
+        # same
+        cube_exptmean, cbarunits = self.mean_equalise_cubes(cube_exptmean)
+        cube_cntlmean, cbarunits = self.mean_equalise_cubes(cube_cntlmean)
+        cube_exptsd, cbarunits = self.mean_equalise_cubes(cube_exptsd)
+        cube_cntlsd, cbarunits = self.mean_equalise_cubes(cube_cntlsd)
+        
+        cube_anom = cube_exptmean - cube_cntlmean
+        # to calculate the divisor in the t-statistic
+        # you will have to look at how to do a t-test on the web for exlanation
+        data1 = ((((cube_exptsd.data ** 2.0) * (NYEARS-1.0))
+                          + ((cube_cntlsd.data ** 2.0) * (NYEARS-1.0)))
+                     / (2.0*(NYEARS-1.0)))
+        data2 = (np.sqrt(data1)) * (np.sqrt(2.0/NYEARS))
+        cube_div = cube_anom.copy(data=data2)
+        
+       
+        cube_tstat = cube_anom / cube_div
+        print(cube_tstat.data)
+       
+      
+        if self.field == 'AMOC':
+            self.main_plot_AMOC(cube_anom, cbarunits, cube_tstat)
+        else:
+            self.main_plot_latlon(cube_anom, cbarunits, cube_tstat)
+        # plot the anomaly
+           
+    def main_plot_AMOC(self, cube_anom, cbarunits, cube_tstat):
+        """
+        do a lat-depth plot of the field
+        we are plotting the anomaly and the tvalue
+        """
+        
+        ax = plt.subplot(1,2,1)
+      
+        anommin, anommax, anomdiff = get_plot_limits(cube_anom, 10, 1)
+        cs = iplt.contourf(cube_anom, np.arange(anommin, anommax+anomdiff, anomdiff), 
+                      cmap='RdYlBu_r', extend='both')
+        cbar=plt.colorbar(cs,orientation="horizontal")
+        plt.title(self.field + ' anomaly', fontsize=10)
+        cbar.set_label('SV')
+        
+        # plot the tstatistic
+        ax2 = plt.subplot(1, 2, 2)
+        tmin, tmax, tdiff = get_plot_limits(cube_tstat, 10, 1)
+        cs = iplt.contourf(cube_tstat, np.arange(tmin, tmax+tdiff, tdiff), cmap='RdYlBu_r', extend='both')
+        cbar=plt.colorbar(cs,orientation="horizontal")
+        
+        iplt.contour(cube_tstat, [-np.inf, -2, 2, np.inf], hatches=[3*'\\\'', None, 3*'\\\''], colors='black')
+        iplt.contourf(cube_tstat, [-np.inf, -2, 2, np.inf], hatches=[3*'\\\'', None, 3*'\\\''], colors='none')
+        plt.title(self.field + ' t-value', fontsize=10)
+        
+        
+        
+        plt.tight_layout()
+        print(self.outstart)
+        plt.savefig(self.outstart + '.png')
+        plt.savefig(self.outstart + '.pdf')
+        #plt.show()
+        plt.close()
+        
+       
+      
+        
+    def main_plot_latlon(self, cube_anom, cbarunits, cube_tstat):
+        """
+        do a latlon plot of the field
+        we are plotting the anomaly and the tvalue
+        """
+
+        ax = plt.subplot(1, 2, 1, projection = ccrs.PlateCarree())
+        anommin, anommax, anomdiff = get_plot_limits(cube_anom, 10, 1)
+        print(anommin, anommax, anomdiff)
+        print(np.arange(anommin, anommax+anomdiff, anomdiff))
+        
+        if cube_anom.data.ndim==3:
+            cube_anom = cube_anom[0,:,:]
+            cube_tstat=cube_tstat[0,:,:]
+       
+        cs = iplt.contourf(cube_anom, np.arange(anommin, anommax+anomdiff, anomdiff), 
+                      cmap='RdYlBu_r', extend='both')
+        cbar=plt.colorbar(cs,orientation="horizontal")
+        if cube_anom.units == '':
+            cbar.set_label(cbarunits)
+        else:
+            cbar.set_label(cube_anom.units)
+        cbar.ax.tick_params(labelsize=8, labelrotation=60) 
+        plt.title(self.fieldname + ' anomaly', fontsize=10)
+        plt.gca().coastlines()
+        #gl = ax.gridlines(crs=ccrs.PlateCarree(), linestyle='-', draw_labels='true')
+        #gl.xlabels_top = False
+        #gl.ylabels_left = False
+        #gl.ylocator = mticker.FixedLocator([-90, -45, 0, 45, 90])
+        #gl.xformatter = LONGITUDE_FORMATTER
+        #gl.yformatter = LATITUDE_FORMATTER
+        
+        
+        # plot the tstatistic
+        ax2 = plt.subplot(1, 2, 2, projection = ccrs.PlateCarree())
+        tmin, tmax, tdiff = get_plot_limits(cube_tstat, 10, 1)
+        cs = iplt.contourf(cube_tstat, np.arange(tmin, tmax+tdiff, tdiff), cmap='RdYlBu_r', extend='both')
+        cbar=plt.colorbar(cs,orientation="horizontal")
+        cbar.ax.tick_params(labelsize=8, labelrotation=60) 
+        iplt.contour(cube_tstat, [-np.inf, -2, 2, np.inf], hatches=[3*'\\\'', None, 3*'\\\''], colors='black')
+        iplt.contourf(cube_tstat, [-np.inf, -2, 2, np.inf], hatches=[3*'\\\'', None, 3*'\\\''], colors='none')
+        plt.title(self.fieldname + ' t-value', fontsize=10)
+        plt.gca().coastlines()
+        #gl = ax.gridlines(crs=ccrs.PlateCarree(), linestyle='-', draw_labels='true')
+        #gl.xlabels_top = False
+        #gl.ylabels_left = False
+        #gl.ylocator = mticker.FixedLocator([-90, -45, 0, 45, 90])
+        #gl.xformatter = LONGITUDE_FORMATTER
+        #gl.yformatter = LATITUDE_FORMATTER
+        
+        plt.tight_layout()
+    
+        plt.savefig(self.outstart + '.png')
+        plt.savefig(self.outstart + '.eps')
+        #plt.show()
+        plt.close()
+        
+       
+          
+    def mean_equalise_cubes(self, cube):
+        """
+        makes the 2 cubes in the main program look the same for analysis
+        they will look the same as cube_expt
+        """    
+        
+        # check dimensions
+        newcube = iris.util.squeeze(cube)
+        
+        
+        # if cube is precipitation: change to mm/month
+        if self.field == 'precip':
+           
+           newcube.long_name = 'Precipitation'
+           newcube.name('precipitation_flux')
+           newcube.title = 'Precipitation'
+           self.fieldname = 'Precipitation'
+           #newcube.units = 'kg m-2 s-1'
+           #newcube.convert_units('mm day-1')
+           newcube.data = newcube.data * 60. * 60. * 24.
+           newcube.units = 'mm day-1'
+           
+        # check names etc
+        cbarunits = ''
+        if self.field == 'cloud_cover':
+            self.fieldname = 'Cloud amount'
+            newcube.units = ''
+            cbarunits = 'fraction'
+            
+        if self.field == 'seaiceconc':
+            newcube.units = ''
+            cbarunits = 'fraction'
+            
+        if self.field == 'oceansurftemp':
+            self.fieldname = 'Ocean Surface Temp'
+        
+        if self.field == 'surfsalinity':
+            self.fieldname = 'Salinity'
+            newcube.units = ''
+            newcube.data = newcube.data * 1000.
+            cbarunits = 'psu'
+            
+        if self.field == 'MLD':
+            self.fieldname = 'Mixed Layer Depth'
+            #cbarunits = 'm'
+            
+        if self.field == 'evapsea':
+            self.fieldname = 'Evaporation from sea'
+            newcube.data = newcube.data * 60. * 60. * 24.
+            newcube.units = 'mm day-1'
+           
+           
+        
+ 
+               
+        return newcube, cbarunits
+       
+    
+#=================================================================
+# MAIN PROGRAM STARTS HERE
+
+
+
+LINUX_WIN='l'
+NYEARS = 50
+SEASON = 'ann'
+
+# data from new experiemnt
+MODELTYPE = 'y' # n=HadGEM, y=HadCM3, F=Famous
+
+EXPT = 'xpsic'  # xpsic PI
+EXPT_STARTYEAR = 2950
+#EXPT = 'Eoi400_ARC4_2450-2499'
+EXPT_TYPE = 'A'#  A = average file like I made using 
+               #      program COMMON/basic_plots/avg_fields.py
+               # B = Bristol file like Paul made
+               # S = average file like Steve made
+
+# data from good experiment
+CNTL_TYPE = 'A' # A = average file like I made
+               # B = Bristol file like Paul made
+                 # S = like file steve made
+CNTL = 'xozzz'
+CNTL_STARTYEAR = 2810
+#CNTL = 'Eoi400_2450-2499'
+#CNTL = 'tcfze'
+#CNTL_STARTYEAR = 0
+
+FIELDS  = ['temp1.5','precip','cloud_cover','mslp',
+          'seaiceconc','oceansurftemp',
+          'surfsalinity','MLD', 'evapsea']
+
+#FIELDS  = ['surfsalinity','MLD', 'evapsea']
+
+#FIELDS_STEVE = ['temp1.5','precipmm','cloud_cover','mslp_hPa',
+#          'icefrac','oceansurftempK',
+#          'surfsalinity','MLD', 'evapsea']
+
+#FIELDS = ['AMOC']
+#FIELDS = ['temp1.5']
+
+for i, field in enumerate(FIELDS):
+    print(field)
+    obj = main(field)
+    obj.main_benchmark_field() # benchmarks this field
+
+    
+::::::::::::::
+check_orbital_expts.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    check_orbital_expts.py
+#PURPOSE
+#
+#  This program is looking at the toa radiation to check that I have
+#  implemented the boundary conditions properly in the orbital experiments
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import cartopy.crs as ccrs
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+
+
+def plot_toa_insolation():
+    # 1 get the toa insolation from expt (by latitude and month)
+    # 2 get the toa insolation from cntl
+    # 3 calculate expt-toa insol - cntl_toa insolation
+    # 4 plot a month-latitude plot showing the difference
+
+    exptfilestart = ('/uolstore/Research/a/hera1/earjcti/um/'+expt+
+                     '/netcdf/'+expt+'a#pd000002099')
+    cntlfilestart = ('/uolstore/Research/a/hera1/earjcti/um/'+cntl+
+                     '/netcdf/'+cntl+'a#pd000002099')
+
+
+    exptnames = {'xpsin' : 'LP_highNH_lowSH_orbit',
+                 'xpsio' : 'LP_lowNH_highSH_orbit',
+                 'xqbwn' : 'LP_highNH_lowSH_orbit',
+                 'xqbwo' : 'LP_lowNH_highSH_orbit',
+                 'xpsic' :'PI'}
+
+    monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    #monthnames = ['ja','fb']
+    # 1/2. get toa insolation from expt and control
+  
+    exptcubelist = CubeList()
+    cntlcubelist = CubeList()
+
+    for i, month in enumerate(monthnames):
+        expt_cube = iris.load_cube(exptfilestart + month + '+.nc',
+                                        'field200')
+        cntl_cube = iris.load_cube(cntlfilestart + month + '+.nc',
+                                        'field200')
+        exptcubelist.append(expt_cube)
+        cntlcubelist.append(cntl_cube)
+
+    iris.util.equalise_attributes(exptcubelist)
+    expt_insw_yearcube = exptcubelist.concatenate_cube()
+   
+    iris.util.equalise_attributes(cntlcubelist)
+    cntl_insw_yearcube = cntlcubelist.concatenate_cube()
+    
+    # get the time latitude cube for plotting
+    expt_insw_lat_time_cube = iris.util.squeeze(expt_insw_yearcube[:,:,:,0]) 
+    cntl_insw_lat_time_cube = iris.util.squeeze(cntl_insw_yearcube[:,:,:,0]) 
+
+    anom_cube = expt_insw_lat_time_cube - cntl_insw_lat_time_cube    
+    
+    # plot the experiment, the control and the anomaly
+    plt.figure(0,figsize=[15.0,5.0])
+    plt.subplot(1,3,1) 
+    cs=plt.contourf(monthnames,expt_insw_lat_time_cube.coord('latitude').points,
+                    np.transpose(expt_insw_lat_time_cube.data),
+                    levels=np.arange(0,600,50),extend='max')
+    plt.title(exptnames.get(expt))
+    plt.colorbar(cs,orientation='horizontal',label='W/m2')
+
+    plt.subplot(1,3,2)
+    cs2=plt.contourf(monthnames,
+                     cntl_insw_lat_time_cube.coord('latitude').points,
+                     np.transpose(cntl_insw_lat_time_cube.data),
+                     levels=np.arange(0,600,50),extend='max')
+    plt.title(exptnames.get(cntl))
+    plt.colorbar(cs2,orientation='horizontal',label='W/m2')
+
+  
+    plt.subplot(1,3,3)
+    cs3=plt.contourf(monthnames,anom_cube.coord('latitude').points,
+                     np.transpose(anom_cube.data),cmap='RdBu_r',
+                     levels=np.arange(-80,100,20),extend='both')
+    plt.title(exptnames.get(expt) + '-'+ exptnames.get(cntl))
+    plt.colorbar(cs3,orientation='horizontal',label='W/m2')
+    
+
+
+    fileout='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/spinup/orbitanom_'+expt+'-' + cntl  
+    plt.savefig(fileout + '.eps', bbox_inches='tight')  
+    plt.savefig(fileout + '.png', bbox_inches='tight')  
+    
+    plt.close()
+
+
+#end def annmean
+
+def check_toa_insolation_daily(exptfilestart,cntlfilestart,expt):
+    """
+    plots the daily isolation by latitude and time
+    """
+    monthnames = ['ja','fb','mr','ar','my','jn','jl','ag','sp','ot','nv','dc']
+    exptnames = {'xpsin' : 'LP_highNH_lowSH_orbit',
+                 'xpsio' : 'LP_lowNH_highSH_orbit',
+                 'xqbwn' : 'LP_highNH_lowSH_orbit',
+                 'xqbwo' : 'LP_lowNH_highSH_orbit',
+                 'xpsip' : 'LP_highNH_lowSH_orbit',
+                 'xpsiq' : 'LP_lowNH_highSH_orbit',
+                 'xpsic' :'PI'}
+
+
+    # read in the data
+    exptcubelist = CubeList([])
+    cntlcubelist = CubeList([])
+    for month in monthnames:
+        print(exptfilestart,month)
+        expt_cube = iris.load_cube(exptfilestart + month + '+.nc',
+                                        'field200')
+        exptcubelist.append(expt_cube)
+
+        cntl_cube = iris.load_cube(cntlfilestart + month + '.nc',
+                                        'field200')
+        cntlcubelist.append(cntl_cube)
+
+    iris.util.equalise_attributes(exptcubelist)
+    expt_insw_yearcube = exptcubelist.concatenate_cube()
+   
+    iris.util.equalise_attributes(cntlcubelist)
+    cntl_insw_yearcube = cntlcubelist.concatenate_cube()
+
+    
+    # get the time latitude cube for plotting
+    expt_insw_lat_time_cube = iris.util.squeeze(expt_insw_yearcube[:,:,:,0]) 
+    cntl_insw_lat_time_cube = iris.util.squeeze(cntl_insw_yearcube[:,:,:,0]) 
+
+    # find the day of the summer solstace winter solstace and equinox
+    # define: summer solstace - max insolation at NP
+    # define: winter solstace - min insolation at SP
+    expt_NP_data = expt_insw_lat_time_cube.data[:,0]
+    expt_SP_data = expt_insw_lat_time_cube.data[:,72]
+    cntl_NP_data = cntl_insw_lat_time_cube.data[:,0]
+    cntl_SP_data = cntl_insw_lat_time_cube.data[:,72]
+
+    # expt
+    print('NP data',cntl_NP_data)
+    print('SP data',cntl_SP_data)
+    expt_day_ss = np.argmax(expt_NP_data)
+    expt_day_ws = np.argmax(expt_SP_data)
+    cntl_day_ss = np.argmax(cntl_NP_data)
+    cntl_day_ws = np.argmax(cntl_SP_data)
+
+    print('expt day of max NP',expt_day_ss,expt_NP_data[expt_day_ss])
+    print('expt day of max SP',expt_day_ws,expt_SP_data[expt_day_ws])
+ 
+    print('cntl day of max NP',cntl_day_ss,cntl_NP_data[cntl_day_ss])
+    print('cntl day of max SP',cntl_day_ws,cntl_SP_data[cntl_day_ws])
+   
+
+
+    # get the anomaly
+    anom_cube_data = (expt_insw_lat_time_cube.data 
+                      - cntl_insw_lat_time_cube.data)
+    anom_cube = expt_insw_lat_time_cube.copy(data=anom_cube_data)
+    
+    # plot the experiment, the control and the anomaly
+    plt.figure(0,figsize=[15.0,5.0])
+    plt.subplot(2,3,1) 
+    cs=plt.contourf(np.arange(1,361,1),
+                    expt_insw_lat_time_cube.coord('latitude').points,
+                    np.transpose(expt_insw_lat_time_cube.data),
+                    levels=np.arange(0,600,50),extend='max')
+    plt.title(exptnames.get(expt))
+    plt.colorbar(cs,orientation='horizontal',label='W/m2')
+
+    plt.subplot(2,3,2)
+    cs2=plt.contourf(np.arange(1,361,1),
+                     cntl_insw_lat_time_cube.coord('latitude').points,
+                     np.transpose(cntl_insw_lat_time_cube.data),
+                     levels=np.arange(0,600,50),extend='max')
+    plt.title('xozza')
+    plt.colorbar(cs2,orientation='horizontal',label='W/m2')
+
+  
+    plt.subplot(2,3,3)
+    cs3=plt.contourf(np.arange(1,361,1),
+                     anom_cube.coord('latitude').points,
+                     np.transpose(anom_cube.data),cmap='RdBu_r',
+                     levels=np.arange(-60,70,10),extend='both')
+    plt.title(exptnames.get(expt) + '-xozza')
+    plt.colorbar(cs3,orientation='horizontal',label='W/m2')
+
+    # calculate months based on Steves calculation
+    if expt == 'xpsip':
+        # first day of year is 23rd December so shift 8 days to the right
+        expt_shiftdata=np.roll(expt_insw_lat_time_cube.data, 8,axis=0)
+        monthlengths=np.array([34.0,33.0,32.0,31.0,29.0,28.0,28.0,28.0,28.0,30.0,31.0,33.0])
+    if expt == 'xpsiq':
+        # first day of year is 7th January so shift 6 days to the left
+        expt_shiftdata=np.roll(expt_insw_lat_time_cube.data,-6,axis=0)
+        monthlengths=np.array([27.0,28.0,29.0,31.0,32.0,34.0,34.0,33.0,32.0,30.0,28.0,27.0])
+    monthlengths=monthlengths * 360. / 365.
+
+    # calculate first and last day of month
+    firstmonthday = np.zeros(12)
+    lastmonthday = np.zeros(12)
+    for i in range(1,12):
+        firstmonthday[i] = firstmonthday[i-1] + monthlengths[i-1]
+        lastmonthday[i-1] = firstmonthday[i]
+    lastmonthday[11]=360.
+    firstmonthint=np.ceil(firstmonthday).astype(int)
+    lastmonthint=np.floor(lastmonthday).astype(int)
+
+    #print(np.sum(monthlengths))
+    #print(monthlengths)
+    #print(firstmonthint)
+    #print(lastmonthint)
+    #print(lastmonthint - firstmonthint+1)
+
+    expt_mondata = np.zeros((12,73))
+    cntl_mondata = np.zeros((12,73))
+    for mon in range(0,12):
+        expt_mondata[mon,:] = np.mean(expt_shiftdata[firstmonthint[mon]:lastmonthint[mon]+1,:],axis=0)
+        cntl_mondata[mon,:] = np.mean(cntl_insw_lat_time_cube.data[mon*30:(mon+1)*30,:],axis=0)
+    anom_mondata = expt_mondata - cntl_mondata
+
+
+    plt.subplot(2,3,4)
+    cs4=plt.contourf(monthnames,
+                     anom_cube.coord('latitude').points,
+                     np.transpose(expt_mondata),
+                     levels=np.arange(0,600,50),extend='both')
+    plt.title('shift data')
+    plt.colorbar(cs4,orientation='horizontal',label='W/m2')
+
+    plt.subplot(2,3,5)
+    cs5=plt.contourf(monthnames,
+                     anom_cube.coord('latitude').points,
+                     np.transpose(cntl_mondata),
+                     levels=np.arange(0,600,50),extend='both')
+    plt.title('shift data')
+    plt.colorbar(cs5,orientation='horizontal',label='W/m2')
+
+    plt.subplot(2,3,6)
+    cs6=plt.contourf(monthnames,
+                     anom_cube.coord('latitude').points,
+                     np.transpose(anom_mondata),cmap='RdBu_r',
+                     levels=np.arange(-60,70,10),extend='both')
+    plt.title('shift data')
+    plt.colorbar(cs6,orientation='horizontal',label='W/m2')
+
+    
+    #plt.show()
+    #sys.exit(0)
+
+
+    fileout='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/spinup/orbitanomdaily_'+expt+'-' + cntl 
+    plt.savefig(fileout + '.eps', bbox_inches='tight')  
+    plt.savefig(fileout + '.png', bbox_inches='tight')  
+    
+    plt.close()
+
+           
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+HadCM3='y'
+
+# checks the monthly insolation
+#expt = 'xpsin'
+#cntl = 'xpsic'
+#plot_toa_insolation()
+
+# checks using the daily insolation
+# use as baseline xozza which is preindustrial so with modern orbit
+expt='xqbwn'
+cntl='xqbwc'
+exptfilestart = '/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pb/'+expt+'a#pb000003900'
+cntlfilestart = '/uolstore/Research/a/hera1/earjcti/um/'+cntl+'/pb/'+cntl+'a#pb000003900'
+#cntlfilestart = '/uolstore/Research/a/hera1/earjcti/um/xozza/netcdf/xozzaa@pam34'
+check_toa_insolation_daily(exptfilestart,cntlfilestart,expt)
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+density_gradients.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    density_gradients
+#PURPOSE
+#
+#   This program will do a timeseries of the mean density southwards of 65S for
+#   a) surface
+#   b) top 100m
+#   c) top 200m
+#   d) top 1000m
+#   e) 1000m-3000m
+#
+#  the density has previously been obtained and is in basin_diagnostics
+#
+#
+#
+# Julia 22/11/2025
+#
+# update Julia 30.1.2026:  we will just write out a timeseries of density
+# on single levels
+#
+#  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+#
+#
+ 
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+import matplotlib.ticker as mticker
+
+exptname='xqbws'
+startyear=3000
+endyear=4000
+filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
+latmax=-60
+single_levs = 'y'  # y write out on levels
+                   # n write out bands of levels
+ 
+
+ 
+def get_density_band(year):
+    """
+    gets the density at each of the bands
+    #   a) surface
+    #   b) top 100m
+    #   c) top 200m
+    #   d) top 1000m
+    #   e) 1000m-3000m
+
+    """
+ 
+    filename=(filestart+'/basin_diagnostics/'+exptname+'_Pacific'+
+              str(year) +'.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    # extract 3d density
+    denscube = cubes.extract('density (calculated from T and S')[0]
+    # density southwards of 65S
+    south_constraint = iris.Constraint(latitude=lambda v:v<latmax)
+    dens_south_cube =denscube.extract(south_constraint)
+
+    # average over area
+    lat = dens_south_cube.coord('latitude')
+    lon = dens_south_cube.coord('longitude')
+    depth = dens_south_cube.coord('depth_1')
+    if not lat.has_bounds():
+        lat.guess_bounds()
+    if not lon.has_bounds():
+        lon.guess_bounds()
+    if not depth.has_bounds():
+        depth.guess_bounds()
+
+
+    weights = iris.analysis.cartography.area_weights(dens_south_cube)
+
+    # mean by depth
+    dens_levels_cube = dens_south_cube.collapsed(['latitude','longitude'],
+                                                 iris.analysis.MEAN,
+                                                 weights=weights)
+
+    surf_data = dens_levels_cube[0].data
+
+    # extract cube by levels
+    cube_100 = dens_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<100))
+    cube_200 = dens_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<200))
+    cube_1000 = dens_levels_cube.extract(
+        iris.Constraint(depth_1=lambda d:d<1000))
+    cube_1000_3000 = dens_levels_cube[13:16]
+    
+    
+    thickness = np.diff(depth.bounds,axis=1).squeeze()
+    
+    avg_100=cube_100.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_100.data)])
+    avg_200=cube_200.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_200.data)])
+    avg_1000=cube_1000.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_1000.data)])
+    avg_1000_3000=cube_1000_3000.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[13:16])
+    
+    data_100=avg_100.data
+    data_200=avg_200.data
+    data_1000=avg_1000.data
+    data_1000_3000=avg_1000_3000.data
+    
+  
+    return (surf_data,data_100,data_200,data_1000,data_1000_3000)
+
+
+
+def get_density_level(year):
+    """
+    gets the density at each of the levels
+    #  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+
+    """
+ 
+    filename=(filestart+'/basin_diagnostics/'+exptname+'_Pacific'+
+              str(year) +'.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    # extract 3d density
+    denscube = cubes.extract('density (calculated from T and S')[0]
+    # density southwards of 65S
+    south_constraint = iris.Constraint(latitude=lambda v:v<latmax)
+    dens_south_cube =denscube.extract(south_constraint)
+
+    # average over area
+    lat = dens_south_cube.coord('latitude')
+    lon = dens_south_cube.coord('longitude')
+    depth = dens_south_cube.coord('depth_1')
+    if not lat.has_bounds():
+        lat.guess_bounds()
+    if not lon.has_bounds():
+        lon.guess_bounds()
+    if not depth.has_bounds():
+        depth.guess_bounds()
+
+
+    weights = iris.analysis.cartography.area_weights(dens_south_cube)
+
+    # mean by depth
+    dens_levels_cube = dens_south_cube.collapsed(['latitude','longitude'],
+                                                 iris.analysis.MEAN,
+                                                 weights=weights)
+
+    surf_data = dens_levels_cube[0].data
+    #print(dens_levels_cube)
+    #print(dens_levels_cube.coord('depth_1').points)
+   
+    # extract cube by levels
+ 
+    data_5= (dens_levels_cube.extract(iris.Constraint(depth_1=5.0))).data
+    data_25= (dens_levels_cube.extract(iris.Constraint(depth_1=25.0))).data
+    data_47= (dens_levels_cube.extract(iris.Constraint(depth_1=47.85))).data
+    data_203= (dens_levels_cube.extract(iris.Constraint(depth_1=203.7))).data
+    data_447= (dens_levels_cube.extract(iris.Constraint(depth_1=447.05))).data
+    data_666= (dens_levels_cube.extract(iris.Constraint(depth_1=666.3))).data
+    data_995= (dens_levels_cube.extract(iris.Constraint(depth_1=995.55))).data
+    data_1500=( dens_levels_cube.extract(iris.Constraint(depth_1=1500.85))).data
+
+    
+  
+    return (data_5,data_25,data_47,data_203,data_447,data_666,data_995,data_1500)
+
+
+
+
+################################
+# main program
+
+all_years = []
+
+if single_levs == 'n': # we will get density bands
+    all_surf = []
+    all_100 = []
+    all_200 = []
+    all_1000 = []
+    all_1000_3000 = []
+
+    for year in range(startyear,endyear):
+        surf_data, data_100,data_200,data_1000,data_1000_3000=get_density_band(year)
+        all_years.append(year)
+        all_surf.append(surf_data)
+        all_100.append(data_100)
+        all_200.append(data_200)
+        all_1000.append(data_1000)
+        all_1000_3000.append(data_1000_3000)
+
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'+exptname+'_Pacific_density'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+ 
+    with open(fileout, "w") as f:
+        string = ("Year, dens_surf,dens_0_100,dens_0_200," +
+                  "dens_0_1000,dens_1000_3000\n") 
+        f.write(string)
+
+        for y, a, b, c, d, e in zip(all_years, all_surf, all_100,all_200,all_1000,all_1000_3000):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}\n")
+
+
+    #plot
+        
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_surf, label='surface')
+    plt.plot(all_years, all_100, label='0-100')
+    plt.plot(all_years, all_200, label='0-200')
+    plt.plot(all_years, all_1000, label='0-1000')
+    plt.plot(all_years, all_1000_3000, label='1000-3000')
+
+    # Add labels and title
+    plt.xlabel('Year')
+    plt.ylim(35.9,36.9)
+    plt.ylabel('density')
+    plt.legend()
+    plt.title('Year vs density')
+
+    # Optional: Add grid
+    plt.grid(True)
+
+    # Show the plot
+    plt.show()
+
+
+
+
+
+if single_levs == 'y': # we will get density on a range of levels
+    #  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+
+    all_5m = []
+    all_25m = []
+    all_47m = []
+    all_203m = []
+    all_447m = []
+    all_666m = []
+    all_995m = []
+    all_1500m = []
+
+    for year in range(startyear,endyear):
+        d5,d25,d47,d203,d447,d666,d995,d1500=get_density_level(year)
+        all_years.append(year)
+        all_5m.append(d5)
+        all_25m.append(d25)
+        all_47m.append(d47)
+        all_203m.append(d203)
+        all_447m.append(d447)
+        all_666m.append(d666)
+        all_995m.append(d995)
+        all_1500m.append(d1500)
+       
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'
+               +exptname+'_Pacific_density_levs'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+ 
+    with open(fileout, "w") as f:
+        string = ("Year, 5m, 25m, 47m 203m, 447m, 666m, 995m, 1500m\n") 
+        f.write(string)
+        print('here',string)
+        for y, a, b, c, d, e, g, h, i in zip(all_years, all_5m,
+                                             all_25m,all_47m,
+                                             all_203m,all_447m,
+                                             all_666m,all_995m,all_1500m):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}, {g}, {h}, {i}\n")
+
+
+    #plot
+    print(all_666m)
+    print(all_995m)
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_5m, label='5m')
+    plt.plot(all_years, all_47m, label='47m')
+    plt.plot(all_years, all_447m, label='447m')
+    plt.plot(all_years, all_666m, label='666m')
+    plt.plot(all_years, all_995m, label='995m')
+    
+    # Add labels and title
+    plt.xlabel('Year')
+    plt.ylim(36,37)
+    plt.ylabel('density')
+    plt.legend()
+    plt.title('Year vs density')
+    
+    # Optional: Add grid
+    plt.grid(True)
+    
+    # Show the plot
+    plt.show()
+
+
+####
+
+::::::::::::::
+flux_through_CAS.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    flux_through_CAS
+#PURPOSE
+#
+#   This program will find
+#   a) the waterflux through the CAS both northwards and eastwards
+#   b) the ocean heat transport through the CAS relative to a reference
+#
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+import matplotlib.ticker as mticker
+
+exptname='xpsig'
+startyear=12
+endyear=2999
+filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
+
+# we will sum v * area from lonmin to lonmax
+# and u* area from latmin to matmax.
+# latmin,latmax,lonmin,lonmax are all given on the v-grid
+lonmin=276.0
+lonmax=283.125
+vacross=13.75
+
+latmax=13.75
+latmin=11.0
+uacross=283.125
+
+
+
+#paper looks like 9N-12N inclusive
+#79W-84W inclusive 281E-276E
+
+
+def where_is_cas():
+    """
+    this program will compare the LSM with and without the CAS open
+    """
+
+    CAS_cube = iris.load_cube('/home/earjcti/um/xqbwe/pg/xqbweo#pg000003970c1+.nc','TOTAL OCEAN V-VELOCITY      CM S**-1')
+    noCAS_cube = iris.load_cube('/home/earjcti/um/xqbwd/pg/xqbwdo#pg000003970c1+.nc','TOTAL OCEAN V-VELOCITY      CM S**-1')
+
+    lons = CAS_cube.coord('longitude').points - 360.
+    lats = CAS_cube.coord('latitude').points
+    
+    CAS_mask_cube = CAS_cube.copy(data=CAS_cube.data.mask)
+    noCAS_mask_cube = noCAS_cube.copy(data=noCAS_cube.data.mask)
+    print(np.shape(noCAS_cube.data.mask))
+    print(np.shape(CAS_cube.data.mask))
+    diff_mask_cube = noCAS_cube.copy(data=noCAS_cube.data.mask & (~CAS_cube.data.mask))  # this is the way to difference two boolean arrays
+
+    fig, [ax0,ax1] = plt.subplots(1, 2, figsize=(14, 6), subplot_kw={'projection': ccrs.PlateCarree()})
+    plt.sca(ax0)
+    qplt.pcolormesh(CAS_mask_cube[0,0,:,:])
+    ax0.set_extent([-100, -60, 0, 25], crs=ccrs.PlateCarree())
+    gl = ax0.gridlines(draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
+    gl.xlocator = mticker.FixedLocator(lons)
+    gl.ylocator = mticker.FixedLocator(lats)
+    gl.bottom_labels = True
+    gl.right_labels = False
+    ax0.xaxis.set_major_formatter(LongitudeFormatter(zero_direction_label=True))
+
+    # draw line where we are averaging
+    
+    print(lons)
+   
+    ax0.plot(
+    [-84.375, -76.875],   # Longitudes
+    [13.75, 13.75],      # Latitudes (constant)
+    color='red',   # Line color
+    linewidth=2,   # Line width
+    transform=ccrs.PlateCarree() ) # Specify the coordinate system
+
+    ax0.plot(
+    [-76.875, -76.875],   # Longitudes
+    [11.25, 13.75],      # Latitudes (constant)
+    color='red',   # Line color
+    linewidth=2,   # Line width
+    transform=ccrs.PlateCarree() ) # Specify the coordinate system
+
+    
+    #ax0.xaxis.set_visible(True)
+   
+
+
+    plt.sca(ax1)
+    qplt.pcolormesh(diff_mask_cube[0,0,:,:])
+    ax1.set_extent([-90, -68, 5, 20], crs=ccrs.PlateCarree())
+    gl = ax1.gridlines(draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
+    gl.xlocator = mticker.FixedLocator(lons)
+    gl.ylocator = mticker.FixedLocator(lats)
+    gl.bottom_labels=True
+    ax1.xaxis.set_visible(True)
+
+    # notes the CAS opennig runs across 13.75N from 
+
+    plt.show()
+    print(CAS_cube.data.mask)
+    sys.exit(0)
+
+    
+
+def get_mean_levels(cube, weights, startlev, endlev):
+    """
+    get volume weighted mean between startlev and endlev
+    """
+    cubelevs = cube[:,startlev:endlev+1,:,:]
+    weightlev = weights[:,startlev:endlev+1,: :]
+
+    meancube = cubelevs.collapsed(['longitude','latitude','depth_1'],
+                              iris.analysis.MEAN,
+                              weights=weightlev)
+    return meancube
+
+
+def get_avg(year,weights):
+    """
+    gets the northwards and eastwards 
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=(filestart+'/pg/'+exptname+'o#pg'+ yearuse + 'c1+.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    Ucube = cubes.extract('TOTAL OCEAN U-VELOCITY      CM S**-1')[0]
+    Vcube = cubes.extract('TOTAL OCEAN V-VELOCITY      CM S**-1')[0]
+    # convert to m/s
+    Vcube.data = Vcube.data / 100.0
+    Ucube.data = Ucube.data / 100.0
+    # this is in degC so we don't need a reference temperature
+    Tcube_origgrid = iris.load_cube(filename,
+                    'POTENTIAL TEMPERATURE (OCEAN)  DEG.C')
+    Tcube = Tcube_origgrid.regrid(Vcube,iris.analysis.Nearest())
+   
+
+
+    # find northward flux from V cube across latitude=vacross and
+    # between longitudes=lonmin and lonmax
+    depths=Vcube.coord('depth_1').points
+    lats=Vcube.coord('latitude').points
+    lons=Vcube.coord('longitude').points
+    # calculate the depthlayers from the midpoints
+    depdiff = np.zeros(20)
+    for k in range(1,19):
+        depdiff[k]=(depths[k+1] - depths[k-1]) / 2.0
+    depdiff[0]=depths[1]-depths[0]
+    depdiff[19]=depths[19]-depths[18]
+    coslat = np.cos(vacross * 2.0 * np.pi / 360.) # cos latitude of vacross
+    onedeg=111100.   # 111.3 km
+    
+    northflux=np.zeros(20) # this is V x area
+    northheatflux = np.zeros(20) 
+    
+    for j, lat in enumerate(lats):
+        if lat == vacross:
+            for i,lon in enumerate(lons):
+                if lonmin < lon < lonmax:
+                    #print('foundlat',j,lat,i,lon)
+                    for k,dep in enumerate(depths):
+                        if not Vcube.data.mask[0,k,j,i]:
+                            # add on the northward flux for all depths
+                            flux_add = (Vcube.data[0,k,j,i]
+                                        * depdiff[k]
+                                        * coslat * onedeg * (lons[1]-lons[0]))
+                            northflux[k] = northflux[k] + (flux_add / 1.0E6)
+                            northheatflux[k] = (northheatflux[k] +
+                                      (flux_add * Tcube.data[0,k,j,i]))
+                            #if k==0:
+                            #    print(Vcube.data[0,k,j,i],lon,dep,flux_add / 1.0E6,northflux[k])
+                            
+    eastflux=np.zeros(20) # this is U x area
+    eastheatflux = np.zeros(20)
+    for i, lon in enumerate(lons):
+        if lon == uacross:
+            for j,lat in enumerate(lats):
+                if latmin < lat < latmax:
+                    for k,dep in enumerate(depths):
+                        if not Ucube.data.mask[0,k,j,i]:
+                            # add on the eastward flux for all depths
+                            flux_add = (Ucube.data[0,k,j,i]
+                                        * depdiff[k]
+                                        * onedeg * (lats[1]-lats[0]))
+                            eastflux[k] = eastflux[k] + (flux_add / 1.0E6)
+                            eastheatflux[k] = (eastheatflux[k] +
+                                      (flux_add * Tcube.data[0,k,j,i]))
+
+
+
+    #print('total northward flux',np.sum(northflux),' levels ',northflux)
+    #print('total eastwardflux',np.sum(eastflux),' levels ',eastflux )
+    
+    heatflux_multiplier = 1025 * 4000 / 1.0E15  # density * cp / petawatt conv
+    tot_north_heat_flux = np.sum(northheatflux)  * heatflux_multiplier
+    tot_east_heat_flux = np.sum(eastheatflux)  * heatflux_multiplier
+    #print('total northward heat flux',tot_north_heat_flux)
+    #print('total eastward heat flux',tot_east_heat_flux)
+    #sys.exit(0)
+
+    return (np.sum(northflux),np.sum(eastflux),tot_north_heat_flux,tot_east_heat_flux)
+
+
+#######################################################
+def gettransport(HadCM3,exptname,startyear,endyear):
+    """
+    gets the northwards and eastwards transport across the CAS between
+    years startyear and endyear
+    """
+
+    # arrays for storing mean temperatures
+    northflux_arr = np.zeros(endyear-startyear+1)
+    eastflux_arr = np.zeros(endyear - startyear+1)
+    northheat_arr = np.zeros(endyear-startyear+1)
+    eastheat_arr = np.zeros(endyear - startyear+1)
+    year_arr = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    weights = [0.0]
+    for year in range(startyear,endyear+1):
+        (northflux,eastflux,northheat,eastheat) = get_avg(year,weights)
+
+        northflux_arr[year-startyear]  = northflux
+        eastflux_arr[year-startyear]  = eastflux
+        northheat_arr[year-startyear]  = northheat
+        eastheat_arr[year-startyear]  = eastheat
+        year_arr[year-startyear] = year
+
+    # plot and save
+    #plt.plot(year_arr,northflux_arr + eastflux_arr,label='total')
+    #plt.plot(year_arr,northflux_arr,label='north')
+    #plt.legend()
+    #plt.show()
+
+    # save to file
+    fileout = filestart + '/spinup/CASflow_' + exptname + '_' + str(startyear) + '_' + str(endyear) + '.tex'
+    
+    with open(fileout, 'w') as f:
+        f.write("year,northflux,eastflux, northheatflux,eastheatflux\n")
+        for x, y, z,a,b in zip(year_arr, northflux_arr, eastflux_arr,
+                               northheat_arr,eastheat_arr):
+            f.write(f"{x},{y},{z},{a},{b}\n")
+    f.close()
+
+    
+
+
+################################
+# main program
+
+
+#where_is_cas()
+
+
+
+# annual mean
+figureno=0
+
+
+HadCM3='y'
+plt.figure(figureno)
+gettransport(HadCM3,exptname,startyear,endyear)
+figureno=figureno+1
+
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+NH_SH_SST_trends.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#
+# This program will plot a timeseries of the NH temperature trend and the
+# SH temperature trend
+#
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+def format_lat(lat):
+    direction = "N" if lat >= 0 else "S"
+    return f"{abs(lat)}{direction}"
+
+def get_avg(year,latbands):
+    """
+    gets average SST for the bands 30-30, 30-60N, 60-90N, 30-90N
+                                          30-60S, 60-90S, 30-90S
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/nfs/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    cube_alllevs = iris.load_cube(filename,'TEMPERATURE (OCEAN)  DEG.C')
+    cube = cube_alllevs[0,0,:,:]  # this is surface temperature
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    weights = iris.analysis.cartography.area_weights(cube) # this is in m2
+  
+    meantemperature=[]
+
+    for latrange in latbands:
+        latmin, latmax=latrange[0], latrange[1]
+        weights_range = np.copy(weights)
+        for j,lat in enumerate(cube.coord('latitude').points):
+            if lat > latmax or lat < latmin:
+                weights_range[j,:]=0.0
+  
+        meancubes = cube.collapsed(['latitude','longitude'],
+                                 iris.analysis.MEAN,weights=weights_range)
+        #print(meancubes)
+        #print(meancubes.data)
+        meantemperature.append(meancubes.data)
+   
+    npmeantemp = np.array(meantemperature)
+  
+    return (npmeantemp)
+
+#####################################################################
+def plotdrifts(temps,startyear,endyear,latbands):
+    """
+    plots the timeseries of temperature for each bad
+    """
+
+    plt.subplot(1,1,1)
+    for i,lats in enumerate(latbands):
+        
+        plt.plot(temps[i,:])
+    #plt.ylim(33.0,34.5)
+    plt.title('temperature ' + P3name.get(exptname))
+    plt.ylabel('degC')
+    plt.xlabel('year')
+
+   
+    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/SST_bands__'+exptname+'_'  + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.eps') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/SST_bands_'+exptname+'_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.png') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    
+    plt.close()
+
+    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/SST_bands_'+exptname+'_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.tex') 
+
+    f= open(fileout,'w')
+    formatted_lats = ",".join(f"{format_lat(x)}-{format_lat(y)}" for x, y in latbands)
+    f.write("year,"+ formatted_lats + " \n")
+
+    for year in range(startyear,endyear):
+        values = temps[:,year-startyear]
+        round_vals = [f"{val:.2f}" for val in values] 
+        line = f"{year}," + ",".join(round_vals)  + '\n'
+        f.write(line)
+    f.close()
+
+
+
+   
+
+
+#######################################################
+def get_temperatures(HadCM3,exptname,startyear,endyear,latbands):
+    """
+    reads in the temperature and extracts for latitude bands
+    """
+
+    # arrays for storing NH, SH and tropical SST
+    temps  = np.zeros((len(latbands),endyear-startyear+1))
+   
+    # obtain means for each year and store in the arrays
+    
+    for year in range(startyear,endyear+1):
+        print(year)
+        meantemps = get_avg(year,latbands)
+        temps[:,year-startyear]=meantemps
+
+    # plot and save
+    plotdrifts(temps,startyear,endyear,latbands)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+P3name = {'xpsie' : 'EP400',    'xpsig':'EP490', 'xpsid':'LP','xpsic':'PI',
+          'xpsij':'LP490'}
+
+# bands that we calculate the temperatures over
+latbands=[[-30,30], [30,60],[60,90],[30,90],[-60,-30],[-90,-60],[-90,-30]]
+  
+
+
+HadCM3='y'
+exptname='xpsij'
+startyear=1991  # can't start before year 12 because we aren't outputting d18o
+endyear=2999
+plt.figure(figureno)
+get_temperatures(HadCM3,exptname,startyear,endyear,latbands)
+figureno=figureno+1
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+ocean_d18o_and_salinity_drift_frompg.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    ocean_d18o_and_salinity_drift_frompg
+#PURPOSE
+#    This program is loosely based on 
+#  IDLPRGS/HadGEM/analysis/temperature_timeseries_frompg.pro
+#
+#  It should do a timeseries 1of the average ocean d18o and salinity
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+def get_mean_levels(cube, weights, startlev, endlev):
+    """
+    get volume weighted mean between startlev and endlev
+    """
+    cubelevs = cube[:,startlev:endlev+1,:,:]
+    weightlev = weights[:,startlev:endlev+1,: :]
+
+    meancube = cubelevs.collapsed(['longitude','latitude','depth_1'],
+                              iris.analysis.MEAN,
+                              weights=weightlev)
+    return meancube
+
+
+def get_avg(year,weights,incl18o):
+    """
+    gets the average d18o and salinity for this year
+    year = year
+    weights = weights for averaging.  Will be calculated here if they are unset
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/uolstore/home/users/earjcti/hera1/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    cubelist = iris.load(filename)
+    salratiocube = cubelist.extract('salinity')[0]
+    half_levels_cube = cubelist.extract('W')[0]
+
+    if incl18o=='y':
+        ratio18ocube = cubelist.extract('otracer1')[0]
+    
+    if np.ndim(weights) == 1: # this has not yet been setup 
+        # get weights for calculating mean - scale by depth
+        salratiocube.coord('latitude').guess_bounds()
+        salratiocube.coord('longitude').guess_bounds()
+        weights = iris.analysis.cartography.area_weights(salratiocube)
+        new_weights = np.zeros(np.shape(weights))
+        
+        #orig way of calculating layer thickness
+        #depths = salratiocube.coord('depth_1').points
+        #layer_depths = np.zeros(20)
+        #layer_depths[0] = depths[0] * 2.0
+        #layer_depths[19] = depths[19] - depths[18]
+        #for k in range(1,19):
+       #     layer_depths[k]=((depths[k+1] - depths[k-1]) * 0.5) 
+        #for k in range(0,20):
+        #    new_weights[:,k,:,:] = weights[:,k,:,:] * layer_depths[k]
+        #print(layer_depths)
+        
+        # new way of calculating layer thickness
+        depths = half_levels_cube.coord('depth').points
+        layer_depths = np.zeros(20)
+        layer_depths[0]=depths[0]
+        for k in range(1,19):
+            layer_depths[k] = depths[k]-depths[k-1]
+        layer_depths[19]=5500. - depths[18]
+        for k in range(0,20):
+            new_weights[:,k,:,:] = weights[:,k,:,:] * layer_depths[k]
+        print(layer_depths)
+    
+    else:
+        new_weights = weights
+
+    # calculate mean and add to the 
+    meansalratio_cube = salratiocube.collapsed(
+        ['longitude','latitude','depth_1'],
+        iris.analysis.MEAN,
+        weights=new_weights)
+
+    if incl18o=='y':
+        mean18oratio_cube = ratio18ocube.collapsed(
+            ['longitude','latitude','depth_1'],
+            iris.analysis.MEAN,
+            weights=new_weights)
+    else:
+        mean18oratio_cube=0
+
+    # get mean for levels
+    # get_mean_level accepts cube, weights, startlevel, endlevel)
+    meansalratio_lev1_10_cube = get_mean_levels(salratiocube, new_weights, 0, 9)
+    meansalratio_lev1_5_cube = get_mean_levels(salratiocube, new_weights, 0, 4)
+    meansalratio_lev1_cube = get_mean_levels(salratiocube, new_weights, 0, 0)
+
+    if incl18o == 'y':
+        mean18oratio_lev1_5_cube = get_mean_levels(ratio18ocube,
+                                                   new_weights, 0, 4)
+        mean18oratio_lev1_10_cube = get_mean_levels(ratio18ocube, 
+                                                    new_weights, 0, 9)
+        mean18oratio_lev1_cube = get_mean_levels(ratio18ocube, 
+                                                 new_weights, 0, 0)
+    else:
+        mean18oratio_lev1_5_cube=0
+        mean18oratio_lev1_10_cube=0
+        mean18oratio_lev1_cube =0
+    
+
+    return (new_weights, meansalratio_cube, mean18oratio_cube,
+            meansalratio_lev1_10_cube, mean18oratio_lev1_10_cube,
+            meansalratio_lev1_5_cube, mean18oratio_lev1_5_cube,
+            meansalratio_lev1_cube, mean18oratio_lev1_cube)
+
+#####################################################################
+def plotdrifts(ratio18o, ratiosal, levels_plotted, incl18o):
+    """
+    plots the drifts for salinity and d18o and saves to a
+    file
+    """
+
+    if incl18o=='y':
+        plt.subplot(2,1,1)
+    else:
+        plt.subplot(1,1,1)
+    plt.plot((ratiosal * 1000) + 35.0)
+    plt.title('ocean salinity - ' + levels_plotted)
+    plt.ylabel('psu')
+    plt.xlabel('year')
+
+    if incl18o=='y':
+        plt.subplot(2,1,2)
+        plt.plot((ratio18o - 2005.2E-6) / 2005.2E-9)
+        plt.title('ocean d18o - ' + levels_plotted)
+        plt.ylabel('permille')
+        plt.xlabel('year')
+   
+    plt.tight_layout()
+
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/drift_sal_18o'+exptname+'_' + levels_plotted + '_' + str(startyear) + '_' + str(endyear) +'.eps') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+    filetxt=('/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/drift_sal_18o'+exptname+'_' + levels_plotted + '_' + str(startyear) + '_' + str(endyear) +'.txt') 
+ 
+    f=open(filetxt,'w')
+    f.write('year,integrated salinity\n')
+    for i in range(0,endyear-startyear+1):
+        f.write(str(i + startyear) +',' + str((ratiosal[i]*1000.)+35.0)+'\n')
+    f.close()
+
+
+
+#######################################################
+def getdrift(HadCM3,exptname,startyear,endyear,incl18o):
+    """
+    gets the ocean salratioerature drift for exeriment = exptname between
+    years startyear and endyear
+    """
+
+    # arrays for storing mean salratioeratures
+    globalmean_18oratio = np.zeros(endyear-startyear+1)
+    mean_18oratio_lev1  = np.zeros(endyear-startyear+1)
+    mean_18oratio_lev1_5  = np.zeros(endyear-startyear+1)
+    mean_18oratio_lev1_10  = np.zeros(endyear-startyear+1)
+    globalmean_salratio = np.zeros(endyear - startyear+1)
+    mean_salratio_lev1  = np.zeros(endyear-startyear+1)
+    mean_salratio_lev1_5  = np.zeros(endyear-startyear+1)
+    mean_salratio_lev1_10  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    weights = [0.0]
+    for year in range(startyear,endyear+1):
+        print(year)
+        (weights, meansalratio_cube, mean18oratio_cube,
+        meansalratio_lev1_10_cube, mean18oratio_lev1_10_cube,
+        meansalratio_lev1_5_cube, mean18oratio_lev1_5_cube,
+        meansalratio_lev1_cube, mean18oratio_lev1_cube) = get_avg(year,
+                                                                  weights,
+                                                                  incl18o)
+       
+        globalmean_salratio[year-startyear]  = meansalratio_cube.data
+        mean_salratio_lev1[year-startyear]  = meansalratio_lev1_cube.data
+        mean_salratio_lev1_5[year-startyear]  = meansalratio_lev1_5_cube.data
+        mean_salratio_lev1_10[year-startyear]  = meansalratio_lev1_10_cube.data
+
+        if incl18o=='y':
+            globalmean_18oratio[year-startyear] = mean18oratio_cube.data
+            mean_18oratio_lev1[year-startyear]  = mean18oratio_lev1_cube.data
+            mean_18oratio_lev1_10[year-startyear]  = mean18oratio_lev1_10_cube.data
+            mean_18oratio_lev1_5[year-startyear]  = mean18oratio_lev1_5_cube.data
+
+
+    # plot and save
+    plotdrifts(globalmean_18oratio, globalmean_salratio, 'alllevs',incl18o)
+    plotdrifts(mean_18oratio_lev1, mean_salratio_lev1, 'lev1',incl18o)
+    plotdrifts(mean_18oratio_lev1_5, mean_salratio_lev1_5, 'lev1_5',incl18o)
+    plotdrifts(mean_18oratio_lev1_10, mean_salratio_lev1_10, 'lev1_10',incl18o)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+incl_18o='n'
+HadCM3='y'
+exptname='xqbwj'
+startyear=3001  # can't start before year 12 because we aren't outputting d18o
+endyear=4000
+plt.figure(figureno)
+getdrift(HadCM3,exptname,startyear,endyear,incl_18o)
+figureno=figureno+1
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+ocean_temp_drift_frompg_multi.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    ocean_temp_drift_frompg
+#PURPOSE
+#    This program is loosely based on 
+#  IDLPRGS/HadGEM/analysis/temperature_timeseries_frompg.pro
+#
+#  It should do a timeseries of the average ocean temperature.
+#  It is designed for PlioMIP3 so will merge two experiments
+
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+def get_mean_levels(cube, weights, startlev, endlev):
+    """
+    get volume weighted mean between startlev and endlev
+    """
+    cubelevs = cube[:,startlev:endlev+1,:,:]
+    weightlev = weights[:,startlev:endlev+1,: :]
+
+    meancube = cubelevs.collapsed(['longitude','latitude','depth_1'],
+                              iris.analysis.MEAN,
+                              weights=weightlev)
+    return meancube
+
+
+def get_avg(year,weights,exptname):
+    """
+    gets the average temperature and potential temperature for this year
+    year = year
+    weights = weights for averaging.  Will be calculated here if they are unset
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    print(filename)
+    cube = iris.load(filename)
+    tempcube = cube.extract('insitu_T')[0]
+    pottempcube = cube.extract('temp')[0]
+    
+    if np.ndim(weights) == 1: # this has not yet been setup 
+        # get weights for calculating mean - scale by depth
+        tempcube.coord('latitude').guess_bounds()
+        tempcube.coord('longitude').guess_bounds()
+        weights = iris.analysis.cartography.area_weights(tempcube)
+        new_weights = np.zeros(np.shape(weights))
+        depths = tempcube.coord('depth_1').points
+        layer_depths = np.zeros(20)
+        layer_depths[0] = depths[0] * 2.0
+        layer_depths[19] = depths[19] - depths[18]
+        for k in range(1,19):
+            layer_depths[k]=((depths[k+1] - depths[k-1]) * 0.5) 
+        for k in range(0,20):
+            new_weights[:,k,:,:] = weights[:,k,:,:] * layer_depths[k]
+    else:
+        new_weights = weights
+
+    # calculate mean and add to the 
+    meantemp_cube = tempcube.collapsed(['longitude','latitude','depth_1'],
+                                       iris.analysis.MEAN,
+                                       weights=new_weights)
+    meanpottemp_cube = pottempcube.collapsed(['longitude','latitude','depth_1'],
+                                       iris.analysis.MEAN,
+                                       weights=new_weights)
+
+    # get mean for levels
+    # get_mean_level accepts cube, weights, startlevel, endlevel)
+    meantemp_lev1_10_cube = get_mean_levels(tempcube, new_weights, 0, 9)
+    meanpottemp_lev1_10_cube = get_mean_levels(pottempcube, new_weights, 0, 9)
+    meantemp_lev1_5_cube = get_mean_levels(tempcube, new_weights, 0, 4)
+    meanpottemp_lev1_5_cube = get_mean_levels(pottempcube, new_weights, 0, 4)
+    meantemp_lev1_cube = get_mean_levels(tempcube, new_weights, 0, 0)
+    meanpottemp_lev1_cube = get_mean_levels(pottempcube, new_weights, 0, 0)
+    
+
+    return (new_weights, meantemp_cube, meanpottemp_cube,
+            meantemp_lev1_10_cube, meanpottemp_lev1_10_cube,
+            meantemp_lev1_5_cube, meanpottemp_lev1_5_cube,
+            meantemp_lev1_cube, meanpottemp_lev1_cube)
+#####################################################################
+def plotdrifts(pottemp, temp, levels_plotted,startyear,endyear,exptname):
+    """
+    plots the drifts for potential temperature and temperature and saves to a
+    file
+    """
+    years=np.arange(startyear,endyear,1)
+
+    plt.subplot(2,1,1)
+    plt.plot(years,pottemp)
+    plt.title('ocean potential temperature - ' + levels_plotted)
+    plt.ylabel('degC')
+    plt.xlabel('year')
+
+    plt.subplot(2,1,2)
+    plt.plot(years,temp)
+    plt.title('ocean insitu temperature - ' + levels_plotted)
+    plt.ylabel('degC')
+    plt.xlabel('year')
+   
+    plt.tight_layout()
+
+
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/tdrift_'+exptname+'_' + levels_plotted + '_'+str(startyear) + '_' + str(endyear) + '.eps') 
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+    filetxt=('/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/tdrift_'+exptname+'_' + levels_plotted + '_'+str(startyear) + '_' + str(endyear) + '.txt')
+    f=open(filetxt,'w')
+    f.write('year,integrated temperature\n')
+    for i in range(0,len(years)):
+        f.write(str(years[i]) +',' + str(pottemp[i])+'\n')
+    f.close()
+
+
+#######################################################
+def getdrift(ending):
+    """
+    gets the ocean temperature drift for exeriment = exptname between
+    years startyear and endyear
+    """
+    if (ending == 'c' or ending=='d' or ending == 'e' or 
+        ending == 'g' or ending=='a' or ending =='b' or 
+        ending == 'h' or ending=='r'):
+       yearstart_1=2
+       #yearstart_1=2990
+    else:
+        yearstart_1=1991
+
+
+    if ending == 'd':
+        yearend_1=2891
+    else:
+        yearend_1=3001
+
+    yearstart_2=yearend_1
+    yearend_2=4001
+    #yearend_2=3020
+    nyears=yearend_2-yearstart_1
+
+
+
+    # arrays for storing mean temperatures
+    globalmean_pottemp = np.zeros(nyears)
+    globalmean_temp = np.zeros(nyears)
+    mean_pottemp_lev1  = np.zeros(nyears)
+    mean_temp_lev1  = np.zeros(nyears)
+    mean_pottemp_lev1_5  = np.zeros(nyears)
+    mean_temp_lev1_5  = np.zeros(nyears)
+    mean_pottemp_lev1_10  = np.zeros(nyears)
+    mean_temp_lev1_10  = np.zeros(nyears)
+
+    # obtain means for each year and store in the arrays
+    weights = [0.0]
+    for year in range(yearstart_1,yearend_1):
+        expt='xpsi'+ending
+        (weights, meantemp_cube, meanpottemp_cube,
+        meantemp_lev1_10_cube, meanpottemp_lev1_10_cube,
+        meantemp_lev1_5_cube, meanpottemp_lev1_5_cube,
+        meantemp_lev1_cube, meanpottemp_lev1_cube) = get_avg(year,weights,expt)
+       
+        globalmean_pottemp[year-yearstart_1] = meanpottemp_cube.data
+        globalmean_temp[year-yearstart_1]  = meantemp_cube.data
+        mean_pottemp_lev1[year-yearstart_1]  = meanpottemp_lev1_cube.data
+        mean_temp_lev1[year-yearstart_1]  = meantemp_lev1_cube.data
+        mean_pottemp_lev1_5[year-yearstart_1]  = meanpottemp_lev1_5_cube.data
+        mean_temp_lev1_5[year-yearstart_1]  = meantemp_lev1_5_cube.data
+        mean_pottemp_lev1_10[year-yearstart_1]  = meanpottemp_lev1_10_cube.data
+        mean_temp_lev1_10[year-yearstart_1]  = meantemp_lev1_10_cube.data
+
+    for year in range(yearstart_2,yearend_2):
+        expt='xqbw'+ending
+        (weights, meantemp_cube, meanpottemp_cube,
+        meantemp_lev1_10_cube, meanpottemp_lev1_10_cube,
+        meantemp_lev1_5_cube, meanpottemp_lev1_5_cube,
+        meantemp_lev1_cube, meanpottemp_lev1_cube) = get_avg(year,weights,expt)
+       
+        globalmean_pottemp[year-yearstart_1] = meanpottemp_cube.data
+        globalmean_temp[year-yearstart_1]  = meantemp_cube.data
+        mean_pottemp_lev1[year-yearstart_1]  = meanpottemp_lev1_cube.data
+        mean_temp_lev1[year-yearstart_1]  = meantemp_lev1_cube.data
+        mean_pottemp_lev1_5[year-yearstart_1]  = meanpottemp_lev1_5_cube.data
+        mean_temp_lev1_5[year-yearstart_1]  = meantemp_lev1_5_cube.data
+        mean_pottemp_lev1_10[year-yearstart_1]  = meanpottemp_lev1_10_cube.data
+        mean_temp_lev1_10[year-yearstart_1]  = meantemp_lev1_10_cube.data
+
+
+   
+    # plot and save
+    plotdrifts(globalmean_pottemp, globalmean_temp, 'alllevs',yearstart_1,
+               yearend_2,expt)
+    plotdrifts(mean_pottemp_lev1, mean_temp_lev1, 'lev1',yearstart_1,
+               yearend_2,expt)
+    plotdrifts(mean_pottemp_lev1_5, mean_temp_lev1_5, 'lev1_5',yearstart_1,
+               yearend_2,expt)
+    plotdrifts(mean_pottemp_lev1_10, mean_temp_lev1_10, 'lev1_10',yearstart_1,
+               yearend_2,expt)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+#endings = ['d','e','g','i','j','k','l','m','n','o','p','q','r','s','t']
+endings = ['t']
+endings=['j']
+for ending in endings:
+   # try:
+        getdrift(ending)
+   # except:
+   #     print('failure on',ending)
+
+
+
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+ocean_temp_drift_frompg.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    ocean_temp_drift_frompg
+#PURPOSE
+#    This program is loosely based on 
+#  IDLPRGS/HadGEM/analysis/temperature_timeseries_frompg.pro
+#
+#  It should do a timeseries of the average ocean temperature
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+def get_mean_levels(cube, weights, startlev, endlev):
+    """
+    get volume weighted mean between startlev and endlev
+    """
+    cubelevs = cube[:,startlev:endlev+1,:,:]
+    weightlev = weights[:,startlev:endlev+1,: :]
+
+    meancube = cubelevs.collapsed(['longitude','latitude','depth_1'],
+                              iris.analysis.MEAN,
+                              weights=weightlev)
+    return meancube
+
+
+def get_avg(year,weights):
+    """
+    gets the average temperature and potential temperature for this year
+    year = year
+    weights = weights for averaging.  Will be calculated here if they are unset
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/nfs/hera1/earjcti/um/'+exptname+'/netcdf/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    print(filename)
+    cube = iris.load(filename)
+    tempcube = cube.extract('insitu_T')[0]
+    pottempcube = cube.extract('temp')[0]
+    
+    if np.ndim(weights) == 1: # this has not yet been setup 
+        # get weights for calculating mean - scale by depth
+        tempcube.coord('latitude').guess_bounds()
+        tempcube.coord('longitude').guess_bounds()
+        weights = iris.analysis.cartography.area_weights(tempcube)
+        new_weights = np.zeros(np.shape(weights))
+        depths = tempcube.coord('depth_1').points
+        layer_depths = np.zeros(20)
+        layer_depths[0] = depths[0] * 2.0
+        layer_depths[19] = depths[19] - depths[18]
+        for k in range(1,19):
+            layer_depths[k]=((depths[k+1] - depths[k-1]) * 0.5) 
+        for k in range(0,20):
+            new_weights[:,k,:,:] = weights[:,k,:,:] * layer_depths[k]
+    else:
+        new_weights = weights
+
+    # calculate mean and add to the 
+    meantemp_cube = tempcube.collapsed(['longitude','latitude','depth_1'],
+                                       iris.analysis.MEAN,
+                                       weights=new_weights)
+    meanpottemp_cube = pottempcube.collapsed(['longitude','latitude','depth_1'],
+                                       iris.analysis.MEAN,
+                                       weights=new_weights)
+
+    # get mean for levels
+    # get_mean_level accepts cube, weights, startlevel, endlevel)
+    meantemp_lev1_10_cube = get_mean_levels(tempcube, new_weights, 0, 9)
+    meanpottemp_lev1_10_cube = get_mean_levels(pottempcube, new_weights, 0, 9)
+    meantemp_lev1_5_cube = get_mean_levels(tempcube, new_weights, 0, 4)
+    meanpottemp_lev1_5_cube = get_mean_levels(pottempcube, new_weights, 0, 4)
+    meantemp_lev1_cube = get_mean_levels(tempcube, new_weights, 0, 0)
+    meanpottemp_lev1_cube = get_mean_levels(pottempcube, new_weights, 0, 0)
+    
+
+    return (new_weights, meantemp_cube, meanpottemp_cube,
+            meantemp_lev1_10_cube, meanpottemp_lev1_10_cube,
+            meantemp_lev1_5_cube, meanpottemp_lev1_5_cube,
+            meantemp_lev1_cube, meanpottemp_lev1_cube)
+#####################################################################
+def plotdrifts(pottemp, temp, levels_plotted):
+    """
+    plots the drifts for potential temperature and temperature and saves to a
+    file
+    """
+
+    plt.subplot(2,1,1)
+    plt.plot(pottemp)
+    plt.title('ocean potential temperature - ' + levels_plotted)
+    plt.ylabel('degC')
+    plt.xlabel('year')
+
+    plt.subplot(2,1,2)
+    plt.plot(temp)
+    plt.title('ocean insitu temperature - ' + levels_plotted)
+    plt.ylabel('degC')
+    plt.xlabel('year')
+   
+    plt.tight_layout()
+
+
+    fileout=('/nfs/hera1/earjcti/um/' + exptname + '/spinup/tdrift_'+exptname+'_' + levels_plotted + '.eps') 
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+
+#######################################################
+def getdrift(HadCM3,exptname,startyear,endyear):
+    """
+    gets the ocean temperature drift for exeriment = exptname between
+    years startyear and endyear
+    """
+
+    # arrays for storing mean temperatures
+    globalmean_pottemp = np.zeros(endyear-startyear+1)
+    globalmean_temp = np.zeros(endyear - startyear+1)
+    mean_pottemp_lev1  = np.zeros(endyear-startyear+1)
+    mean_temp_lev1  = np.zeros(endyear-startyear+1)
+    mean_pottemp_lev1_5  = np.zeros(endyear-startyear+1)
+    mean_temp_lev1_5  = np.zeros(endyear-startyear+1)
+    mean_pottemp_lev1_10  = np.zeros(endyear-startyear+1)
+    mean_temp_lev1_10  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    weights = [0.0]
+    for year in range(startyear,endyear+1):
+        (weights, meantemp_cube, meanpottemp_cube,
+        meantemp_lev1_10_cube, meanpottemp_lev1_10_cube,
+        meantemp_lev1_5_cube, meanpottemp_lev1_5_cube,
+        meantemp_lev1_cube, meanpottemp_lev1_cube) = get_avg(year,weights)
+       
+        globalmean_pottemp[year-startyear] = meanpottemp_cube.data
+        globalmean_temp[year-startyear]  = meantemp_cube.data
+        mean_pottemp_lev1[year-startyear]  = meanpottemp_lev1_cube.data
+        mean_temp_lev1[year-startyear]  = meantemp_lev1_cube.data
+        mean_pottemp_lev1_5[year-startyear]  = meanpottemp_lev1_5_cube.data
+        mean_temp_lev1_5[year-startyear]  = meantemp_lev1_5_cube.data
+        mean_pottemp_lev1_10[year-startyear]  = meanpottemp_lev1_10_cube.data
+        mean_temp_lev1_10[year-startyear]  = meantemp_lev1_10_cube.data
+
+    # plot and save
+    plotdrifts(globalmean_pottemp, globalmean_temp, 'alllevs')
+    plotdrifts(mean_pottemp_lev1, mean_temp_lev1, 'lev1')
+    plotdrifts(mean_pottemp_lev1_5, mean_temp_lev1_5, 'lev1_5')
+    plotdrifts(mean_pottemp_lev1_10, mean_temp_lev1_10, 'lev1_10')
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+HadCM3='y'
+exptname='xpsig'
+startyear=2
+endyear=3000
+plt.figure(figureno)
+getdrift(HadCM3,exptname,startyear,endyear)
+figureno=figureno+1
+
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+plot_AMOC_strength_NH.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_AMOC strength NH
+#PURPOSE
+#    This program will do some plots on the MOC (which were calculated in the 
+#    ~earjcti/MOC directory
+# it will cobble toget
+#
+# search for 'main program' to find end of functions
+#
+# it is pretty much identical to plot_GMOC_strength_SH.  However we have
+# printed the values to a file so that we can produce a nice plot later
+# Julia April 2025
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import scipy.signal as sig
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#import sklearn.decomposition as sk
+#from sklearn.preprocessing import normalize
+
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+  
+def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,cbarname,plottype,ax,AMOC_PMOC_IND):
+    lats, depths = np.meshgrid(lat,dep)
+
+    if V ==0:
+        V=np.arange(minval,maxval,valinc)
+    cmapuse='RdBu_r'
+
+    labels=np.copy(V)
+    for i,label in enumerate(labels):
+        if label - int(label) == 0.0:
+            label = str(int(label))
+        else:
+            label = str(label)
+        labels[i]=label
+
+        
+    if plottype =='pc' or plottype =='diff':
+        print('here',uselog)
+        if uselog == 'la':
+            print(V)
+            cs = ax.contourf(lats,depths,plotdata,V,
+                             norm=mp.colors.SymLogNorm(linthresh=2.0,
+                                                       linscale=2.0,
+                                                       vmin=-32,vmax=32),
+                             cmap='RdBu_r')
+
+        else:
+            cs = ax.contourf(lats,depths,plotdata,V,cmap='RdBu_r')
+        #contourvals=[0]
+        #ax.contour(lats,depths,plotdata,contourvals)
+  
+    else:
+        print('normal plot')
+        cs = ax.contourf(lats,depths,plotdata,V,extend='max',cmap=cmapuse)
+        contourvals=[-16,-12,-8,-4,0,4,8,12,16]
+        #ax.contour(lats,depths,plotdata,contourvals)
+    if AMOC_PMOC_IND == 'AMOC' or AMOC_PMOC_IND == 'PMOC':
+        ax.set_xlim(-20,85)
+    if AMOC_PMOC_IND == 'GMOC':
+        ax.set_xlim(-85,85)
+    if AMOC_PMOC_IND == 'SMOC':
+        ax.set_xlim(-85,-50)
+
+    plt.gca().invert_yaxis()
+    plt.title(titlename)
+  
+    if plottype != 'n' or fileno >9:
+        cbar = plt.colorbar(cs,orientation="horizontal")
+        cbar.set_label(cbarname)
+        print(V)
+        print(labels)
+        #cbar.set_ticks(ticks=V,labels=labels)
+
+    plt.xlabel('latitude (degrees N)')
+    plt.ylabel('depth (m)')
+    #plt.show()
+    #sys.exit(0)
+
+
+    return
+
+#end def plotdata
+
+def plotmap(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for a NAO region
+   # map=Basemap(width=12000000,height=8000000,projection='stere',\
+   #                 resolution='c',lat_ts=50,lat_0=50,lon_0=0)
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='at':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(x),np.shape(y),np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotmap
+
+
+def indexplot(toplot,xdata,fileno,data_sm,xmin,xmax,expt,xlabel,ymin,ymax,titlename):
+    plt.subplot(4,2,fileno*2)
+    print(fileno)
+
+    plt.xlim([xmin,xmax])
+    plt.ylim([ymin,ymax])
+    datasize=len(toplot)
+
+    
+    # plot data
+    plt.plot(xdata,toplot)
+    plt.title(titlename)
+    plt.xlabel(xlabel)
+    # overplot smoothed data
+    plt.plot(xdata,data_sm,'-')
+    # overplot zero line and +-0.5deg line
+    plt.plot(xdata,np.zeros(datasize))
+    #bar_width=1.0/12.0
+    #plt.bar(xdata,elninoarr,bar_width,color='red',edgecolor="none")
+    #plt.bar(xdata,laninaarr,bar_width,color='blue',edgecolor="none")
+   
+# 
+
+# end def indexplot
+
+def get_AMOC_file(datasetname, field):
+    """
+    get AMOC from a single file
+    """
+    f=Dataset(datasetname)
+    lat_full = f.variables['latitude'][:]
+    depth = f.variables['depth'][:]
+    ndepth=len(depth)
+    nlatf=len(lat_full)
+    AMOC_full=f.variables[field][:]
+    AMOC_full=np.squeeze(AMOC_full)
+
+    nlat=0
+    AMOC_strength=0
+    AMOC_lat=0
+    AMOC_dep=0
+    for i, latitude in enumerate(lat_full):
+        if latitude > 20.:
+            for k,dep in enumerate(depth):
+                if AMOC_full[k,i] > AMOC_strength:
+                    AMOC_strength = AMOC_full[k,i]
+                    AMOC_lat = latitude
+                    AMOC_dep = dep
+    f.close()
+   
+    return (AMOC_full,lat_full,depth, AMOC_strength,AMOC_lat,AMOC_dep)
+
+##################################################
+def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
+    """
+    note use extra=# for new fileformats
+    This plots a longitude depth plot of the average AMOC
+    and also the AMOC strength through time
+    """
+
+    if startyear < 3000:
+        yearstart_1=startyear
+        yearstart_2=3000
+    else:
+        yearstart_1=startyear
+        yearstart_2=startyear
+
+    if endyear < 3000:
+        yearend_1=endyear
+        yearend_2=endyear
+    else:
+        yearend_1=3000
+        yearend_2=endyear
+
+
+
+    nyears=endyear-startyear
+
+    field = {'AMOC':'Merid_Atlantic','PMOC':'Merid_Pacific',
+             'GMOC': 'Merid_Global','SMOC':'Merid_Global'}
+
+    figcount=0
+    # get from experiment1
+    exp1='xpsi' + expt_name
+    for year in range(yearstart_1,yearend_1):
+        if extra == '#':
+            datasetname = '/uolstore/Research/a/hera1/earjcti/um/' + exp1 + '/pk2/' + exp1 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            print(datasetname)
+
+        (AMOC, lat, depth,
+         AMOC_strength,AMOC_lat,
+         AMOC_depth)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
+        ndepth,nlat=np.shape(AMOC)
+        
+        if year == yearstart_1:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+            latAMOC = np.zeros((nyears))
+            depAMOC = np.zeros((nyears))
+            
+        allAMOC[year-yearstart_1,:,:]=AMOC
+        maxAMOC[year-yearstart_1]=AMOC_strength
+        latAMOC[year-yearstart_1]=AMOC_lat
+        depAMOC[year-yearstart_1]=AMOC_depth
+       
+
+    # get from experiment2
+    print(yearstart_2,yearend_2)
+    if endyear > 3000:
+        exp2='xqbw' + expt_name
+    else:
+        exp2='xpsi' + expt_name
+    for year in range(yearstart_2,yearend_2):
+        if extra == '#':
+            datasetname = '/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/pk2/' + exp2 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            print(datasetname)
+
+        (AMOC, lat, depth,
+         AMOC_strength,AMOC_lat,
+         AMOC_depth)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
+        ndepth,nlat=np.shape(AMOC)
+        
+
+        if year == yearstart_1:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+            latAMOC = np.zeros((nyears))
+            depAMOC = np.zeros((nyears))
+
+      
+        allAMOC[year-yearstart_1,:,:]=AMOC
+        maxAMOC[year-yearstart_1]=AMOC_strength # this is the max value north
+                                                # of 20N
+        latAMOC[year-yearstart_1]=AMOC_lat
+        depAMOC[year-yearstart_1]=AMOC_depth
+      
+    avgAMOC=np.mean(allAMOC,axis=0)
+
+    fig = plt.figure()
+    ax1 = plt.subplot(2,1,1)
+    titlename=AMOC_PMOC_IND + ' avg: '+expt_name
+    plotdata(avgAMOC,-99,lat,depth,titlename,-30,32,2.0,0.0,'n','Sv','avg',ax1,
+             AMOC_PMOC_IND)
+        
+    ax2=plt.subplot(2,1,2)
+    yeararr=np.arange(startyear,endyear,1)
+    print(np.shape(yeararr),np.shape(maxAMOC))
+
+    ax2.plot(yeararr,maxAMOC)
+    plt.title('max AMOC north of 20N ' + AMOC_PMOC_IND)
+    meanmaxamoc = np.mean(maxAMOC)
+    
+    plt.tight_layout()
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/'+ AMOC_PMOC_IND +
+               '_' + exp2 + extra + 
+               str(int(yearstart_1)) + '_' + str(int(yearend_2)) + 
+               '_AMOC.eps')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+               '_' + exp2 + extra + str(int(yearstart_1)) + '_' + 
+               str(int(yearend_2)) + 
+               '_AMOC.png')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+               '_' + exp2 + extra + str(int(yearstart_1)) + '_' + 
+               str(int(yearend_2)) + 
+               '_AMOC.tex')
+
+    f= open(fileout,'w')
+    f.write("year,    max AMOC north of 20N \n")
+    for year in range(startyear,endyear):
+        string = (str(year) + ','+ 
+                  str(np.round(maxAMOC[year-startyear],2)) +','+ 
+                  str(np.round(latAMOC[year-startyear],2)) +','+ 
+                  str(np.round(depAMOC[year-startyear],2)) + '\n')
+        f.write(string)
+    f.close()
+
+    return(lat,depth,avgAMOC)
+    
+    
+
+################################
+# main program
+
+
+##################################
+# plot average of the MOC
+
+basin = 'AMOC'  # AMOC, PMOC,  GMOC  (global meridional overturning)
+                #              SMOC  (overturning in the southern ocean)
+
+##############################################
+#  plot_avg_moc will plot the lat-depth avg AMOC and also the maximum
+#  AMOC strength through time.
+# for pliomip we have the xpsi series which is followed by the xqbw series
+
+
+#EXPTNAMES = ['e']  # r1768
+#for EXPTNAME in EXPTNAMES:
+#    #try:
+#        retdata=plot_avg_moc(EXPTNAME,'#',basin) # extra is '#' or letter
+#    #except:
+#    #    print('failure on',EXPTNAME)#
+
+#sys.exit(0)
+
+
+
+EXPTNAME = 'j' # just give the name
+startyear=1991
+endyear=3999
+retdata=plot_avg_moc(EXPTNAME,'#',basin,startyear,endyear) 
+# extra is '#' or letter
+lat=retdata[0]
+depth=retdata[1]
+e_AMOC=retdata[2]
+
+::::::::::::::
+plot_density_by_basin.py
+::::::::::::::
+#NAME
+#    plot density by basin
+#PURPOSE 
+#
+#  This program will do two things.
+#  1. It will do a latitude-depth plot of density temperature and salinity
+#     for each basin
+#  2. It will try and optimise the number of density classes so that
+#     we have the same number of gridpoints in each density class
+
+# Import necessary libraries
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import iris.quickplot as qplt
+import gsw
+import sys
+import pandas as pd
+from pathlib import Path
+#from netCDF4 import Dataset, MFDataset
+#from mpl_toolkits.basemap import Basemap,maskoceans, shiftgrid
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
+#============================================================================
+def calculate_density(filename):
+    """
+    reads in temperature and salinity and converts to density (at 2000m)
+    """
+
+    # read in data
+    T_cube = iris.load_cube(filename,'insitu_T')
+    #print(T_cube)
+    S_cube = iris.load_cube(filename,'salinity')
+    S_cube.data = (S_cube.data * 1000.) + 35.0 # convert to psu
+    S_cube.attributes.pop("valid_min")
+    S_cube.attributes.pop("valid_max")
+    
+    latitude = T_cube.coord('latitude').points
+    longitude = T_cube.coord('longitude').points
+    depth = T_cube.coord('depth_1').points
+    latmesh,depmesh,lonmesh = np.meshgrid(latitude,depth,longitude)
+
+    # convert to absolute salinity and conservative temperature
+    pressmesh=gsw.p_from_z(depmesh * (-1.0), latmesh)
+    SA = gsw.SA_from_SP(S_cube.data, pressmesh,lonmesh,latmesh)
+    CT = gsw.CT_from_t(SA, T_cube.data, pressmesh)
+
+    # calculate density (rho potential) referenced to 2000m
+    rho_potential = gsw.rho(SA,CT,2000) - 1000.
+    #print(rho_potential.mask)
+    rho_potential = np.where(rho_potential.mask,-99999,rho_potential)
+    
+    rho_potential_cube = T_cube.copy(data=rho_potential)
+    iris.util.mask_cube(rho_potential_cube,T_cube.data.mask,in_place=True)
+    rho_potential_cube.long_name = 'density (calculated from T and S'
+    rho_potential_cube.units=None
+    rho_potential_cube.attributes=None
+
+    return rho_potential_cube,T_cube,S_cube
+
+
+
+def get_mask(filename,basin):
+    """
+    gets the mask from the Atlantic mask file on a v grid
+    """
+
+    cube = iris.load_cube(filename,basin + ' mask T_grid')
+
+    return cube
+
+
+
+####################################################################
+def mask_function(cube,mask_cube):
+    """
+    masks the cubes
+    """
+
+    # mask V cube
+    cube=iris.util.squeeze(cube)
+    
+    cubelev=np.copy(cube.data)
+    depth_coord = cube.coord('depth_1').points
+    for k in range(0,len(depth_coord)):
+        cubelev[k,:,:] = np.ma.where(mask_cube.data > 0.5, cube.data[k,:,:],
+                              -99999.)
+
+    returncube = cube.copy(data=cubelev)
+    returncube.data = np.ma.where(returncube.data > 1.0E20,-99999.,
+                                  returncube.data)
+    returncube.data.mask = np.where(returncube.data < -9999,1.0,0.0)
+    #cube.data.mask = np.where(cube.data ==-99999., 1.0,0.0)
+    
+
+    return returncube
+
+
+def basin_avg(cube):
+    """
+    calculates the basin average across the cube
+    """
+
+    cubedata = cube.data
+    #print(cubedata.mask)
+    zonalmean_data = np.ma.mean(cube.data,axis=2)
+    #print(np.shape(cube.data))
+    #print(np.shape(zonalmean_data))
+    basin_avg_cube = cube.collapsed('longitude',iris.analysis.MEAN)
+    basin_avg_cube = basin_avg_cube.copy(data=zonalmean_data)
+    #print(zonalmean_data)
+    #print(basin_avg_cube)
+    #print(basin_avg_cube.data[0,90])
+    #print(zonalmean_data[0,90])
+    #print(cube.data[0,90,:])
+    #print(cube.data.mask[0,90,:])
+    #sys.exit(0)
+
+    return basin_avg_cube
+
+
+
+def quantile_binning(full_data, num_bins,filename):
+    """
+    Copilot wrote this subsection
+    Bins data into quantile-based bins with roughly equal number of points 
+    per bin.
+    
+    Parameters:
+        data (array-like): The input data to bin.
+        num_bins (int): Number of bins to create.
+    
+    Returns:
+        bin_edges (np.ndarray): The edges of the bins.
+        bin_labels (pd.Series): Labels indicating which bin each data point 
+        belongs to.
+    """
+    print(len(full_data.flatten()))
+    data = []
+    for point in full_data.flatten():
+        if point > 0:
+            data.append(point)
+    print(len(data))
+    data = pd.Series(data)
+    
+    # Create quantile-based bins
+    bin_labels = pd.qcut(data, q=num_bins, labels=False, duplicates='drop')
+    
+    # Extract bin edges
+    bin_edges = pd.qcut(data, q=num_bins, duplicates='drop').unique().categories
+
+    #  Calculate bin centres
+    bin_centres = np.array([(interval.left + interval.right) / 2 for interval in bin_edges])
+
+    # write bin centres to a text file
+    f=open(filename, 'w') 
+    for i, centre in enumerate(bin_centres):
+        f.write(f"Bin {i} centre: {centre:.6f}\n")
+    f.close()
+    
+    return bin_edges, bin_labels, bin_centres
+
+
+#####################################################################
+def process_data(filename,basin,year):
+    """
+    processess all the data for each year
+    """
+
+
+    # file where V and dz are stored on density coordinates
+
+    # 1. calculate density on Temp, Salinity grid
+    (density_T_grid_cube,
+     temperature_cube,
+     salinity_cube) = calculate_density(filename)
+
+    # gets the basins over which we calculate
+    mask_cube=get_mask('masks.nc',basin) # get mask on T grid
+
+    density_T_grid_cube = mask_function(density_T_grid_cube,mask_cube)
+    temperature_cube = mask_function(temperature_cube,mask_cube)
+    salinity_cube = mask_function(salinity_cube,mask_cube)
+
+    # calculate stream function for the basin
+    density_basin_avg_cube = basin_avg(density_T_grid_cube)
+    temperature_basin_avg_cube = basin_avg(temperature_cube)
+    salinity_basin_avg_cube = basin_avg(salinity_cube)
+
+
+    # put data into unequally spaced bins if global and we haven't already done this
+
+    filename = exptname + '_sigmas.txt'
+    filepath = Path(filename)
+
+    if basin == 'Global' and not filepath.exists():
+        edges, labels, bin_centres = quantile_binning(density_T_grid_cube.data,
+                                                      90,filename)
+
+        print("Bin edges:")
+        for i, interval in enumerate(edges):
+            print(f"Bin {i}: {interval}")
+
+    # save everything to a file
+
+    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + exptname +
+               '/basin_diagnostics/' + exptname + '_' +
+               basin + str(year) + '.nc')
+
+    density_basin_avg_cube.long_name='density basin'
+    temperature_basin_avg_cube.long_name='temperature basin'
+    salinity_basin_avg_cube.long_name='salinity basin'
+    iris.save([density_T_grid_cube,
+               density_basin_avg_cube,temperature_basin_avg_cube,
+               salinity_basin_avg_cube],
+               fileout,fill_value = -99999.)
+
+
+###########################################################    
+def plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin):
+    """
+    plots the difference in density salinity and temperature between two 
+    experiments
+    """
+
+    exptfile=('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_' +
+                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
+    cntlfile=('/home/earjcti/um/' + cntlname +
+                  '/basin_diagnostics/mean_' + cntlname + '_' +
+                  basin + str(cntlstart) + '_' + str(cntlend-1)+'.nc')
+
+    expt_temp_cube = iris.load_cube(exptfile,'temperature basin')
+    cntl_temp_cube = iris.load_cube(cntlfile,'temperature basin')
+
+    expt_dens_cube = iris.load_cube(exptfile,'density basin')
+    cntl_dens_cube = iris.load_cube(cntlfile,'density basin')
+
+    expt_sal_cube = iris.load_cube(exptfile,'salinity basin')
+    cntl_sal_cube = iris.load_cube(cntlfile,'salinity basin')
+
+    temp_anom = expt_temp_cube - cntl_temp_cube
+    dens_anom = expt_dens_cube - cntl_dens_cube
+    sal_anom = expt_sal_cube - cntl_sal_cube
+
+    vals = np.arange(-1.0,7.5,0.5)
+    if cntlname !='xqbwc':
+        vals = np.arange(-2.0,2.5,0.5)
+    qplt.contourf(temp_anom,levels=vals,extend='both')
+    plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-0.5,0.55,0.05)
+    qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meandens_' + exptname + '-' +
+                cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    qplt.contourf(sal_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meansal_' + exptname + '-' +
+                cntlname + '_' + basin + str(startyear) + '_' +
+                str(endyear-1)+'.png')
+    plt.close()
+   
+    
+    sys.exit(0)
+
+
+def plot_Pacific_and_Atlantic(exptname,startyear,endyear,lev):
+    """
+    plots the difference in SST and SSS between the Pacific
+    and the Atlantic for the experiment
+    """
+    Atlfile=('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_Atlantic' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+
+    Atl_temp_cube = iris.load_cube(Atlfile,'temperature basin')
+
+    Atl_dens_cube = iris.load_cube(Atlfile,'density basin')
+
+    Atl_sal_cube = iris.load_cube(Atlfile,'salinity basin')
+
+
+    Pacfile=('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/mean_' + exptname + '_Pacific' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+
+    Pac_temp_cube = iris.load_cube(Pacfile,'temperature basin')
+
+    Pac_dens_cube = iris.load_cube(Pacfile,'density basin')
+
+    Pac_sal_cube = iris.load_cube(Pacfile,'salinity basin')
+
+    Atlcntl=('/home/earjcti/um/' + cntlname +
+                  '/basin_diagnostics/mean_' + cntlname + '_Atlantic' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+    Paccntl=('/home/earjcti/um/' + cntlname +
+                  '/basin_diagnostics/mean_' + cntlname + '_Pacific' +
+                  str(startyear) + '_' + str(endyear-1)+'.nc')
+    Atlcntl_cube = iris.load_cube(Atlcntl,'temperature basin')
+    Paccntl_cube = iris.load_cube(Paccntl,'temperature basin')
+    Atl_diff_cube = Atl_temp_cube - Atlcntl_cube
+    Pac_diff_cube = Pac_temp_cube - Paccntl_cube
+
+    # plot temperature
+    plt.subplot(221)
+    plt.plot(Atl_temp_cube.coord('latitude').points,Atl_temp_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_temp_cube.coord('latitude').points,Pac_temp_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin temperature for : ' + period.get(exptname,exptname) + ' lev = ' + str(lev))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('degC')
+    plt.axvline(x=10)
+    plt.grid(True)
+  
+    # plot salinity
+    plt.subplot(222)
+    plt.plot(Atl_sal_cube.coord('latitude').points,Atl_sal_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_sal_cube.coord('latitude').points,Pac_sal_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin salinity for : ' + period.get(exptname,exptname))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('psu')
+    plt.axvline(x=10)
+    plt.grid(True)
+
+
+    # plot density
+    plt.subplot(223)
+    plt.plot(Atl_dens_cube.coord('latitude').points,Atl_dens_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_dens_cube.coord('latitude').points,Pac_dens_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin dens for : ' + period.get(exptname,exptname))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('density')
+    plt.axvline(x=10)
+    plt.grid(True)
+    plt.tight_layout()   
+
+    # plot anomaly
+    plt.subplot(224)
+    plt.plot(Atl_diff_cube.coord('latitude').points,Atl_diff_cube[lev,:].data,
+             label='Atlantic')
+    plt.plot(Pac_diff_cube.coord('latitude').points,Pac_diff_cube[lev,:].data,
+             label='Pacific')
+    plt.legend()
+    plt.title('Basin anomaly for : ' + period.get(exptname,exptname) + '-' +
+              period.get(cntlname,cntlname))
+    plt.xlabel('latitude')                                     
+    plt.ylabel('degc diff')
+    plt.axvline(x=10)
+    plt.grid(True)
+    plt.tight_layout()   
+
+    plt.show()
+    sys.exit(0)
+    
+    plt.title(basin + ' Temperature anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meanT_' + exptname + '-' + cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-1.0,1.1,0.1)
+    qplt.contourf(dens_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Density anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meandens_' + exptname + '-' +
+                cntlname + '_'
+                + basin + str(startyear) + '_' + str(endyear-1)+'.png')
+    plt.close()
+
+    vals = np.arange(-1.0,1.1,0.1)
+    qplt.contourf(sal_anom,levels=vals,extend='both',cmap='RdBu_r')
+    plt.title(basin + ' Salinity anomaly: '+ exptname + '-'+ cntlname)
+    plt.savefig('/home/earjcti/um/' + exptname +
+                  '/basin_diagnostics/meansal_' + exptname + '-' +
+                cntlname + '_' + basin + str(startyear) + '_' +
+                str(endyear-1)+'.png')
+    plt.close()
+   
+    
+    sys.exit(0)
+
+
+#######################################################################
+exptname = 'xpsid'
+startyear=12
+endyear=2000
+basin='Pacific'
+
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwd':'LP','xqbwj':'LP490','xqbwe':'EP400',
+          'xqbwg':'EP',
+          'xqbwc':'PI'}
+
+
+# get individual years diagnostics for the basin
+
+for year in range(startyear,endyear):
+    print(year)
+    filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/pg/' + exptname 
+    filename = filestart + 'o#pg'+str(year).zfill(9)+'c1+.nc'
+    process_data(filename,basin,year)
+
+#################################################
+# get the mean dianostics for the basin
+#dens_cubelist = CubeList([])
+#sal_cubelist = CubeList([])
+#temp_cubelist = CubeList([])
+
+#for year in range(startyear,endyear):
+#     filename = ('/home/earjcti/um/' + exptname +
+#                  '/basin_diagnostics/' + exptname + '_' +
+#                  basin + str(year) + '.nc')
+
+#     dens_cubelist.append(iris.load_cube(filename,'density basin'))
+#     temp_cubelist.append(iris.load_cube(filename,'temperature basin'))
+#     sal_cubelist.append(iris.load_cube(filename,'salinity basin'))
+#     sal_cube = iris.load_cube(filename,'salinity basin')
+   
+#iris.util.equalise_attributes(dens_cubelist)
+#iris.util.equalise_attributes(sal_cubelist)
+#iris.util.equalise_attributes(temp_cubelist)
+#dens_cubes = dens_cubelist.merge_cube()
+#sal_cubes = sal_cubelist.merge_cube()
+#temp_cubes = temp_cubelist.merge_cube()
+
+#dens_avg_cube = dens_cubes.collapsed('t',iris.analysis.MEAN)
+#sal_avg_cube = sal_cubes.collapsed('t',iris.analysis.MEAN)
+#temp_avg_cube = temp_cubes.collapsed('t',iris.analysis.MEAN)
+
+#fileout = ('/home/earjcti/um/' + exptname +
+#                  '/basin_diagnostics/mean_' + exptname + '_' +
+#                  basin + str(startyear) + '_' + str(endyear-1)+'.nc')
+#iris.save([dens_avg_cube,temp_avg_cube,sal_avg_cube],
+#          fileout,fill_value = -99999.)
+  
+
+################################################
+# plot anomalies
+#cntlname = 'xpsig'
+#cntlstart=startyear
+#cntlend=endyear
+#cntlstart=12
+#cntlend=2000
+#plot_anomaly(exptname,cntlname,startyear,endyear,cntlstart,cntlend,basin)
+#plot_Pacific_and_Atlantic(exptname,startyear,endyear,0)  # the last number is the level
+
+sys.exit(0)
+
+::::::::::::::
+plot_density_gradients.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#
+# This program will plot the density at different levels
+#
+#
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+import pandas as pd
+
+
+
+def get_avg(year, latstart):
+    """
+    gets average salinity for this year between latstart and -90
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/nfs/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    cube_alllevs = iris.load_cube(filename,
+                                  'SALINITY (OCEAN)       (PSU-35)/1000')
+    cube = cube_alllevs[0,0,:,:]  # this is surface salinity
+    cube=cube * 1000. + 35.0
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    weights = iris.analysis.cartography.area_weights(cube) # this is in m2
+  
+    for j,lat in enumerate(cube.coord('latitude').points):
+        if lat > latstart:
+            weights[j,:]=0.0
+      
+    SH_sal_mean = cube.collapsed(['latitude','longitude'],
+                                 iris.analysis.MEAN,weights=weights)
+
+  
+    return (SH_sal_mean.data)
+
+#####################################################################
+def plotdrifts(salinity,startyear,endyear,latstart):
+    """
+    plots the timeseries of seaice area
+    file
+    """
+
+    plt.subplot(1,1,1)
+    plt.plot(salinity)
+    plt.ylim(33.0,34.5)
+    plt.title('Salinity ' + P3name.get(exptname))
+    plt.ylabel('psu')
+    plt.xlabel('year')
+    if latstart < 0:
+        latstartuse = str(latstart * -1.0) + 'S'
+    else:
+        latstartuse = str(latstart) + 'N'
+
+
+    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.eps') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout=('/nfs/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + np.str(np.int(startyear)) + '_'+ np.str(np.int(endyear)) +'.png') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    
+    plt.close()
+
+
+   
+
+
+#######################################################
+def get_SHsalin(HadCM3,exptname,startyear,endyear,latstart):
+    """
+    reads in the salinity and extracts for the SH
+    """
+
+    # arrays for storing seaice
+    salinity_SH  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    
+    for year in range(startyear,endyear+1):
+        print(year)
+        salin = get_avg(year,latstart)
+        salinity_SH[year-startyear]=salin
+
+    # plot and save
+    plotdrifts(salinity_SH,startyear,endyear,latstart)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+P3name = {'xpsie' : 'EP400',    'xpsig':'EP490' ,'xpsig':'LP'}
+
+latstart=-70   # will plot from latstart to -90.0
+HadCM3='y'
+exptname='xpsig'
+startyear=12  # can't start before year 12 because we aren't outputting d18o
+endyear=1999
+
+
+#
+# this file comes from (spinup_and_timeseries/density_gradients.py
+filename=('/home/earjcti/um/'+ exptname + '/basin_diagnostics/'
+          + exptname + '_Pacific_density' + str(startyear) + '_' +
+          str(endyear) + '_' + str(latstart) + '.txt')
+
+
+df = pd.read_csv(filename)
+print(df.columns.tolist())
+
+# Access columns
+years = df["Year"].tolist()
+dens_surf = df[" dens_surf"].tolist()
+dens_0_100 = df["dens_0_100"].tolist()
+dens_0_200 = df["dens_0_200"].tolist()
+dens_0_1000 = df["dens_0_1000"].tolist()
+dens_1000_3000 = df["dens_1000_3000"].tolist()
+
+
+# print mean value from year 500-1000
+
+mask = (df["Year"] >= 500) & (df["Year"] <= 1000)
+df_subset = df.loc[mask]
+
+if df_subset.empty:
+    print("No rows with Year between 100 and 500.")
+else:
+    # Select numeric columns excluding Year
+    numeric_cols = df_subset.select_dtypes(include=[np.number]).columns.tolist()
+  
+    # Compute means
+    means = df_subset[numeric_cols].mean()
+
+    # Print to display (pretty)
+    print("Means for Year in [500,1000]:")
+    for col, val in means.items():
+        print(f"{col}: {val:.6f}")
+
+
+        
+# plot timeseries
+fig, (ax1,ax2) = plt.subplots(nrows=2,ncols=1,figsize=(11,8),
+                              sharex=True,gridspec_kw=dict(hspace=0.25))
+
+ax1.plot(years,dens_surf,label='surface density')
+ax1.plot(years,dens_0_100,label='0-100m')
+ax1.plot(years,dens_0_200,label='0-200m')
+ax1.plot(years,dens_0_1000,label='0-1000m')
+#ax1.plot(years,dens_1000_3000,label='1000-3000m')
+
+ax1.set_ylim(35.5,37.0)
+#ax1.set_xlim(1400,2000)
+ax1.set_xlabel("Year")
+ax1.set_ylabel("density")
+ax1.set_title("density at different levels: " + exptname)
+ax1.grid(True, alpha=0.3)
+ax1.legend()  # adjust ncols if many lines
+
+
+ax2.plot(years,[b-a for b,a in zip(dens_0_100,dens_surf)],
+         label='anom 0-100 minus surface density')
+ax2.plot(years,[b-a for b,a in zip(dens_0_200,dens_0_100)],
+         label='anom 0-200m - 0-100')
+ax2.plot(years,[b-a for b,a in zip(dens_0_1000,dens_0_200)],
+         label='anom 0-1000 - 0-200m')
+#ax2.plot(years,[b-a for b,a in zip(dens_1000_3000,dens_0_1000)],
+#         label='anom 1000-3000 - 0-1000m')
+
+ax2.set_xlabel("Year")
+ax2.set_ylabel("density")
+ax2.set_title("density anomalies at different levels: " + exptname)
+ax2.set_ylim(0.,0.4)
+#ax2.set_xlim(1400,2000)
+ax2.grid(True, alpha=0.3)
+ax2.legend(loc='lower left')  # adjust ncols if many lines
+
+plt.tight_layout()
+plt.show()
+####
+
+::::::::::::::
+plot_GMOC_strength_SH.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    PLOT_GMOC strength SH
+#PURPOSE
+#    This program will do some plots on the MOC (which were calculated in the 
+#    ~earjcti/MOC directory
+# it will cobble toget
+#
+# search for 'main program' to find end of functions
+#
+#  note this is based on PLOT MOC however I have added some specific limits
+#  for the GMOC which means that we do not need too many IF..ELSE statements
+#  in plot AMOC
+#
+# Julia April 2025
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import scipy.signal as sig
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#import sklearn.decomposition as sk
+#from sklearn.preprocessing import normalize
+
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+#  def seasmean
+
+# functions start here
+  
+def plotdata(plotdata,fileno,lat,dep,titlename,minval,maxval,valinc,V,uselog,cbarname,plottype,ax,AMOC_PMOC_IND):
+    lats, depths = np.meshgrid(lat,dep)
+
+    if V ==0:
+        V=np.arange(minval,maxval,valinc)
+    cmapuse='RdBu_r'
+
+    labels=np.copy(V)
+    for i,label in enumerate(labels):
+        if label - int(label) == 0.0:
+            label = np.str(int(label))
+        else:
+            label = np.str(label)
+        labels[i]=label
+
+        
+    if plottype =='pc' or plottype =='diff':
+        print('here',uselog)
+        if uselog == 'la':
+            print(V)
+            cs = ax.contourf(lats,depths,plotdata,V,
+                             norm=mp.colors.SymLogNorm(linthresh=2.0,
+                                                       linscale=2.0,
+                                                       vmin=-32,vmax=32),
+                             cmap='RdBu_r')
+
+        else:
+            cs = ax.contourf(lats,depths,plotdata,V,cmap='RdBu_r')
+        #contourvals=[0]
+        #ax.contour(lats,depths,plotdata,contourvals)
+  
+    else:
+        print('normal plot')
+        cs = ax.contourf(lats,depths,plotdata,V,extend='max',cmap=cmapuse)
+        contourvals=[-16,-12,-8,-4,0,4,8,12,16]
+        #ax.contour(lats,depths,plotdata,contourvals)
+    if AMOC_PMOC_IND == 'AMOC' or AMOC_PMOC_IND == 'PMOC':
+        ax.set_xlim(-20,85)
+    if AMOC_PMOC_IND == 'GMOC':
+        ax.set_xlim(-85,85)
+    if AMOC_PMOC_IND == 'SMOC':
+        ax.set_xlim(-85,-50)
+
+    plt.gca().invert_yaxis()
+    plt.title(titlename)
+  
+    if plottype != 'n' or fileno >9:
+        cbar = plt.colorbar(cs,orientation="horizontal")
+        cbar.set_label(cbarname)
+        print(V)
+        print(labels)
+        #cbar.set_ticks(ticks=V,labels=labels)
+
+    plt.xlabel('latitude (degrees N)')
+    plt.ylabel('depth (m)')
+    #plt.show()
+    #sys.exit(0)
+
+
+    return
+
+#end def plotdata
+
+def plotmap(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+    plt.subplot(2,2,fileno+1)
+
+   # this is good for a NAO region
+   # map=Basemap(width=12000000,height=8000000,projection='stere',\
+   #                 resolution='c',lat_ts=50,lat_0=50,lon_0=0)
+   # this is good for the globe
+    map=Basemap(llcrnrlon=-180.0,urcrnrlon=180.0,llcrnrlat=-90.0,urcrnrlat=90.0,projection='cyl',resolution='c')
+    #map.drawmapboundary(fill_color='aqua')
+    map.drawmapboundary
+    x, y = map(lons, lats)
+    map.drawcoastlines()
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(x,y,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.))
+        cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+    else:
+        if uselog =='la':
+            cs = map.contourf(x,y,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu')
+            cbar = plt.colorbar(cs,orientation="horizontal",extend='both')
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(x,y,plotdata,V,cmap='RdBu',extend='both')
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                if uselog =='at':
+                    cs = map.contourf(x,y,plotdata,V,cmap='RdBu_r',extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+                else:
+                    print(np.shape(x),np.shape(y),np.shape(plotdata))
+                    cs = map.contourf(x,y,plotdata,V,extend='both')
+                    cbar = plt.colorbar(cs,orientation="horizontal")
+
+    plt.title(titlename)
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotmap
+
+
+def indexplot(toplot,xdata,fileno,data_sm,xmin,xmax,expt,xlabel,ymin,ymax,titlename):
+    plt.subplot(4,2,fileno*2)
+    print(fileno)
+
+    plt.xlim([xmin,xmax])
+    plt.ylim([ymin,ymax])
+    datasize=len(toplot)
+
+    
+    # plot data
+    plt.plot(xdata,toplot)
+    plt.title(titlename)
+    plt.xlabel(xlabel)
+    # overplot smoothed data
+    plt.plot(xdata,data_sm,'-')
+    # overplot zero line and +-0.5deg line
+    plt.plot(xdata,np.zeros(datasize))
+    #bar_width=1.0/12.0
+    #plt.bar(xdata,elninoarr,bar_width,color='red',edgecolor="none")
+    #plt.bar(xdata,laninaarr,bar_width,color='blue',edgecolor="none")
+   
+# 
+
+# end def indexplot
+
+def get_AMOC_file(datasetname, field):
+    """
+    get AMOC from a single file
+    """
+    f=Dataset(datasetname)
+    lat_full = f.variables['latitude'][:]
+    depth = f.variables['depth'][:]
+    ndepth=len(depth)
+    nlatf=len(lat_full)
+    AMOC_full=f.variables[field][:]
+    AMOC_full=np.squeeze(AMOC_full)
+
+    nlat=0
+    AABW_strength=0
+    AABW_lat=0
+    AABW_dep=0
+    for i, latitude in enumerate(lat_full):
+        if latitude < -60.:
+            for k,dep in enumerate(depth):
+                if AMOC_full[k,i] < AABW_strength:
+                    AABW_strength = AMOC_full[k,i]
+                    AABW_lat = latitude
+                    AABW_dep = dep
+    f.close()
+   
+    return (AMOC_full,lat_full,depth, AABW_strength)
+
+##################################################
+def plot_avg_moc(expt_name,extra,AMOC_PMOC_IND,startyear,endyear):
+    """
+    note use extra=# for new fileformats
+    This plots a longitude depth plot of the average AMOC
+    and also the AMOC strength through time
+    """
+
+    if startyear < 3000:
+        yearstart_1=startyear
+        yearstart_2=3000
+    else:
+        yearstart_1=startyear
+        yearstart_2=startyear
+
+    if endyear < 3000:
+        yearend_1=endyear
+        yearend_2=endyear
+    else:
+        yearend_1=3000
+        yearend_2=endyear
+
+
+
+    nyears=endyear-startyear
+
+    field = {'AMOC':'Merid_Atlantic','PMOC':'Merid_Pacific',
+             'GMOC': 'Merid_Global','SMOC':'Merid_Global'}
+
+    figcount=0
+    # get from experiment1
+    exp1='xpsi' + expt_name
+    for year in range(yearstart_1,yearend_1):
+        if extra == '#':
+            datasetname = '/nfs/hera1/earjcti/um/' + exp1 + '/pk2/' + exp1 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            print(datasetname)
+
+        (AMOC, lat, depth,
+         AABW_strength)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
+        ndepth,nlat=np.shape(AMOC)
+        
+        if year == yearstart_1:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+
+        allAMOC[year-yearstart_1,:,:]=AMOC
+        maxAMOC[year-yearstart_1]=AABW_strength
+       
+
+    # get from experiment2
+    print(yearstart_2,yearend_2)
+    if endyear > 3000:
+        exp2='xqbw' + expt_name
+    else:
+        exp2='xpsi' + expt_name
+    for year in range(yearstart_2,yearend_2):
+        if extra == '#':
+            datasetname = '/nfs/hera1/earjcti/um/' + exp2 + '/pk2/' + exp2 + 'o#pk' + str(year).zfill(9) + 'c1+.nc'
+            print(datasetname)
+
+        (AMOC, lat, depth,
+         AABW_strength)=get_AMOC_file(datasetname, field.get(AMOC_PMOC_IND))
+        ndepth,nlat=np.shape(AMOC)
+        
+
+        if year == yearstart_1:
+            allAMOC=np.zeros((nyears,ndepth,nlat))
+            maxAMOC = np.zeros((nyears))
+
+      
+        allAMOC[year-yearstart_1,:,:]=AMOC
+        maxAMOC[year-yearstart_1]=AABW_strength # this is the min value
+                                                # South of 60S
+
+    avgAMOC=np.mean(allAMOC,axis=0)
+
+    fig = plt.figure()
+    ax1 = plt.subplot(2,1,1)
+    titlename=AMOC_PMOC_IND + ' avg: '+expt_name
+    plotdata(avgAMOC,-99,lat,depth,titlename,-30,32,2.0,0.0,'n','Sv','avg',ax1,
+             AMOC_PMOC_IND)
+        
+    ax2=plt.subplot(2,1,2)
+    yeararr=np.arange(startyear,endyear,1)
+    print(np.shape(yeararr),np.shape(maxAMOC))
+
+    ax2.plot(yeararr,maxAMOC)
+    plt.title('min south of 60S ' + AMOC_PMOC_IND)
+    meanmaxamoc = np.mean(maxAMOC)
+    
+    plt.tight_layout()
+    fileout = ('/nfs/hera1/earjcti/um/' + exp2 + '/MOC/'+ AMOC_PMOC_IND +
+               '_' + exp2 + extra + 
+               np.str(np.int(yearstart_1)) + '_' + np.str(np.int(yearend_2)) + 
+               '_AABW.eps')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/nfs/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+               '_' + exp2 + extra + np.str(np.int(yearstart_1)) + '_' + 
+               np.str(np.int(yearend_2)) + 
+               '_AABW.png')
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout = ('/nfs/hera1/earjcti/um/' + exp2 + '/MOC/' + AMOC_PMOC_IND + 
+               '_' + exp2 + extra + np.str(np.int(yearstart_1)) + '_' + 
+               np.str(np.int(yearend_2)) + 
+               '_AABW.tex')
+
+    f= open(fileout,'w')
+    f.write("year,    min GMOC south of 60S \n")
+    for year in range(startyear,endyear):
+        string = (np.str(year) + ','+ 
+                  np.str(np.round(maxAMOC[year-startyear],2)) + '\n')
+        f.write(string)
+    f.close()
+
+    return(lat,depth,avgAMOC)
+    
+    
+
+################################
+# main program
+
+
+##################################
+# plot average of the MOC
+
+basin = 'GMOC'  # AMOC, PMOC,  GMOC  (global meridional overturning)
+                #              SMOC  (overturning in the southern ocean)
+
+##############################################
+#  plot_avg_moc will plot the lat-depth avg AMOC and also the maximum
+#  AMOC strength through time.
+# for pliomip we have the xpsi series which is followed by the xqbw series
+
+
+#EXPTNAMES = ['e']  # r1768
+#for EXPTNAME in EXPTNAMES:
+#    #try:
+#        retdata=plot_avg_moc(EXPTNAME,'#',basin) # extra is '#' or letter
+#    #except:
+#    #    print('failure on',EXPTNAME)#
+
+#sys.exit(0)
+
+
+
+EXPTNAME = 'c' # just give the name
+startyear=12
+endyear=2999
+retdata=plot_avg_moc(EXPTNAME,'#',basin,startyear,endyear) 
+# extra is '#' or letter
+lat=retdata[0]
+depth=retdata[1]
+e_AMOC=retdata[2]
+
+::::::::::::::
+salinity_gradients.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    salinity_gradients
+#PURPOSE
+#
+#   This program will do a timeseries of the mean salinity southwards of 65S for
+#   a) surface
+#   b) top 100m
+#   c) top 200m
+#   d) top 1000m
+#   e) 1000m-3000m
+#
+#  the salinity has previously been obtained and is in basin_diagnostics
+#
+#
+#
+# Julia 22/11/2025
+#
+# update Julia 30.1.2026:  we will just write out a timeseries of salinity
+# on single levels
+#
+#  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+#
+#
+ 
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+import matplotlib.ticker as mticker
+
+exptname='xpsio'
+startyear=1991
+endyear=3000
+filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
+latmax=-65
+single_levs = 'y'  # y write out on levels
+                   # n write out bands of levels
+
+
+ 
+def get_salinity_band(year):
+    """
+    gets the salinity at each of the bands
+    #   a) surface
+    #   b) top 100m
+    #   c) top 200m
+    #   d) top 1000m
+    #   e) 1000m-3000m
+
+    """
+ 
+    filename=(filestart+'/basin_diagnostics/'+exptname+'_Pacific'+
+              str(year) +'.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    # extract 3d salinity
+    salincube = cubes.extract('salinity basin')[0]
+    # salinity southwards of 65S
+    south_constraint = iris.Constraint(latitude=lambda v:v<latmax)
+    salin_south_cube =salincube.extract(south_constraint)
+
+    # average over area
+    lat = salin_south_cube.coord('latitude')
+    lon = salin_south_cube.coord('longitude')
+    depth = salin_south_cube.coord('depth_1')
+    if not lat.has_bounds():
+        lat.guess_bounds()
+    if not lon.has_bounds():
+        lon.guess_bounds()
+    if not depth.has_bounds():
+        depth.guess_bounds()
+
+
+    weights = iris.analysis.cartography.area_weights(salin_south_cube)
+
+    # mean by depth
+    salin_levels_cube = salin_south_cube.collapsed(['latitude','longitude'],
+                                                 iris.analysis.MEAN,
+                                                 weights=weights)
+
+    surf_data = salin_levels_cube[0].data
+
+    # extract cube by levels
+    cube_100 = salin_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<100))
+    cube_200 = salin_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<200))
+    cube_1000 = salin_levels_cube.extract(
+        iris.Constraint(depth_1=lambda d:d<1000))
+    cube_1000_3000 = salin_levels_cube[13:16]
+    
+    
+    thickness = np.diff(depth.bounds,axis=1).squeeze()
+    
+    avg_100=cube_100.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_100.data)])
+    avg_200=cube_200.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_200.data)])
+    avg_1000=cube_1000.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_1000.data)])
+    avg_1000_3000=cube_1000_3000.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[13:16])
+    
+    data_100=avg_100.data
+    data_200=avg_200.data
+    data_1000=avg_1000.data
+    data_1000_3000=avg_1000_3000.data
+    
+  
+    return (surf_data,data_100,data_200,data_1000,data_1000_3000)
+
+
+
+def get_salinity_level(year):
+    """
+    gets the salinity at each of the levels
+    #  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+
+    """
+ 
+    filename=(filestart+'/basin_diagnostics/'+exptname+'_Pacific'+
+              str(year) +'.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    # extract 3d salinity
+    salincube = cubes.extract('salinity basin')[0]
+    # salinity southwards of 65S
+    south_constraint = iris.Constraint(latitude=lambda v:v<latmax)
+    salin_south_cube =salincube.extract(south_constraint)
+
+    # average over area
+    lat = salin_south_cube.coord('latitude')
+    lon = salin_south_cube.coord('longitude')
+    depth = salin_south_cube.coord('depth_1')
+    if not lat.has_bounds():
+        lat.guess_bounds()
+    if not lon.has_bounds():
+        lon.guess_bounds()
+    if not depth.has_bounds():
+        depth.guess_bounds()
+
+
+    weights = iris.analysis.cartography.area_weights(salin_south_cube)
+
+    # mean by depth
+    salin_levels_cube = salin_south_cube.collapsed(['latitude','longitude'],
+                                                 iris.analysis.MEAN,
+                                                 weights=weights)
+
+    surf_data = salin_levels_cube[0].data
+    #print(salin_levels_cube)
+    #print(salin_levels_cube.coord('depth_1').points)
+   
+    # extract cube by levels
+ 
+    data_5= (salin_levels_cube.extract(iris.Constraint(depth_1=5.0))).data
+    data_25= (salin_levels_cube.extract(iris.Constraint(depth_1=25.0))).data
+    data_47= (salin_levels_cube.extract(iris.Constraint(depth_1=47.85))).data
+    data_203= (salin_levels_cube.extract(iris.Constraint(depth_1=203.7))).data
+    data_447= (salin_levels_cube.extract(iris.Constraint(depth_1=447.05))).data
+    data_666= (salin_levels_cube.extract(iris.Constraint(depth_1=666.3))).data
+    data_995= (salin_levels_cube.extract(iris.Constraint(depth_1=995.55))).data
+    data_1500=( salin_levels_cube.extract(iris.Constraint(depth_1=1500.85))).data
+
+    
+  
+    return (data_5,data_25,data_47,data_203,data_447,data_666,data_995,data_1500)
+
+
+
+
+################################
+# main program
+
+all_years = []
+
+if single_levs == 'n': # we will get salinity bands
+    all_surf = []
+    all_100 = []
+    all_200 = []
+    all_1000 = []
+    all_1000_3000 = []
+
+    for year in range(startyear,endyear):
+        surf_data, data_100,data_200,data_1000,data_1000_3000=get_salinity_band(year)
+        all_years.append(year)
+        all_surf.append(surf_data)
+        all_100.append(data_100)
+        all_200.append(data_200)
+        all_1000.append(data_1000)
+        all_1000_3000.append(data_1000_3000)
+
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'+exptname+'_Pacific_salinity'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+ 
+    with open(fileout, "w") as f:
+        string = ("Year, salin_surf,salin_0_100,salin_0_200," +
+                  "salin_0_1000,salin_1000_3000\n") 
+        f.write(string)
+
+        for y, a, b, c, d, e in zip(all_years, all_surf, all_100,all_200,all_1000,all_1000_3000):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}\n")
+
+
+    #plot
+        
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_surf, label='surface')
+    plt.plot(all_years, all_100, label='0-100')
+    plt.plot(all_years, all_200, label='0-200')
+    plt.plot(all_years, all_1000, label='0-1000')
+    plt.plot(all_years, all_1000_3000, label='1000-3000')
+
+    # Add labels and title
+    plt.xlabel('Year')
+    plt.ylim(35.9,36.9)
+    plt.ylabel('salinity')
+    plt.legend()
+    plt.title('Year vs salinity')
+
+    # Optional: Add grid
+    plt.grid(True)
+
+    # Show the plot
+    plt.show()
+
+
+
+
+
+if single_levs == 'y': # we will get salinity on a range of levels
+    #  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+
+    all_5m = []
+    all_25m = []
+    all_47m = []
+    all_203m = []
+    all_447m = []
+    all_666m = []
+    all_995m = []
+    all_1500m = []
+
+    for year in range(startyear,endyear):
+        d5,d25,d47,d203,d447,d666,d995,d1500=get_salinity_level(year)
+        all_years.append(year)
+        all_5m.append(d5)
+        all_25m.append(d25)
+        all_47m.append(d47)
+        all_203m.append(d203)
+        all_447m.append(d447)
+        all_666m.append(d666)
+        all_995m.append(d995)
+        all_1500m.append(d1500)
+       
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'
+               +exptname+'_Pacific_salinity_levs'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+ 
+    with open(fileout, "w") as f:
+        string = ("Year, 5m, 25m, 47m 203m, 447m, 666m, 995m, 1500m\n") 
+        f.write(string)
+        print('here',string)
+        for y, a, b, c, d, e, g, h, i in zip(all_years, all_5m,
+                                             all_25m,all_47m,
+                                             all_203m,all_447m,
+                                             all_666m,all_995m,all_1500m):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}, {g}, {h}, {i}\n")
+
+
+    #plot
+    print(all_666m)
+    print(all_995m)
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_5m, label='5m')
+    plt.plot(all_years, all_47m, label='47m')
+    plt.plot(all_years, all_447m, label='447m')
+    plt.plot(all_years, all_666m, label='666m')
+    plt.plot(all_years, all_995m, label='995m')
+    
+    # Add labels and title
+    plt.xlabel('Year')
+   # plt.ylim(36,37)
+    plt.ylabel('salinity')
+    plt.legend()
+    plt.title('Year vs salinity')
+    
+    # Optional: Add grid
+    plt.grid(True)
+    
+    # Show the plot
+    plt.show()
+
+
+####
+
+::::::::::::::
+seaicearea.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#
+# This program will do a sea ice area timeseries for the NH and the SH
+#
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+
+def get_avg(year):
+    """
+    gets total sea ice area for this year
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    cube = iris.load_cube(filename,'AICE : ICE CONCENTRATION')
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    weights = iris.analysis.cartography.area_weights(cube) # this is in m2
+    SH_weights=np.copy(weights)
+    NH_weights=np.copy(weights)
+
+    for j,lat in enumerate(cube.coord('latitude').points):
+        if lat < 0.0:
+            NH_weights[0,0,j,:]=0.0
+        if lat > 0.0:
+            SH_weights[0,0,j,:]=0.0
+
+    NH_ice_cube = iris.util.squeeze(cube.copy(data=cube.data * NH_weights))
+    SH_ice_cube = iris.util.squeeze(cube.copy(data=cube.data * SH_weights))
+            
+
+    NH_ice = NH_ice_cube.collapsed(['latitude','longitude'],iris.analysis.SUM)
+    SH_ice = SH_ice_cube.collapsed(['latitude','longitude'],iris.analysis.SUM)
+
+    # convert from m^2 to km^2
+    NH_ice.data = NH_ice.data / (1000. * 1000.)
+    SH_ice.data = SH_ice.data / (1000. * 1000.)
+
+
+    return (NH_ice.data, SH_ice.data)
+
+#####################################################################
+def plotdrifts(seaicearea, hemisphere,startyear,endyear):
+    """
+    plots the timeseries of seaice area
+    file
+    """
+
+    plt.subplot(1,1,1)
+    plt.plot(seaicearea)
+    plt.ylim(0.0,10000000)
+  
+    plt.title('seaicearea')
+    plt.ylabel('km2')
+    plt.xlabel('year')
+
+
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.eps') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.png') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_area_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.tex') 
+    f= open(fileout,'w')
+    f.write("year,    seaicearea " + hemisphere + "\n")
+    for year in range(startyear,endyear):
+        string = (str(year) + ','+ 
+                  str(np.round(seaicearea[year-startyear],2)) + '\n')
+        f.write(string)
+    f.close()
+
+
+
+#######################################################
+def get_seaice(HadCM3,exptname,startyear,endyear):
+    """
+    reads in the sea ice area and stores over the NH and the SH
+    """
+
+    # arrays for storing seaice
+    seaicearea_NH  = np.zeros(endyear-startyear+1)
+    seaicearea_SH  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    
+    for year in range(startyear,endyear+1):
+        print(year)
+        (seaice_NH, seaice_SH) = get_avg(year)
+
+        seaicearea_NH[year-startyear]=seaice_NH
+        seaicearea_SH[year-startyear]=seaice_SH
+
+    # plot and save
+    plotdrifts(seaicearea_NH,'NH',startyear,endyear)
+    plotdrifts(seaicearea_SH,'SH',startyear,endyear)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+incl_18o='n'
+HadCM3='y'
+exptname='xqbws'
+startyear=3001  # can't start before year 12 because we aren't outputting d18o
+endyear=4000
+plt.figure(figureno)
+get_seaice(HadCM3,exptname,startyear,endyear)
+figureno=figureno+1
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+seaicevol.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#
+# This program will do a sea ice volume timeseries for the NH and the SH
+#
+#  this is too HIGH DUE TO SOME GRIDBOXES WITH WAY TOO DEEP ICE.
+#  SUGGEST USE SEAICE AREA INSTEAD
+#
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+
+def get_avg(year):
+    """
+    gets total sea ice area for this year
+    """
+ 
+    yearuse = str(year).zfill(9)
+    
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    try: 
+        cube = iris.load_cube(filename,'HICE: MEAN ICE DEPTH OVER GRIDBOX  M')
+        cube.coord('latitude').guess_bounds()
+        cube.coord('longitude').guess_bounds()
+        weights = iris.analysis.cartography.area_weights(cube) # this is in m2
+        SH_weights=np.copy(weights)
+        NH_weights=np.copy(weights)
+        
+        for j,lat in enumerate(cube.coord('latitude').points):
+            if lat < 0.0:
+                NH_weights[0,0,j,:]=0.0
+                if lat > 0.0:
+                    SH_weights[0,0,j,:]=0.0
+                    
+        NH_ice_cube = iris.util.squeeze(cube.copy(data=cube.data * NH_weights))
+        SH_ice_cube = iris.util.squeeze(cube.copy(data=cube.data * SH_weights))
+            
+
+        NH_ice = NH_ice_cube.collapsed(['latitude','longitude'],iris.analysis.SUM)
+        SH_ice = SH_ice_cube.collapsed(['latitude','longitude'],iris.analysis.SUM)
+
+        # convert from m^3 TO  KM 3
+        NH_ice = NH_ice.data / (1000. * 1000. * 1000.)
+        SH_ice = SH_ice.data / (1000. * 1000. * 1000.)
+    except:
+        print('not found',filename)
+        if year > 3:
+            sys.exit(0)
+        NH_ice = np.nan
+        SH_ice = np.nan
+
+
+    return (NH_ice, SH_ice)
+
+#####################################################################
+def plotdrifts(seaicearea, hemisphere,startyear,endyear):
+    """
+    plots the timeseries of seaice VOLUME
+    file
+    """
+
+    plt.subplot(1,1,1)
+    plt.plot(seaicearea)
+    plt.ylim(0.0,1000000)
+  
+    plt.title('seaiceVOLUME')
+    plt.ylabel('km3')
+    plt.xlabel('year')
+
+
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_VOL_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.eps') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_VOL_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.png') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+
+    fileout=('/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/seaice/seaice_volume_'+exptname+'_' + hemisphere + '_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.tex') 
+    f= open(fileout,'w')
+    f.write("year,    seaicearea " + hemisphere + "\n")
+    for year in range(startyear,endyear):
+        string = (str(year) + ','+ 
+                  str(np.round(seaicearea[year-startyear],2)) + '\n')
+        f.write(string)
+    f.close()
+
+
+
+#######################################################
+def get_seaice(HadCM3,exptname,startyear,endyear):
+    """
+    reads in the sea ice volume and stores over the NH and the SH
+    """
+
+    # arrays for storing seaice
+    seaicearea_NH  = np.zeros(endyear-startyear+1)
+    seaicearea_SH  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    
+    for year in range(startyear,endyear+1):
+        print(year)
+        (seaice_NH, seaice_SH) = get_avg(year)
+
+        seaicearea_NH[year-startyear]=seaice_NH
+        seaicearea_SH[year-startyear]=seaice_SH
+
+    # plot and save
+    plotdrifts(seaicearea_NH,'NH',startyear,endyear)
+    plotdrifts(seaicearea_SH,'SH',startyear,endyear)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+incl_18o='n'
+HadCM3='y'
+exptname='xpsic'
+startyear=0  # can't start before year 12 because we aren't outputting d18o
+endyear=100
+plt.figure(figureno)
+get_seaice(HadCM3,exptname,startyear,endyear)
+figureno=figureno+1
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+SH_salinity.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#
+# This program will plots the Sea Surface Salinity south of a given latitude
+#
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+
+def get_avg(year, latstart):
+    """
+    gets average salinity for this year between latstart and -90
+    """
+ 
+    yearuse = str(year).zfill(9)
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    cube_alllevs = iris.load_cube(filename,
+                                  'SALINITY (OCEAN)       (PSU-35)/1000')
+    cube = cube_alllevs[0,0,:,:]  # this is surface salinity
+    cube=cube * 1000. + 35.0
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    weights = iris.analysis.cartography.area_weights(cube).copy() # this is in m2
+  
+    for j,lat in enumerate(cube.coord('latitude').points):
+        if lat > latstart:
+            weights[j,:]=0.0
+      
+    SH_sal_mean = cube.collapsed(['latitude','longitude'],
+                                 iris.analysis.MEAN,weights=weights)
+
+  
+    return (SH_sal_mean.data)
+
+#####################################################################
+def plotdrifts(salinity,startyear,endyear,latstart):
+    """
+    plots the timeseries of seaice area
+    file
+    """
+
+    plt.subplot(1,1,1)
+    plt.plot(salinity)
+    plt.ylim(33.0,34.5)
+    plt.title('Salinity ' + P3name.get(exptname,exptname))
+    plt.ylabel('psu')
+    plt.xlabel('year')
+    if latstart < 0:
+        latstartuse = str(latstart * -1.0) + 'S'
+    else:
+        latstartuse = str(latstart) + 'N'
+
+
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.eps') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.png') 
+    print('savingfig',fileout)
+    plt.savefig(fileout, bbox_inches='tight')  
+
+    
+    plt.close()
+
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.tex') 
+
+    f= open(fileout,'w')
+    f.write("year,    SH mean salinity: top level \n")
+    for year in range(startyear,endyear):
+        string = (str(year) + ','+ 
+                  str(np.round(salinity[year-startyear],2)) + '\n')
+        f.write(string)
+    f.close()
+
+
+
+   
+
+
+#######################################################
+def get_SHsalin(HadCM3,exptname,startyear,endyear,latstart):
+    """
+    reads in the salinity and extracts for the SH
+    """
+
+    # arrays for storing seaice
+    salinity_SH  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    
+    for year in range(startyear,endyear+1):
+        print(year)
+        salin = get_avg(year,latstart)
+        salinity_SH[year-startyear]=salin
+
+    # plot and save
+    plotdrifts(salinity_SH,startyear,endyear,latstart)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+P3name = {'xpsie' : 'EP400',    'xpsig':'EP490', 'xpsid':'LP','xpsic':'PI',
+          'xpsij':'LP490'}
+
+latstart=-65.0   # will plot from latstart to -90.0
+HadCM3='y'
+exptname='xpsio'
+startyear=1991  # can't start before year 12 because we aren't outputting d18o
+endyear=3000
+plt.figure(figureno)
+get_SHsalin(HadCM3,exptname,startyear,endyear,latstart)
+figureno=figureno+1
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+SH_salinity_subsurf.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#
+# This program will get the SH salinity for each year averaged over the 
+# following
+# 0-50m, 0-100m, 0-200m, 0-500m, 0-1000m and write them to a file
+#
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+
+def get_avg(year, latstart):
+    """
+    gets average salinity for this year between latstart and -90
+    """
+
+    yearuse = str(year).zfill(9)
+    filename=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pg/'+exptname+'o#pg'
+              + yearuse + 'c1+.nc')
+    cube = iris.load_cube(filename,
+                          'SALINITY (OCEAN)       (PSU-35)/1000')
+
+    cube = iris.util.squeeze(cube)
+  
+    cube=cube * 1000. + 35.0
+    cube.coord('latitude').guess_bounds()
+    cube.coord('longitude').guess_bounds()
+    cube.coord('depth_1').guess_bounds()
+
+    w_ro = iris.analysis.cartography.area_weights(cube) # this is in m2
+    weights = np.copy(w_ro) 
+    
+    for j,lat in enumerate(cube.coord('latitude').points):
+        if lat > latstart:
+            weights[:,j,:]=0.0
+    
+
+    # get the weights for each of the ranges
+
+    low_lims = [50.,100.,200.,500.,1000.]
+
+    SH_sal_data_lims = []
+    for lim in low_lims:
+        print(lim)
+        weights_use = np.copy(weights)
+        for k,dep in enumerate(cube.coord('depth_1').points):
+            if dep > lim:
+                weights_use[k,:,:] = 0.0
+
+
+        SH_sal_mean = cube.collapsed(['depth_1','latitude','longitude'],
+                                 iris.analysis.MEAN,weights=weights_use)
+        SH_sal_data_lims.append(SH_sal_mean.data)
+    
+  
+    return (SH_sal_data_lims)
+
+#####################################################################
+def plotdrifts(salinity_0_50,salinity_0_100,salinity_0_200,salinity_0_500,salinity_0_1000,startyear,endyear,latstart):
+    """
+    plots the salinity
+    write the timeseries of seaice area
+    to a file
+    """
+
+    plt.subplot(1,1,1)
+    plt.plot(salinity_0_50)
+    plt.ylim(33.0,34.5)
+    plt.title('Salinity ' + P3name.get(exptname,exptname))
+    plt.ylabel('psu')
+    plt.xlabel('year')
+    if latstart < 0:
+        latstartuse = str(latstart * -1.0) + 'S'
+    else:
+        latstartuse = str(latstart) + 'N'
+    
+
+    fileout=('/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/spinup/salinity_subsurface_'+exptname+'_' + latstartuse + '-90S_' + str(int(startyear)) + '_'+ str(int(endyear)) +'.tex') 
+
+    f= open(fileout,'w')
+    f.write("year,    SH mean salinity:0-50,  0-100, 0-200, 0-500,0_1000 \n")
+    for year in range(startyear,endyear):
+        string = (str(year) + ','+ 
+                  str(np.round(salinity_0_50[year-startyear],2)) + ',' +  
+                  str(np.round(salinity_0_100[year-startyear],2)) + ','+
+                  str(np.round(salinity_0_200[year-startyear],2)) + ','+
+                  str(np.round(salinity_0_500[year-startyear],2)) + ','+
+                  str(np.round(salinity_0_100[year-startyear],2)) + 
+                  '\n')
+        f.write(string)
+    f.close()
+
+    plt.show()
+    plt.close()
+
+   
+
+
+#######################################################
+def get_SHsalin(HadCM3,exptname,startyear,endyear,latstart):
+    """
+    reads in the salinity and extracts for the SH
+    """
+
+    # arrays for storing seaice
+    salinity_SH_0_50  = np.zeros(endyear-startyear+1)
+    salinity_SH_0_100  = np.zeros(endyear-startyear+1)
+    salinity_SH_0_200  = np.zeros(endyear-startyear+1)
+    salinity_SH_0_500  = np.zeros(endyear-startyear+1)
+    salinity_SH_0_1000  = np.zeros(endyear-startyear+1)
+
+    # obtain means for each year and store in the arrays
+    
+    for year in range(startyear,endyear+1):
+        print(year)
+        S_0_50,S_0_100,S_0_200,S_0_500,S_0_1000 = get_avg(year,latstart)
+     
+        salinity_SH_0_50[year-startyear]=S_0_50
+        salinity_SH_0_100[year-startyear]=S_0_100
+        salinity_SH_0_200[year-startyear]=S_0_200
+        salinity_SH_0_500[year-startyear]=S_0_500
+        salinity_SH_0_1000[year-startyear]=S_0_1000
+
+    # plot and save
+    plotdrifts(salinity_SH_0_50,salinity_SH_0_100,salinity_SH_0_200,
+            salinity_SH_0_500,salinity_SH_0_1000,startyear,endyear,latstart)
+  
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+P3name = {'xpsie' : 'EP400',    'xpsig':'EP490', 'xpsid':'LP','xpsic':'PI',
+          'xpsij':'LP490'}
+
+latstart=-60.0   # will plot from latstart to -90.0
+HadCM3='y'
+exptname='xpsid'
+startyear=12  # can't start before year 12 because we aren't outputting d18o
+endyear=2999
+plt.figure(figureno)
+get_SHsalin(HadCM3,exptname,startyear,endyear,latstart)
+figureno=figureno+1
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+temperature_gradients.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    temperature_gradients
+#PURPOSE
+#
+#   This program will do a timeseries of the mean temperature southwards of 65S for
+#   a) surface
+#   b) top 100m
+#   c) top 200m
+#   d) top 1000m
+#   e) 1000m-3000m
+#
+#  the temperature has previously been obtained and is in basin_diagnostics
+#
+#
+#
+# Julia 22/11/2025
+#
+# update Julia 30.1.2026:  we will just write out a timeseries of temperature
+# on single levels
+#
+#  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+#
+#
+ 
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import iris
+import iris.quickplot as qplt
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+import matplotlib.ticker as mticker
+
+exptname='xpsid'
+startyear=12
+endyear=2999
+filestart = '/uolstore/Research/a/hera1/earjcti/um/' + exptname 
+latmax=-65
+single_levs = 'y'  # y write out on levels
+                   # n write out bands of levels
+
+
+ 
+def get_temperature_band(year):
+    """
+    gets the temperature at each of the bands
+    #   a) surface
+    #   b) top 100m
+    #   c) top 200m
+    #   d) top 1000m
+    #   e) 1000m-3000m
+
+    """
+ 
+    filename=(filestart+'/basin_diagnostics/'+exptname+'_Pacific'+
+              str(year) +'.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    # extract 3d temperature
+    tempcube = cubes.extract('temperature basin')[0]
+    # temperature southwards of 65S
+    south_constraint = iris.Constraint(latitude=lambda v:v<latmax)
+    temp_south_cube =tempcube.extract(south_constraint)
+
+    # average over area
+    lat = temp_south_cube.coord('latitude')
+    lon = temp_south_cube.coord('longitude')
+    depth = temp_south_cube.coord('depth_1')
+    if not lat.has_bounds():
+        lat.guess_bounds()
+    if not lon.has_bounds():
+        lon.guess_bounds()
+    if not depth.has_bounds():
+        depth.guess_bounds()
+
+
+    weights = iris.analysis.cartography.area_weights(temp_south_cube)
+
+    # mean by depth
+    temp_levels_cube = temp_south_cube.collapsed(['latitude','longitude'],
+                                                 iris.analysis.MEAN,
+                                                 weights=weights)
+
+    surf_data = temp_levels_cube[0].data
+
+    # extract cube by levels
+    cube_100 = temp_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<100))
+    cube_200 = temp_levels_cube.extract(iris.Constraint(depth_1=lambda d:d<200))
+    cube_1000 = temp_levels_cube.extract(
+        iris.Constraint(depth_1=lambda d:d<1000))
+    cube_1000_3000 = temp_levels_cube[13:16]
+    
+    
+    thickness = np.diff(depth.bounds,axis=1).squeeze()
+    
+    avg_100=cube_100.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_100.data)])
+    avg_200=cube_200.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_200.data)])
+    avg_1000=cube_1000.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[0:len(cube_1000.data)])
+    avg_1000_3000=cube_1000_3000.collapsed('depth_1',iris.analysis.MEAN,
+                               weights=thickness[13:16])
+    
+    data_100=avg_100.data
+    data_200=avg_200.data
+    data_1000=avg_1000.data
+    data_1000_3000=avg_1000_3000.data
+    
+  
+    return (surf_data,data_100,data_200,data_1000,data_1000_3000)
+
+
+
+def get_temperature_level(year):
+    """
+    gets the temperature at each of the levels
+    #  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+
+    """
+ 
+    filename=(filestart+'/basin_diagnostics/'+exptname+'_Pacific'+
+              str(year) +'.nc')
+    print(filename)
+    cubes = iris.load(filename)
+    # extract 3d temperature
+    tempcube = cubes.extract('temperature basin')[0]
+    # temperature southwards of 65S
+    south_constraint = iris.Constraint(latitude=lambda v:v<latmax)
+    temp_south_cube =tempcube.extract(south_constraint)
+
+    # average over area
+    lat = temp_south_cube.coord('latitude')
+    lon = temp_south_cube.coord('longitude')
+    depth = temp_south_cube.coord('depth_1')
+    if not lat.has_bounds():
+        lat.guess_bounds()
+    if not lon.has_bounds():
+        lon.guess_bounds()
+    if not depth.has_bounds():
+        depth.guess_bounds()
+
+
+    weights = iris.analysis.cartography.area_weights(temp_south_cube)
+
+    # mean by depth
+    temp_levels_cube = temp_south_cube.collapsed(['latitude','longitude'],
+                                                 iris.analysis.MEAN,
+                                                 weights=weights)
+
+    surf_data = temp_levels_cube[0].data
+    #print(temp_levels_cube)
+    #print(temp_levels_cube.coord('depth_1').points)
+   
+    # extract cube by levels
+ 
+    data_5= (temp_levels_cube.extract(iris.Constraint(depth_1=5.0))).data
+    data_25= (temp_levels_cube.extract(iris.Constraint(depth_1=25.0))).data
+    data_47= (temp_levels_cube.extract(iris.Constraint(depth_1=47.85))).data
+    data_203= (temp_levels_cube.extract(iris.Constraint(depth_1=203.7))).data
+    data_447= (temp_levels_cube.extract(iris.Constraint(depth_1=447.05))).data
+    data_666= (temp_levels_cube.extract(iris.Constraint(depth_1=666.3))).data
+    data_995= (temp_levels_cube.extract(iris.Constraint(depth_1=995.55))).data
+    data_1500=( temp_levels_cube.extract(iris.Constraint(depth_1=1500.85))).data
+
+    
+  
+    return (data_5,data_25,data_47,data_203,data_447,data_666,data_995,data_1500)
+
+
+
+
+################################
+# main program
+
+all_years = []
+
+if single_levs == 'n': # we will get temperature bands
+    all_surf = []
+    all_100 = []
+    all_200 = []
+    all_1000 = []
+    all_1000_3000 = []
+
+    for year in range(startyear,endyear):
+        surf_data, data_100,data_200,data_1000,data_1000_3000=get_temperature_band(year)
+        all_years.append(year)
+        all_surf.append(surf_data)
+        all_100.append(data_100)
+        all_200.append(data_200)
+        all_1000.append(data_1000)
+        all_1000_3000.append(data_1000_3000)
+
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'+exptname+'_Pacific_temperature'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+ 
+    with open(fileout, "w") as f:
+        string = ("Year, temp_surf,temp_0_100,temp_0_200," +
+                  "temp_0_1000,temp_1000_3000\n") 
+        f.write(string)
+
+        for y, a, b, c, d, e in zip(all_years, all_surf, all_100,all_200,all_1000,all_1000_3000):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}\n")
+
+
+    #plot
+        
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_surf, label='surface')
+    plt.plot(all_years, all_100, label='0-100')
+    plt.plot(all_years, all_200, label='0-200')
+    plt.plot(all_years, all_1000, label='0-1000')
+    plt.plot(all_years, all_1000_3000, label='1000-3000')
+
+    # Add labels and title
+    plt.xlabel('Year')
+    plt.ylim(35.9,36.9)
+    plt.ylabel('temperature')
+    plt.legend()
+    plt.title('Year vs temperature')
+
+    # Optional: Add grid
+    plt.grid(True)
+
+    # Show the plot
+    plt.show()
+
+
+
+
+
+if single_levs == 'y': # we will get temperature on a range of levels
+    #  5m, 25m, 47.8m 203m, 447m, 666m, 995m, 1500m
+
+    all_5m = []
+    all_25m = []
+    all_47m = []
+    all_203m = []
+    all_447m = []
+    all_666m = []
+    all_995m = []
+    all_1500m = []
+
+    for year in range(startyear,endyear):
+        d5,d25,d47,d203,d447,d666,d995,d1500=get_temperature_level(year)
+        all_years.append(year)
+        all_5m.append(d5)
+        all_25m.append(d25)
+        all_47m.append(d47)
+        all_203m.append(d203)
+        all_447m.append(d447)
+        all_666m.append(d666)
+        all_995m.append(d995)
+        all_1500m.append(d1500)
+       
+    # Write to a text file
+    fileout = (filestart+'/basin_diagnostics/'
+               +exptname+'_Pacific_temperature_levs'+
+               str(startyear) +'_' + str(endyear) + '_'+str(latmax)+ '.txt')
+ 
+    with open(fileout, "w") as f:
+        string = ("Year, 5m, 25m, 47m 203m, 447m, 666m, 995m, 1500m\n") 
+        f.write(string)
+        print('here',string)
+        for y, a, b, c, d, e, g, h, i in zip(all_years, all_5m,
+                                             all_25m,all_47m,
+                                             all_203m,all_447m,
+                                             all_666m,all_995m,all_1500m):
+            f.write(f"{y}, {a}, {b},{c},{d},{e}, {g}, {h}, {i}\n")
+
+
+    #plot
+    print(all_666m)
+    print(all_995m)
+    plt.figure(figsize=(8, 5))
+    plt.plot(all_years, all_5m, label='5m')
+    plt.plot(all_years, all_47m, label='47m')
+    plt.plot(all_years, all_447m, label='447m')
+    plt.plot(all_years, all_666m, label='666m')
+    plt.plot(all_years, all_995m, label='995m')
+    
+    # Add labels and title
+    plt.xlabel('Year')
+    #plt.ylim(36,37)
+    plt.ylabel('temperature')
+    plt.legend()
+    plt.title('Year vs temperature')
+    
+    # Optional: Add grid
+    plt.grid(True)
+    
+    # Show the plot
+    plt.show()
+
+
+####
+
+::::::::::::::
+TOA_rad_inbalance.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    TOA_rad_inbalance
+#PURPOSE
+#    This program was based on PYTHON/PROGRAMS/HadGEM2/plot_radiation.py
+#
+#  It should do the same thing but might have been updated for PlioMIP3.
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+import subprocess
+
+
+#functions are:
+#  def plotdata
+#  def annmean
+
+# functions start here
+def plotdata(plotdata,fileno,lon,lat,titlename,minval,maxval,valinc,V,uselog,cbarname):
+    lons, lats = np.meshgrid(lon,lat)
+
+   # this is good for a tropical region
+   # map=Basemap(llcrnrlon=10.0,urcrnrlon=70.0,llcrnrlat=10.0,urcrnrlat=55.0,projection='cyl',resolution='c')
+   # this is good for the globe
+    map=plt.subplot(2,2,fileno+1,projection=ccrs.PlateCarree())
+   # x, y = map(lons, lats)
+    if V == 0:
+        V=np.arange(minval,maxval,valinc)
+    if uselog =='y':
+        cs = map.contourf(lons,lats,plotdata,V,norm=mp.colors.PowerNorm(gamma=1./3.),extend="both")
+        cbar = plt.colorbar(cs,orientation="horizontal")
+    else:
+        if uselog =='la':
+            cs = map.contourf(lons,lats,plotdata,V,norm=mp.colors.SymLogNorm(linthresh=2.0,linscale=2.0,vmin=-32,vmax=32),cmap='RdBu_r',extend="both")
+            cbar = plt.colorbar(cs,orientation="horizontal")
+
+        else:
+            if uselog =='a':
+                cs = map.contourf(lons,lats,
+                                  plotdata,V,cmap='RdBu_r',extend="both")
+                cbar = plt.colorbar(cs,orientation="horizontal")
+            else:
+                print(np.shape(plotdata))
+                cs = map.contourf(lons,lats,plotdata,V,extend="both")
+                cbar = plt.colorbar(cs,orientation="horizontal",)
+
+    plt.title(titlename)
+    #map.gridlines()
+    map.coastlines()
+
+    cbar.set_label(cbarname,labelpad=-40)
+#end def plotdata
+
+def annmean(switch,HadCM3,expt):
+    # switch is a dummy variable to allow the program to be called
+
+    # we will plot a) incoming sw ra flux (toa) field200
+    #              b) outgoing sw ra flux (toa) field201
+    #              c) outgoing lw rad flux (toa) olr
+    # other things if the budsgets don't balance
+
+    if HadCM3 == 'y':
+        datasetname='/uolstore/Research/a/hera1/earjcti/um/'+expt+'/pcpd/'+expt+'a#pd00000' + century +'[7-9]????.nc'
+        print(datasetname)
+        f=MFDataset(datasetname)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        insw=f.variables['field200'][:]
+        outsw=f.variables['field201'][:]
+        outlw=f.variables['olr'][:]
+        netlw= (-1.0) *outlw
+        netsw=insw-outsw
+
+
+        titlePI='PI-TAnn_HadCM3'
+        titlediff='Plio - PI Tanom_HadCM3'
+    else:
+    # read in data from multiple files
+        dirname='/uolstore/Research/a/hera1/earjcti/um/HadGEM_data/'+expt+'/netcdf/'
+        filename=expt+'a@pd'+extra+'[7-9]*.nc'
+        os.system('ls '+dirname+filename)
+        os.system('ls '+dirname+filename+' | wc -l')
+        nval=os.system('ls '+dirname+filename+' | wc -l')
+        allfiles=subprocess.check_output('ls '+dirname+filename+' | wc -l',shell=True)
+        print('number of files=',allfiles)
+        f=MFDataset(dirname+filename)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        # net downward sw flux at the trop
+        netsw=f.variables['solar_2'][:]
+        # net downward lw flux at the trop
+        netlw=f.variables['longwave_2'][:]
+
+        # alternative 1
+        insw=f.variables['field200'][:]
+        outsw=f.variables['field201'][:]
+        outlw=f.variables['olr'][:]
+        netlw= (-1.0) *outlw
+        netsw=insw-outsw
+
+
+    netsw=np.squeeze(netsw)
+    netlw=np.squeeze(netlw)
+    ntimes,ny,nx=np.shape(netsw)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    netsw_ann=np.mean(netsw,axis=0)
+    netlw_ann=np.mean(netlw,axis=0)
+    
+    
+    plt.figure(0)
+    wm2='w/m2'
+    lontemp=lon
+    titlename=expt+'net SW ann'
+    #netsw_ann,lon = shiftgrid(180.,netsw_ann,lon,start=False)    
+    plotdata(netsw_ann,0,lon,lat,titlename,0,400,40.0,0.0,'n',wm2)
+
+
+    lon=lontemp
+    #netlw_ann,lon = shiftgrid(180.,netlw_ann,lon,start=False)    
+    plotdata(netlw_ann * (-1.0),1,lon,lat,' net lw ann',100,300,40.0,0.0,'n',wm2)
+
+    # calculate residual and mean residual weighted by cos latitude
+
+    residual=netsw_ann+ netlw_ann
+  
+    weights=np.cos(np.radians(lat))
+    print('len weights',len(weights))
+    resid_zon=np.average(residual,axis=0,weights=weights)
+    average_residual=np.average(resid_zon)
+
+    print('residual' + str(average_residual))
+    titlename='residual, avg='+str(average_residual)+'(w/m2)'
+    plotdata(residual,2,lon,lat,titlename,-100,100,20.0,0.0,'n',wm2)
+    
+
+
+    fileout='/uolstore/home/users/earjcti/PYTHON/PLOTS/PLIOMIP3/assess_spinup/TOA_rad/annmean_'+expt+'.eps' 
+    plt.savefig(fileout, bbox_inches='tight')  
+    
+    plt.close()
+
+
+#end def annmean
+
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+HadCM3='y'
+exptname='xqbwe'
+century='39'  # put century as 2 characters ie. 01 02 03  13
+plt.figure(figureno)
+annmean('y',HadCM3,exptname)
+figureno=figureno+1
+
+
+
+
+
+
+sys.exit(0)
+
+####
+
+::::::::::::::
+TOA_rad_inbal_timeseries.py
+::::::::::::::
+#!/usr/bin/env python2.7
+#NAME
+#    TOA_rad_inbalance
+#PURPOSE
+#    This program was based on PYTHON/PROGRAMS/HadGEM2/plot_radiation.py
+#
+#  It should do the same thing but might have been updated for PlioMIP3.
+#
+# search for 'main program' to find end of functions
+# Julia 22/11/2016
+
+
+
+import os
+import numpy as np
+#import scipy as sp
+import matplotlib as mp
+import matplotlib.pyplot as plt
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset, MFDataset
+#import cartopy.crs as ccrs
+import sys
+#from mpl_toolkits.basemap import Basemap, shiftgrid
+#import subprocess
+
+
+#functions are:
+#  def annmean
+
+def get_rad_inbal(year):
+    # we will get  a) incoming sw ra flux (toa) field200
+    #              b) outgoing sw ra flux (toa) field201
+    #              c) outgoing lw rad flux (toa) olr
+    # other things if the budgets don't balance
+
+    if HadCM3 == 'y':
+        datasetname='/uolstore/Research/a/hera1/earjcti/um/'+exptname+'/pcpd/'+exptname+'a#pd' + str(year).zfill(9) + '??+.nc'
+        print(datasetname)
+        #sys.exit(0)
+        f=MFDataset(datasetname)
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        lat = f.variables['latitude'][:]
+        lon = f.variables['longitude'][:]
+        insw=f.variables['field200'][:]
+        outsw=f.variables['field201'][:]
+        outlw=f.variables['olr'][:]
+        netlw= (-1.0) *outlw
+        netsw=insw-outsw
+
+
+    netsw=np.squeeze(netsw)
+    netlw=np.squeeze(netlw)
+    ntimes,ny,nx=np.shape(netsw)
+    print(ntimes,ny,nx)
+    
+#average across the time dimension
+    netsw_ann=np.mean(netsw,axis=0)
+    netlw_ann=np.mean(netlw,axis=0)
+    
+    
+    # calculate residual and mean residual weighted by cos latitude
+
+    residual=netsw_ann+ netlw_ann
+  
+    weights=np.cos(np.radians(lat))
+    resid_zon=np.average(residual,axis=0,weights=weights)
+    average_residual=np.average(resid_zon)
+
+
+    return(average_residual)
+
+
+################################
+# main program
+
+# annual mean
+figureno=0
+
+
+HadCM3='y'
+startyear=2
+endyear=3000
+
+#endings=['i','j','k','l','m','n','o','p','q','r','s','t']
+endings=['g','e']
+for ending in endings:
+    #exptname = 'xqbw' + ending
+    exptname = 'xpsi' + ending
+    ann_avg_ts = np.zeros(endyear-startyear+1)
+    years=np.arange(startyear, endyear+1)
+
+    try:
+        for year in range(startyear,endyear+1):
+            print(year)
+            ann_avg = get_rad_inbal(year)
+            ann_avg_ts[year-startyear]=ann_avg
+
+        print('got data')
+       # get running mean (30 year)
+
+        weights = np.ones(30)/30
+        #print('sum weights',np.sum(weights))
+        run_mean = np.convolve(ann_avg_ts, weights, "valid")
+        years_run_mean = np.arange(startyear+14, endyear-14)
+
+#print(run_mean)
+#print(np.shape(run_mean))
+#print(np.shape(years_run_mean))
+#sys.exit(0)
+
+        print('about to plot')
+        plt.plot(years,ann_avg_ts)
+        print('j1')
+        plt.plot(years_run_mean, run_mean)
+        print('j2')
+        plt.hlines(y=0,xmin=startyear, xmax=endyear)
+        plt.title('TOA radiation inbalance:'+exptname)
+        plt.xlabel('year')
+        plt.ylabel('W/m2')
+        fileout = '/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/' + exptname + '_TOAinbal.eps'
+        plt.savefig(fileout)
+        plt.close()
+
+
+        datafile = '/uolstore/Research/a/hera1/earjcti/um/' + exptname + '/spinup/' + exptname + '_TOAinbal.tex'
+        print('about to open',datafile)
+        with open(datafile, 'w') as f:
+            f.write('% year  toa_imbalance_Wm2\n')
+            for yr, val in zip(years, ann_avg_ts):
+                f.write(f'{yr:d} {val:.6f}\n')
+      
+
+    except:
+        print('failure on',exptname)
+
+
+
+sys.exit(0)
+
+####
+

@@ -1,0 +1,4028 @@
+::::::::::::::
+plot_AABW.py
+::::::::::::::
+#python program
+#
+# this program will plot the AABW.  This is defined as the minimum GMOC south of
+# 60S
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
+          'xpsie':'EP400','xpsig':'EP'}
+
+#plot data from all the files
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/GMOC_' + expt
+    if expt == 'xpsij':
+        filename = filestart + '#1991_2999_AABW.tex'
+    else:
+        filename = filestart + '#12_2999_AABW.tex'
+  
+    x, y = read_data(filename)
+
+    # Plot the data
+    plt.subplot(211)
+    plt.plot(x, y, label=expt + ': ' + period.get(expt) )
+    plt.title('GMOC min 60S-90S')
+
+plt.xlabel('year')
+plt.ylabel('Sv')
+plt.legend()
+plt.grid(True)
+
+
+#do a 30 year running mean
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/GMOC_' + expt
+    if expt == 'xpsij':
+        filename = filestart + '#1991_2999_AABW.tex'
+    else:
+        filename = filestart + '#12_2999_AABW.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    plt.subplot(212)
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('GMOC min 60S-90S (30 year running mean)')
+
+plt.xlabel('year',fontsize=14)
+plt.ylabel('Sv',fontsize=14)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+#plt.xlim(0,1000)
+plt.tight_layout()
+
+# Save the plot to a file
+plt.savefig('AABW.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+
+
+#now do a 30 year running mean all by itself for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/GMOC_' + expt
+    if expt == 'xpsij':
+        filename = filestart + '#1991_2999_AABW.tex'
+    else:
+        filename = filestart + '#12_2999_AABW.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('GMOC min 60S-90S (30 year running mean)')
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('Sv',fontsize=16)
+#plt.legend(fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.grid(True)
+#plt.xlim(0,1000)
+#plt.tight_layout()
+MARGINS = dict(left=0.14, right=0.98, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('AABW_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+::::::::::::::
+plot_AMOC.py
+::::::::::::::
+#python program
+#
+# this program will plot the maximum strenght of the AMOC using the file
+# produced by /uolstore...../PYTHON/PROGRAMS/PLIOMIP3/spinup_and_timeseries
+# plot_AMOC_strength_NH
+#
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xqbwd','xqbwg','xqbwe','xqbwj']
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y, a, b = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
+          'xpsie':'EP400','xpsig':'EP','xqbwd':'LP',
+          'xqbwe':'EP400','xqbwg':'EP','xqbwj':'LP490'}
+
+#plot data from all the files
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/AMOC_' + expt
+    if expt == 'xpsij' or expt == 'xqbwj':
+        filename = filestart + '#1991_3999_AMOC.tex'
+    else:
+        filename = filestart + '#12_3999_AMOC.tex'
+  
+    x, y = read_data(filename)
+
+    # Plot the data
+    plt.subplot(211)
+    plt.plot(x, y, label=expt + ': ' + period.get(expt) )
+    plt.title('maximum AMOC strength')
+
+plt.xlabel('year')
+plt.ylabel('Sv')
+plt.legend()
+plt.grid(True)
+
+
+#do a 30 year running mean
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/AMOC_' + expt
+    if expt == 'xpsij' or expt == 'xqbwj':
+        filename = filestart + '#1991_3999_AMOC.tex'
+    else:
+        filename = filestart + '#12_3999_AMOC.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    plt.subplot(212)
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('max AMOC strength (30 year running mean)')
+
+plt.xlabel('year',fontsize=14)
+plt.ylabel('Sv',fontsize=14)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+#plt.xlim(0,1000)
+plt.tight_layout()
+
+# Save the plot to a file
+plt.savefig('AMOC.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+
+
+#now do a 30 year running mean all by itself for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/AMOC_' + expt
+    if expt == 'xpsij' or expt == 'xqbwj':
+        filename = filestart + '#1991_3999_AMOC.tex'
+    else:
+        filename = filestart + '#12_3999_AMOC.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('Max AMOC strength (30 year running mean)',fontsize=18)
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('Sv',fontsize=16)
+plt.legend(fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.grid(True)
+#plt.xlim(0,1000)
+plt.tight_layout()
+#MARGINS = dict(left=0.14, right=0.98, bottom=0.16, top=0.96)  # tweak to suit labels
+#plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('AMOC_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+::::::::::::::
+plot_CASflux.py
+::::::::::::::
+#python program
+#
+# this program will plot the CAS flux created from flux_through_CAS.py
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+exptnames = ['xpsie','xpsig']
+which_to_plot = 'heat'  # this is 'water' or 'heat'
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    year_vals = []
+    flow_vals = []
+    heatflow_vals=[]
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y, z, a, b = map(float, line.strip().split(','))
+                year_vals.append(x)
+                flow_vals.append(y+z)
+                heatflow_vals.append(a+b)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return year_vals, flow_vals, heatflow_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP'}
+
+#plot data from all the files
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/'
+
+    if expt == 'xpsij':
+        filename = filestart + 'CASflow_' + expt + '_1991_2999.tex'
+    else:
+        filename = filestart + 'CASflow_' + expt + '_12_2999.tex'
+  
+    year, waterflow, heatflow= read_data(filename)
+
+    if which_to_plot == 'water':
+        y=waterflow
+        ylab='Sv'
+    if which_to_plot == 'heat':
+        y=heatflow
+        ylab='PW'
+    
+    # Plot the data
+    plt.subplot(211)
+    plt.plot(year, y, label=expt + ': ' + period.get(expt,expt) )
+    plt.title(which_to_plot + ' Flux throught CAS')
+    print(expt,': mean: ' + str(float(sum(y[1400:1600]) / len(y[1400:1600]))))
+  
+plt.xlabel('year')
+plt.ylabel(ylab)
+plt.legend()
+plt.grid(True)
+
+
+#do a 30 year running mean
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/'
+
+    if expt == 'xpsij':
+        filename = filestart + 'CASflow_' + expt + '_1991_2999.tex'
+    else:
+        filename = filestart + 'CASflow_' + expt + '_12_2999.tex'
+
+    year, waterflow, heatflow= read_data(filename)
+
+    if which_to_plot == 'water':
+        y=waterflow
+        ylab='Sv'
+    if which_to_plot == 'heat':
+        y=heatflow
+        ylab='PW'
+
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=year[window-1:]
+
+    # Plot the data
+    plt.subplot(212)
+    plt.plot(x_mean, y_mean, label=expt + ': ' + period.get(expt,expt) )
+    plt.title(which_to_plot + ' flow through CAS (30 year running mean)')
+
+plt.xlabel('year')
+plt.ylabel(ylab)
+plt.legend()
+plt.grid(True)
+#plt.show()
+#sys.exit(0)
+
+# Save the plot to a file
+plt.savefig(which_to_plot + '_total_flow_through_CAS.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_dens_diff_203_5.py
+::::::::::::::
+#python program
+#
+# this program will plot the timeseries of the density difference between 666m and 5m.  The file used was created by:  spinup/and/timeseries/density_gradients.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y203_vals) - np.array(y5_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('density 203m-density 5m')
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('kg/m$^3$',fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.xlim(0,3000)
+plt.axvline(x=1803,color='red',linestyle='--')
+
+#plt.legend(fontsize=14)
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+#ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+#ax.set_xlabel(None)
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('dens_diff_203_5_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_dens_diff_666_203.py
+::::::::::::::
+#python program
+#
+# this program will plot the timeseries of the density difference between 666m and 204m.  The file used was created by:  spinup/and/timeseries/density_gradients.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y666_vals) - np.array(y203_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('density 666m-density 203m')
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('kg/m$^3$',fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.xlim(0,3000)
+#plt.legend(fontsize=14)
+plt.axvline(x=1803,color='red',linestyle='--')
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+#ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+#ax.set_xlabel(None)
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('dens_diff_666_203_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_density_timeseries.py
+::::::::::::::
+#python program
+#
+# this program will plot a timeseries of the density at different levels and
+# the gradients between them
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsio']
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+def run_mean(y):
+    window = 30
+    # convolution with a uniform window
+    y_smooth = np.convolve(y, np.ones(window)/window, mode='valid')
+    # put into an array the same size as y
+    left = window //2
+    right = window -1 -left
+
+    yout = np.full_like(y,np.nan,dtype=float)
+    yout[left:len(y)-right]=y_smooth
+ 
+    return yout
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+    y5_valsa = run_mean(y5_vals)
+    y25_valsa= run_mean(y25_vals)
+    y47_valsa= run_mean(y47_vals)
+    y203_valsa= run_mean(y203_vals)
+    y447_valsa= run_mean(y447_vals)
+    y666_valsa= run_mean(y666_vals)
+    y995_valsa= run_mean(y995_vals)
+    y1500_valsa= run_mean(y1500_vals)
+    
+    
+                
+    return (x_vals, y5_valsa, y25_valsa, y47_valsa,
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa)
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
+          'xpsie':'EP400','xpsig':'EP','xpsio':'highSHorb'}
+
+yearstring = '12_2999_'
+
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+
+#plot data from all the files
+for expt in exptnames:
+    # this file was produced by density_gradients
+  
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_density_levs')
+    print(expt)
+    if expt == 'xpsio':
+        print('here')
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + yearstring +lat+'.txt'
+
+
+    print(expt,filename)
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    print('read')
+    # Plot the data
+    line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y25)
+    axes[0,1].set_title("25m")
+
+    axes[0,2].plot(x, y47)
+    axes[0,2].set_title("47m")
+    
+    axes[1,0].plot(x, y203)
+    axes[1,0].set_title("203m")
+
+    axes[1,1].plot(x, y447)
+    axes[1,1].set_title("447m")
+
+    axes[1,2].plot(x, y666)
+    axes[1,2].set_title("666m")
+    
+    axes[2,0].plot(x, y995)
+    axes[2,0].set_title("995m")
+
+    axes[2,1].plot(x, y1500)
+    axes[2,1].set_title("1500m")
+
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+#for i in range(axes.shape[0]):
+#    for j in range(axes.shape[1]):
+#        axes[i, j].set_xlim(1500, 2000)
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_'+yearstring + lat+'.eps')
+plt.close()
+
+
+# now plot difference between 203m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + yearstring+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y203-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("203m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y203-y25)
+    axes[0,1].set_title("203m-25m")
+
+    axes[0,2].plot(x, y203-y47)
+    axes[0,2].set_title("203m -47m")
+    
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_203m_diff'+yearstring + lat+'.eps')
+plt.close()
+
+
+# now plot difference between 447m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + yearstring+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y447-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("447m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y447-y25)
+    axes[0,1].set_title("447m-25m")
+
+    axes[0,2].plot(x, y447-y47)
+    axes[0,2].set_title("447m -47m")
+
+    axes[1,0].plot(x, y447-y203)
+    axes[1,0].set_title("447m -203m")
+   
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_447m_diff'+yearstring + lat+'.eps')
+plt.close()
+
+
+# now plot difference between 666m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    # this file was produced by density_gradients
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + yearstring+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y666-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("666m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y666-y25)
+    axes[0,1].set_title("666m-25m")
+
+    axes[0,2].plot(x, y666-y47)
+    axes[0,2].set_title("666m -47m")
+
+    axes[1,0].plot(x, y666-y203)
+    axes[1,0].set_title("666m -203m")
+
+    axes[1,1].plot(x, y666-y447)
+    axes[1,1].set_title("666m -447m")
+ 
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_666m_diff'+yearstring + lat+'.eps')
+plt.close()
+
+
+# now plot difference between 995m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    # this file was produced by density_gradients
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + yearstring+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y995-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("995m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y995-y25)
+    axes[0,1].set_title("995m-25m")
+
+    axes[0,2].plot(x, y995-y47)
+    axes[0,2].set_title("995m -47m")
+
+    axes[1,0].plot(x, y995-y203)
+    axes[1,0].set_title("995m -203m")
+
+    axes[1,1].plot(x, y995-y447)
+    axes[1,1].set_title("995m -447m")
+
+    axes[1,2].plot(x, y995-y666)
+    axes[1,2].set_title("995m -666m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_995m_diff'+yearstring  + lat+'.eps')
+plt.close()
+
+
+# now plot difference between 1500m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    # this file was produced by density_gradients
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_density_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + yearstring+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y1500-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("1500m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y1500-y25)
+    axes[0,1].set_title("1500m-25m")
+
+    axes[0,2].plot(x, y1500-y47)
+    axes[0,2].set_title("1500m -47m")
+
+    axes[1,0].plot(x, y1500-y203)
+    axes[1,0].set_title("1500m -203m")
+
+    axes[1,1].plot(x, y1500-y447)
+    axes[1,1].set_title("1500m -447m")
+
+    axes[1,2].plot(x, y1500-y666)
+    axes[1,2].set_title("1500m -666m")
+
+    axes[2,0].plot(x, y1500-y995)
+    axes[2,0].set_title("1500m -995m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+#for ax in axes.flat[:-1]:
+#    ax.grid(True)
+#    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('density_plots/density_alllevs_1500m_diff'+yearstring  + lat+'.eps')
+plt.close()
+
+::::::::::::::
+plot_OHT.py
+::::::::::::::
+#python program
+#
+# this program will plot the diagnostics associated with ocean heat transport
+#
+# will do
+# 1. mean OHT over a given number of years
+# 1a.mean d/dy of ocean heat transport.  (ie heat in vs heat out at latitude)
+# 2 timeseries of OHT for a given latitude 
+
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import numpy as np
+import sys
+
+#exptnames = ['xpsic','xpsid','xpsig','xpsie']
+exptnames = ['xqbwg','xqbwj']
+meanreq='y'
+timeseries_req='n'
+latreq=-20.0
+yearstart=3900
+yearend=4000
+basin='global'  # basin must be global / atlantic / pacific
+
+
+
+# Function to read data from a netcdf file
+def get_data(filestart,yearstart,yearend):
+    """
+    this will read the data from a netcdf files according to yearstart,yearend
+    note that the netcdf files will be in chunks of 1000 years
+    I am assume that the date in the file corresponds to the calendar year
+    """
+
+    allcubes = CubeList([])
+    if yearstart < 1000:
+        cube = iris.load_cube(filestart + '_12_1000.nc',
+                              'Ocean heat transport ('+basin+')')
+        allcubes.append(cube)
+    if yearstart < 2000 and yearend > 1000:
+        try:
+            cube = iris.load_cube(filestart + '_1000_2000Tref_is_zero.nc',
+                                  'Ocean heat transport ('+basin+')')
+        except:
+            cube = iris.load_cube(filestart + '_1000_2000.nc',
+                                  'Ocean heat transport ('+basin+')')
+
+        allcubes.append(cube)
+    if yearstart < 3000 and yearend > 2000:
+        cube = iris.load_cube(filestart + '_2000_3000.nc',
+                              'Ocean heat transport (+basin+)')
+        allcubes.append(cube)
+
+    if yearstart== 3900 and yearend == 4000:
+        #cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
+        #                      'Ocean heat transport ('+basin+')')
+        cube = iris.load_cube(filestart + '_3900_4000.nc',
+                              'Ocean heat transport ('+basin+')')
+        allcubes.append(cube)
+
+
+    fullcube = allcubes.concatenate_cube()
+    print(fullcube.coord('t').points)
+    time_constraint = iris.Constraint(t=lambda
+                      cell: yearstart <= cell.point.year <= yearend)
+
+    # Apply the constraint
+    timecube = fullcube.extract(time_constraint)
+   
+    return timecube
+
+# Function to compute running mean**
+def running_mean(cube):
+
+    # Extract data and time coordinate
+    data = cube.data
+    time_coord = cube.coord('t')
+    
+    # Apply a 30-year running mean using convolution
+    window = 30
+    weights = np.ones(window) / window
+    smoothed_data = np.convolve(data, weights, mode='valid')
+
+    # Trim the time coordinate to match the smoothed data
+    smoothed_time_points = time_coord.points[window - 1:]
+    smoothed_time_units = time_coord.units
+    smoothed_time = iris.coords.DimCoord(smoothed_time_points, standard_name='time', units=smoothed_time_units)
+
+    # Create a new cube with the smoothed data
+    smoothed_cube = iris.cube.Cube(smoothed_data, dim_coords_and_dims=[(smoothed_time, 0)])
+
+    return smoothed_cube
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwg':'EP','xqbwj':'LP490'}
+
+
+#plot data from all the files
+allexpts_cubes = CubeList([])
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/OHT_' + expt
+
+    expt_cube =get_data(filestart,yearstart,yearend)
+    allexpts_cubes.append(expt_cube)
+
+if meanreq == 'y':
+    if basin == 'global':
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))  
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4.5))  
+  
+    for i,cube in enumerate(allexpts_cubes):
+        mean_cube = cube.collapsed('t', iris.analysis.MEAN)
+        if i == 0:
+            cntl_cube = mean_cube.copy()
+        else:
+            diffcube = mean_cube - cntl_cube
+          
+        # Extract latitude and data values
+        latitudes = mean_cube.coord('latitude').points
+        values = mean_cube.data
+
+        # get d/dy of data (for plotting later) along with the middle latitude
+        # mask out between -10 and 10 as the flow changes direction here
+        # we want here from equator - towards pole
+        #  (ie (i-1)-i in NH, i-(i-1) in SH
+        # the ddy is not helpful.  I have removed the plot
+        ddy_latitudes = (latitudes[:-1] + latitudes[1:]) / 2
+        value_differences = values[1:] - values[:-1]
+        #mask = (ddy_latitudes > -10) & (ddy_latitudes < 10)
+        #value_differences[mask] = np.nan
+        value_differences[ddy_latitudes > 0] *= -1.0  # multiply by -1.0 where d/dy> 0
+
+       
+        # Plot latitude vs mean value
+        ax.plot(values, latitudes, label=period.get(exptnames[i]),linewidth=2)
+        #ax[1].plot(ddy_latitudes, value_differences,
+        #             label=period.get(exptnames[i]))
+        
+    ax.set_ylabel('Latitude',fontsize=16)
+    ax.set_xlabel('OHT (PW)',fontsize=16)
+    plt.tick_params(axis='both',which='major',labelsize=16)
+
+    #ax[1].set_title('OHT diff from equ - to pole.  If this is > 0 this latitude warms')
+
+    ax.axvline(x=0, color='black', linewidth=2)
+    #ax[1].axhline(y=0, color='black', linewidth=2)
+    ax.legend(fontsize=14)
+    #ax[1].legend()
+    ax.set_xlim(-1.5,1.6)
+    #ax[1].set_ylim(-0.1,0.1)
+    #ax.set_xlim(-30,90)
+    ax.grid(True)
+
+    if basin =='atlantic':  # basin must be global / atlantic / pacific
+        ax.set_title('a) Atlantic Ocean Heat Transport',fontsize=16)
+        ax.set_ylim(-30,90)
+        ax.set_yticks([-30, 0, 30, 60, 90])
+    if basin =='pacific':  # basin must be global / atlantic / pacific
+        ax.set_title('b) Pacific Ocean Heat Transport',fontsize=16)
+        ax.set_ylim(-30,90)
+        ax.set_yticks([-30, 0, 30, 60, 90])
+    if basin =='global':  # basin must be global / atlantic / pacific
+        ax.set_title('c) Global Ocean Heat Transport',fontsize=16)
+        ax.set_yticks([-90, -60, -30, 0, 30, 60, 90])
+       
+        
+    plt.tight_layout() 
+    plt.show()
+    sys.exit()
+    plt.savefig('OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '.png')
+    plt.close()
+
+    #plt.subplot(111)
+    #plt.plot(diffcube.data)
+    #plt.show()
+    #sys.exit(0)
+
+    sys.exit(0)
+
+cubes_for_meaning = CubeList([])
+if timeseries_req=='y':
+    plt.figure(figsize=(8, 5))
+    for i,cube in enumerate(allexpts_cubes):
+        # extract the latitude of interest
+        lat_constraint = iris.Constraint(latitude=latreq)
+
+        # Apply the constraint
+        timeseriescube = cube.extract(lat_constraint)
+        cubes_for_meaning.append(timeseriescube)
+        time_coord = cube.coord('t')
+        dates = time_coord.units.num2date(time_coord.points)
+        years = [date.year for date in dates]
+
+        values = timeseriescube.data
+
+        plt.plot(years, values, label=period.get(exptnames[i]))
+        
+    plt.xlabel('year')
+    plt.ylabel('OHT (PW)')
+    plt.title(basin+' ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
+    plt.legend()
+    plt.grid(True)
+#    plt.close()
+
+    # do a 30 year mean
+
+    plt.figure(figsize=(8, 5))
+    for i,cube in enumerate(cubes_for_meaning):
+        running_mean_cube = running_mean(cube)
+        print(running_mean_cube)
+        time_coord = running_mean_cube.coord('time')
+        dates = time_coord.units.num2date(time_coord.points)
+        years = [date.year for date in dates]
+
+        values = running_mean_cube.data
+
+        plt.plot(years, values, label=period.get(exptnames[i]))
+    plt.xlabel('year')
+    plt.ylabel('OHT (PW)')
+    plt.title(basin + 'ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
+    plt.legend()
+    plt.grid(True)
+
+    plt.show()
+    plt.close()
+    plt.savefig('OHT/'+basin+'OHT_accross_' + str(latreq) + 'png')
+    sys.exit(0)
+::::::::::::::
+plot_OHT_with_anomaly.py
+::::::::::::::
+#python program
+#
+# this program will plot the diagnostics associated with ocean heat transport
+#
+# will do
+# 1. mean OHT over a given number of years
+# 1a.mean d/dy of ocean heat transport.  (ie heat in vs heat out at latitude)
+# 2 timeseries of OHT for a given latitude 
+
+import matplotlib.pyplot as plt
+import iris
+from iris.cube import CubeList
+import numpy as np
+import sys
+
+#exptnames = ['xpsic','xpsid','xpsig','xpsie']
+exptnames = ['xpsie','xpsig']
+meanreq='y'
+timeseries_req='n'
+latreq=-20.0
+yearstart=1400
+yearend=1600
+basin='global'  # basin must be global / atlantic / pacific
+
+
+
+# Function to read data from a netcdf file
+def get_data(filestart,yearstart,yearend):
+    """
+    this will read the data from a netcdf files according to yearstart,yearend
+    note that the netcdf files will be in chunks of 1000 years
+    I am assume that the date in the file corresponds to the calendar year
+    """
+
+    allcubes = CubeList([])
+    if yearstart < 1000:
+        cube = iris.load_cube(filestart + '_12_1000.nc',
+                              'Ocean heat transport ('+basin+')')
+        allcubes.append(cube)
+    if yearstart < 2000 and yearend > 1000:
+        try:
+            cube = iris.load_cube(filestart + '_1000_2000Tref_is_zero.nc',
+                                  'Ocean heat transport ('+basin+')')
+        except:
+            cube = iris.load_cube(filestart + '_1000_2000.nc',
+                                  'Ocean heat transport ('+basin+')')
+
+        allcubes.append(cube)
+    if yearstart < 3000 and yearend > 2000:
+        cube = iris.load_cube(filestart + '_2000_3000.nc',
+                              'Ocean heat transport (+basin+)')
+        allcubes.append(cube)
+
+    if yearstart== 3900 and yearend == 4000:
+        cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
+                              'Ocean heat transport ('+basin+')')
+        allcubes.append(cube)
+
+
+    fullcube = allcubes.concatenate_cube()
+    print(fullcube.coord('t').points)
+    time_constraint = iris.Constraint(t=lambda
+                      cell: yearstart <= cell.point.year <= yearend)
+
+    # Apply the constraint
+    timecube = fullcube.extract(time_constraint)
+   
+    return timecube
+
+# Function to compute running mean**
+def running_mean(cube):
+
+    # Extract data and time coordinate
+    data = cube.data
+    time_coord = cube.coord('t')
+    
+    # Apply a 30-year running mean using convolution
+    window = 30
+    weights = np.ones(window) / window
+    smoothed_data = np.convolve(data, weights, mode='valid')
+
+    # Trim the time coordinate to match the smoothed data
+    smoothed_time_points = time_coord.points[window - 1:]
+    smoothed_time_units = time_coord.units
+    smoothed_time = iris.coords.DimCoord(smoothed_time_points, standard_name='time', units=smoothed_time_units)
+
+    # Create a new cube with the smoothed data
+    smoothed_cube = iris.cube.Cube(smoothed_data, dim_coords_and_dims=[(smoothed_time, 0)])
+
+    return smoothed_cube
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI','xqbwg':'EP','xqbwj':'LP490'}
+
+
+#plot data from all the files
+allexpts_cubes = CubeList([])
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/OHT_' + expt
+
+    expt_cube =get_data(filestart,yearstart,yearend)
+    allexpts_cubes.append(expt_cube)
+
+if meanreq == 'y':
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))  # 1 row, 2 columns
+    for i,cube in enumerate(allexpts_cubes):
+        mean_cube = cube.collapsed('t', iris.analysis.MEAN)
+
+        # Extract latitude and data values
+        latitudes = mean_cube.coord('latitude').points
+        values = mean_cube.data
+        if i == 0:
+            cntl_values = values
+
+        # get d/dy of data (for plotting later) along with the middle latitude
+        # mask out between -10 and 10 as the flow changes direction here
+        # we want here from equator - towards pole
+        #  (ie (i-1)-i in NH, i-(i-1) in SH
+        # the ddy is not helpful.  I have removed the plot
+        ddy_latitudes = (latitudes[:-1] + latitudes[1:]) / 2
+        value_differences = values[1:] - values[:-1]
+        #mask = (ddy_latitudes > -10) & (ddy_latitudes < 10)
+        #value_differences[mask] = np.nan
+        value_differences[ddy_latitudes > 0] *= -1.0  # multiply by -1.0 where d/dy> 0
+
+       
+        # Plot latitude vs mean value
+        ax.plot(latitudes, values, label=period.get(exptnames[i]),linewidth=2)
+        #ax[1].plot(ddy_latitudes, value_differences,
+        #             label=period.get(exptnames[i]))
+
+        if i ==1:
+            ax2=ax.twinx()
+            ax2.plot(latitudes,values-cntl_values,
+                    label=period.get(exptnames[1]) +  ' - ' +
+                     period.get(exptnames[0]),linewidth=2,color='grey',linestyle='dotted')
+            anomvals = ((values - cntl_values) / values) * 100.
+            for ix,anom in enumerate(anomvals):
+                if -85 < latitudes[ix] < 0.0:
+                    print(latitudes[ix],round(anom,0),round(values[ix],2),round(cntl_values[ix],2),round((values[ix]-cntl_values[ix]),2))
+            sys.exit(0)
+            
+        
+    ax.set_xlabel('Latitude',fontsize=16)
+    ax.set_ylabel('OHT (PW)',fontsize=16)
+    ax.tick_params(axis='both',which='major',labelsize=14)
+
+    #ax[1].set_title('OHT diff from equ - to pole.  If this is > 0 this latitude warms')
+
+    ax.axhline(y=0, color='black', linewidth=2)
+    #ax[1].axhline(y=0, color='black', linewidth=2)
+
+    # sort out legend
+    
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+
+    lines = lines1 + lines2
+    labels = labels1 + labels2
+
+
+    #ax[1].legend()
+    ax.set_ylim(-1.5,1.6)
+    ax2.set_ylim(-0.15,0.15)
+    ax2.tick_params(axis='y', colors='grey',labelsize=14)
+    ax2.spines['right'].set_color('grey')
+    ax2.set_ylabel('anomaly (PW)',fontsize=16,color='grey')
+
+    #ax[1].set_ylim(-0.1,0.1)
+    #ax.set_xlim(-30,90)
+    ax.grid(True)
+
+    if basin =='atlantic':  # basin must be global / atlantic / pacific
+        ax.set_title('a) Atlantic Ocean Heat Transport',fontsize=16)
+        ax.set_xlim(-30,90)
+        ax.legend(lines, labels, loc='lower right')
+
+    if basin =='pacific':  # basin must be global / atlantic / pacific
+        ax.set_title('b) Pacific Ocean Heat Transport',fontsize=16)
+        ax.set_xlim(-30,90)
+    if basin =='global':  # basin must be global / atlantic / pacific
+        ax.set_title('c) Global Ocean Heat Transport',fontsize=16)
+       
+
+    plt.tight_layout() 
+    #plt.show()
+    #sys.exit()
+    plt.savefig('OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '_anomaly.png')
+    plt.close()
+    sys.exit(0)
+
+cubes_for_meaning = CubeList([])
+if timeseries_req=='y':
+    plt.figure(figsize=(8, 5))
+    for i,cube in enumerate(allexpts_cubes):
+        # extract the latitude of interest
+        lat_constraint = iris.Constraint(latitude=latreq)
+
+        # Apply the constraint
+        timeseriescube = cube.extract(lat_constraint)
+        cubes_for_meaning.append(timeseriescube)
+        time_coord = cube.coord('t')
+        dates = time_coord.units.num2date(time_coord.points)
+        years = [date.year for date in dates]
+
+        values = timeseriescube.data
+
+        plt.plot(years, values, label=period.get(exptnames[i]))
+
+            
+        
+    plt.xlabel('year')
+    plt.ylabel('OHT (PW)')
+    plt.title(basin+' ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
+    plt.legend()
+    plt.grid(True)
+#    plt.close()
+
+    # do a 30 year mean
+
+    plt.figure(figsize=(8, 5))
+    for i,cube in enumerate(cubes_for_meaning):
+        running_mean_cube = running_mean(cube)
+        print(running_mean_cube)
+        time_coord = running_mean_cube.coord('time')
+        dates = time_coord.units.num2date(time_coord.points)
+        years = [date.year for date in dates]
+
+        values = running_mean_cube.data
+
+        plt.plot(years, values, label=period.get(exptnames[i]))
+    plt.xlabel('year')
+    plt.ylabel('OHT (PW)')
+    plt.title(basin + 'ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
+    plt.legend()
+    plt.grid(True)
+
+    plt.show()
+    plt.close()
+    plt.savefig('OHT/'+basin+'OHT_accross_' + str(latreq) + 'png')
+    sys.exit(0)
+::::::::::::::
+plot_sal_diff_203_5.py
+::::::::::::::
+#python program
+#
+# this program will plot the timeseries of the salinity difference between 666m and 5m.  The file used was created by:  spinup/and/timeseries/salinity_gradients.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y203_vals) - np.array(y5_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('salinity 203m-salinity 5m')
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('psu',fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.xlim(0,3000)
+plt.axvline(x=1803,color='red',linestyle='--')
+#plt.legend(fontsize=14)
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+#ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+#ax.set_xlabel(None)
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('salinity_diff_203_5_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_salinity_AABW.py
+::::::::::::::
+#python program
+#
+# this program will plot  SH salinity and AABW on the same plot
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import sys
+
+expt = 'xpsie'
+corr_yearstart = 100
+corr_yearend = 1500
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP'}
+axis_label = {'salinity':'psu','AABW':'SV'}
+
+#plot data from all the files
+if expt == 'xpsij':
+    startyear=1991
+else:
+    startyear=12
+
+labels=[]
+filestart = '/home/earjcti/um/' + expt + '/timeseries/'
+salfile = (filestart + 'salinity_' + expt + '_60.0S-90S_' +
+           str(startyear) + '_2999.tex')
+AABWfile = (filestart + 'GMOC_' + expt + '#' +
+            str(startyear) + '_2999_AABW.tex')
+   
+xsal, ysal = read_data(salfile)
+xAABW, yAABW= read_data(AABWfile)
+
+# Plot the data
+plt.subplot(211)
+ax1=plt.gca()
+ax2=ax1.twinx()
+ax2.invert_yaxis()
+
+line1=ax1.plot(xsal, ysal, label='Salinity', color='blue' )
+line2=ax2.plot(xAABW, yAABW, label='AABW',color='orange' )
+        
+plt.title(expt + ': ' +  period.get(expt))
+
+ax1.set_xlabel('year')
+ax1.set_ylabel('psu',color='blue')
+ax2.set_ylabel('Sv',color='orange')
+
+lines=line1 + line2
+labels = [l.get_label() for l in lines]
+
+ax1.legend(lines, labels, loc='lower left')
+
+plt.grid(True)
+
+
+
+#do a 30 year running mean
+window=30
+ysal_mean=running_mean(ysal,window)
+xsal_mean=xsal[window-1:]
+yAABW_mean=running_mean(yAABW,window)
+xAABW_mean=xAABW[window-1:]
+
+# Plot the data
+plt.subplot(212)
+ax1=plt.gca()
+ax2=ax1.twinx()
+ax2.invert_yaxis()
+
+
+line1=ax1.plot(xsal_mean, ysal_mean, label='Salinity', color='blue' )
+line2=ax2.plot(xAABW_mean, yAABW_mean, label='AABW',color='orange' )
+        
+plt.title(expt + '(30 year mean) : ' +  period.get(expt))
+
+ax1.set_xlabel('year')
+ax1.set_ylabel('psu',color='blue')
+ax2.set_ylabel('km2',color='orange')
+
+lines=line1 + line2
+labels = [l.get_label() for l in lines]
+
+ax1.legend(lines, labels, loc='lower left')
+
+#plt.grid(True)
+#plt.xlim(1500,2000)
+ax1.grid(True)
+
+
+# Save the plot to a file
+plt.savefig(expt + '_salinity_and_AABW.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+
+##################################################################
+# do a lag correlation on the raw data.  To avoid too high correlations
+# only use xvalues between year start and yearend
+print('LAG CORRELATIONS RAW DATA')
+print('--------------------------------------')
+
+xsal_arr = np.array(xsal)
+mask=(xsal_arr >= corr_yearstart) & (xsal_arr <=corr_yearend)
+ysal_sub = np.array(ysal)[mask]
+yAABW_sub=np.array(yAABW)[mask]
+print(np.shape(ysal_sub))
+print(np.shape(ysal))
+
+ysal_series = pd.Series(ysal_sub)
+yAABW_series = pd.Series(yAABW_sub)
+
+# Choose the maximum lag to test (in time steps)
+max_lag = 30  # 30 years
+
+# Compute correlations for lags from -max_lag to +max_lag
+lags = range(-max_lag, max_lag + 1)
+lag_corrs = [ysal_series.corr(yAABW_series.shift(lag)) for lag in lags]
+
+# Print results
+for lag, corr in zip(lags, lag_corrs):
+    if lag < 0:
+        relation = f"Salinity leads AABW by {lag} steps"
+    elif lag > 0:
+        relation = f"AABW leads Salinity by {abs(lag)} steps"
+    else:
+        relation = "No lead/lag (simultaneous)"
+        
+    r_squared = corr**2 if corr is not None else np.nan
+    if r_squared > 0.2:
+        print(f"{relation}: r = {corr:.3f}, R² = {r_squared:.3f}")
+
+
+##################################################################
+# do a lag correlation on the 30 year averaged data
+print('LAG CORRELATIONS 30 yr avg DATA ')
+print('--------------------------------------')
+xsal_arr = np.array(xsal_mean)
+mask=(xsal_arr >= corr_yearstart) & (xsal_arr <=corr_yearend)
+ysal_sub = np.array(ysal_mean)[mask]
+yAABW_sub=np.array(yAABW_mean)[mask]
+x_sub = xsal_arr[mask]
+print(np.shape(ysal_sub))
+print(np.shape(ysal))
+
+ysal_series = pd.Series(ysal_sub)
+yAABW_series = pd.Series(yAABW_sub)
+
+# Choose the maximum lag to test (in time steps)
+max_lag = 30  # 30 years
+
+
+# Compute correlations for lags from -max_lag to +max_lag on 30 year mean data
+lags = range(-max_lag, max_lag + 1)
+lag_corrs = [ysal_series.corr(yAABW_series.shift(lag)) for lag in lags]
+lag_r2 = [corr**2 if corr is not None else np.nan for corr in lag_corrs]
+
+lagged_AABW = np.array(yAABW_series.shift(-2))
+
+# Print results
+for lag, corr, r2 in zip(lags, lag_corrs, lag_r2):
+    if lag < 0:
+        relation = f"Salinity leads AABW by {lag} steps"
+    elif lag > 0:
+        relation = f"AABW leads Salinity by {abs(lag)} steps"
+    else:
+        relation = "No lead/lag (simultaneous)"
+        
+    if r2 > 0.2:
+        print(f"{relation}: r = {corr:.3f}, R² = {r2:.3f}")
+
+# --- Create subplots: top = data, bottom = lead–lag correlation ---
+fig, (ax_data, ax_corr) = plt.subplots(2, 1, figsize=(8, 8), sharex=False)
+
+# --- Top panel: time series data ---
+ax2=ax_data.twinx()
+ax2.invert_yaxis()
+
+ax_data.plot(x_sub, ysal_sub, label='Salinity', color='blue')
+ax2.plot(x_sub, yAABW_sub, label='AABW', color='orange')
+#ax2.plot(x_sub, lagged_AABW, label='AABW lagged', color='green')
+ax_data.set_ylabel("Value")
+ax_data.set_title("Time Series: Salinity and AABW")
+ax_data.legend(loc="lower right")
+ax2.legend()
+ax_data.grid(True)
+
+# --- Bottom panel: lead–lag correlation ---
+ax_corr.plot(lags, lag_corrs, marker='o', label='Correlation (r)')
+#ax_corr.plot(lags, lag_r2, marker='s', linestyle='--', label='R²')
+
+# Highlight the max correlation
+max_idx = np.nanargmax(np.abs(lag_corrs))
+ax_corr.axvline(lags[max_idx], color='red', linestyle=':', 
+                label=f"Peak at lag {lags[max_idx]}")
+
+# Shade regions for clarity
+ax_corr.axvspan(min(lags), -1, color='lightblue', alpha=0.2, label='Salinity leads')
+ax_corr.axvspan(1, max(lags), color='lightgreen', alpha=0.2, label='AABW leads')
+
+ax_corr.axhline(0, color='black', linewidth=0.8)
+ax_corr.set_xlabel("Lag (positive = AABW leads)")
+ax_corr.set_ylabel("Correlation")
+ax_corr.set_title("Lead–Lag Correlation")
+ax_corr.legend()
+ax_corr.grid(True)
+
+plt.tight_layout()
+plt.savefig(expt + '_lead_lag_corr_salinity_and_AABW.png')
+
+###############################################
+# now I want to find to use the best lag correlation to relate antarcic bottom
+# water to salinity
+
+best_lag = lags[np.argmax(np.abs(lag_corrs))]
+shifted_ysal = ysal_series.shift(-best_lag)
+
+# Drop NaNs due to shifting
+valid_idx = shifted_ysal.dropna().index.intersection(yAABW_series.dropna().index)
+X = shifted_ysal.loc[valid_idx].values.reshape(-1, 1)  # Predictor
+y = yAABW_series.loc[valid_idx].values               # Target
+
+# Fit linear regression
+model = LinearRegression().fit(X, y)
+print('model score (for checking the correlation',model.score(X,y))
+
+# print equation and use to estimate AABW over the whole time period
+slope = model.coef_[0]
+intercept = model.intercept_
+print(f"Best lag: {best_lag}")
+print(f"Equation: yAABW = {slope:.4f} * y_sal_lagged + {intercept:.4f}")
+
+# model the AABW but do this for the whole timeseries
+ysal_mean_shifted=pd.Series(ysal_mean).shift(-best_lag)
+modelled_AABW = (slope * ysal_mean_shifted) + intercept
+
+print(pd.Series(xsal_mean).shape)
+print(ysal_mean_shifted.shape)
+print(pd.Series(yAABW_mean).shape)
+print(modelled_AABW.shape)
+      
+
+fig, (ax_data, ax_diff) = plt.subplots(2, 1, figsize=(8, 8), sharex=False)
+ax_data.plot(xsal_mean, yAABW_mean, label='AABW orig', color='blue')
+ax_data.plot(xsal_mean, modelled_AABW, label='AABW from salinity', color='orange')
+ax_data.legend()
+
+ax_data.set_title('AABW from model and obtained from salinity correlation')
+ax_diff.plot(xsal_mean, yAABW_mean - modelled_AABW)
+ax_diff.set_title('Unaccounted for AABW')
+plt.show()
+plt.close()
+::::::::::::::
+plot_salinity_diff_666_203.py
+::::::::::::::
+#python program
+#
+# this program will plot the timeseries of the salinity difference between 666m and 204m.  The file used was created by:  spinup/and/timeseries/salinity_gradients.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y666_vals) - np.array(y203_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('salinity 666m-salinity 203m')
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('psu',fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.axvline(x=1803,color='red',linestyle='--')
+#plt.xlim(900,1000)
+#plt.legend(fontsize=14)
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+#ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+#ax.set_xlabel(None)
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('salinity_diff_666_203_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_salinity.py
+::::::::::::::
+#python program
+#
+# this program will plot the salinity SH from files created from SH_salinity.py
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line  
+        for line in file:
+            #print(line) # this should be the title
+            #sys.exit(0)
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+#plot data from all the files
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
+   
+    if expt == 'xpsij':
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
+    else:
+        filename = filestart + '_70.0S-90S_2_100.tex'
+   
+    x, y = read_data(filename)
+
+    # Plot the data
+    plt.subplot(211)
+    plt.plot(x, y, label=period.get(expt) )
+    plt.title('SSS 70S-90S')
+
+plt.xlabel('year')
+plt.ylabel('psu')
+plt.legend()
+plt.grid(True)
+
+
+#do a 30 year running mean
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
+    if expt == 'xpsij':
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
+    else:
+        filename = filestart + '_70.0S-90S_2_100.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    plt.subplot(212)
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('SSS 70S-90S (30 year running mean)')
+
+plt.xlabel('year',fontsize=14)
+plt.ylabel('psu',fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+#plt.xlim(0,1000)
+plt.legend(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+
+# Save the plot to a file
+plt.savefig('salinity_plots/salinity_2_100_70.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = '/home/earjcti/um/' + expt + '/timeseries/salinity_' + expt
+    if expt == 'xpsij':
+        filename = filestart + '_70.0S-90S_1991_2999.tex'
+    else:
+        filename = filestart + '_70.0S-90S_2_100.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('SSS 70S-90S (30 year running mean)')
+
+#plt.xlabel('year',fontsize=16)
+plt.ylabel('psu',fontsize=16)
+#plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.xlim(0,3000)
+#plt.legend(fontsize=14)
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+ax.set_xlabel(None)
+plt.axvline(x=1803,color='red',linestyle='--')
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('salinity_plots/salinity_30yr_2_100_70.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_salinity_seaice.py
+::::::::::::::
+#python program
+#
+# this program will plot  SH salinity and sea ice on the same plot
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import sys
+
+expt = 'xpsig'
+corr_yearstart = 1500
+corr_yearend = 1800
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP'}
+axis_label = {'salinity':'psu','seaice_area':'km2'}
+
+#plot data from all the files
+if expt == 'xpsij':
+    startyear=1991
+else:
+    startyear=12
+
+labels=[]
+salfile = ('salinity_' + expt + '_60.0S-90S_' + str(startyear) + '_2999.tex')
+cicefile = ('seaice_area_' + expt + '_SH_' + str(startyear) + '_2999.tex')
+   
+xsal, ysal = read_data(salfile)
+xcice, ycice= read_data(cicefile)
+
+# Plot the data
+plt.subplot(211)
+ax1=plt.gca()
+ax2=ax1.twinx()
+
+line1=ax1.plot(xsal, ysal, label='Salinity', color='blue' )
+line2=ax2.plot(xcice, ycice, label='Sea ice area',color='orange' )
+        
+plt.title(expt + ': ' +  period.get(expt))
+
+ax1.set_xlabel('year')
+ax1.set_ylabel('psu',color='blue')
+ax2.set_ylabel('km2',color='orange')
+
+lines=line1 + line2
+labels = [l.get_label() for l in lines]
+
+ax1.legend(lines, labels, loc='lower left')
+
+plt.grid(True)
+
+
+
+#do a 30 year running mean
+window=30
+ysal_mean=running_mean(ysal,window)
+xsal_mean=xsal[window-1:]
+ycice_mean=running_mean(ycice,window)
+xcice_mean=xcice[window-1:]
+
+# Plot the data
+plt.subplot(212)
+ax1=plt.gca()
+ax2=ax1.twinx()
+
+line1=ax1.plot(xsal_mean, ysal_mean, label='Salinity', color='blue' )
+line2=ax2.plot(xcice_mean, ycice_mean, label='Sea ice area',color='orange' )
+        
+plt.title(expt + '(30 year mean) : ' +  period.get(expt))
+
+ax1.set_xlabel('year')
+ax1.set_ylabel('psu',color='blue')
+ax2.set_ylabel('km2',color='orange')
+
+lines=line1 + line2
+labels = [l.get_label() for l in lines]
+
+ax1.legend(lines, labels, loc='lower left')
+
+#plt.grid(True)
+#plt.xlim(1500,2000)
+ax1.grid(True)
+
+
+# Save the plot to a file
+plt.savefig(expt + '_salinity_and_seaice.png')
+print("Plot saved to 'combined_plot.png'.")
+plt.close()
+
+##################################################################
+# do a lag correlation on the raw data.  To avoid too high correlations
+# only use xvalues between year start and yearend
+print('LAG CORRELATIONS RAW DATA')
+print('--------------------------------------')
+
+xsal_arr = np.array(xsal)
+mask=(xsal_arr >= corr_yearstart) & (xsal_arr <=corr_yearend)
+ysal_sub = np.array(ysal)[mask]
+ycice_sub=np.array(ycice)[mask]
+print(np.shape(ysal_sub))
+print(np.shape(ysal))
+
+ysal_series = pd.Series(ysal_sub)
+ycice_series = pd.Series(ycice_sub)
+
+# Choose the maximum lag to test (in time steps)
+max_lag = 30  # 30 years
+
+# Compute correlations for lags from -max_lag to +max_lag
+lags = range(-max_lag, max_lag + 1)
+lag_corrs = [ysal_series.corr(ycice_series.shift(lag)) for lag in lags]
+
+# Print results
+for lag, corr in zip(lags, lag_corrs):
+    if lag < 0:
+        relation = f"Salinity leads Sea Ice by {lag} steps"
+    elif lag > 0:
+        relation = f"Sea Ice leads Salinity by {abs(lag)} steps"
+    else:
+        relation = "No lead/lag (simultaneous)"
+        
+    r_squared = corr**2 if corr is not None else np.nan
+    if r_squared > 0.2:
+        print(f"{relation}: r = {corr:.3f}, R² = {r_squared:.3f}")
+
+
+##################################################################
+# do a lag correlation on the 30 year averaged data
+print('LAG CORRELATIONS 30 yr avg DATA ')
+print('--------------------------------------')
+xsal_arr = np.array(xsal_mean)
+mask=(xsal_arr >= corr_yearstart) & (xsal_arr <=corr_yearend)
+ysal_sub = np.array(ysal_mean)[mask]
+ycice_sub=np.array(ycice_mean)[mask]
+x_sub = xsal_arr[mask]
+print(np.shape(ysal_sub))
+print(np.shape(ysal))
+
+ysal_series = pd.Series(ysal_sub)
+ycice_series = pd.Series(ycice_sub)
+
+# Choose the maximum lag to test (in time steps)
+max_lag = 25  # 30 years
+
+
+# Compute correlations for lags from -max_lag to +max_lag on 30 year mean data
+lags = range(-max_lag, max_lag + 1)
+lag_corrs = [ysal_series.corr(ycice_series.shift(lag)) for lag in lags]
+lag_r2 = [corr**2 if corr is not None else np.nan for corr in lag_corrs]
+
+lagged_sea_ice = np.array(ycice_series.shift(-2))
+
+# Print results
+for lag, corr, r2 in zip(lags, lag_corrs, lag_r2):
+    if lag < 0:
+        relation = f"Salinity leads Sea Ice by {lag} steps"
+    elif lag > 0:
+        relation = f"Sea Ice leads Salinity by {abs(lag)} steps"
+    else:
+        relation = "No lead/lag (simultaneous)"
+        
+    if r2 > 0.2:
+        print(f"{relation}: r = {corr:.3f}, R² = {r2:.3f}")
+
+# --- Create subplots: top = data, bottom = lead–lag correlation ---
+fig, (ax_data, ax_corr) = plt.subplots(2, 1, figsize=(8, 8), sharex=False)
+
+# --- Top panel: time series data ---
+ax2=ax_data.twinx()
+ax_data.plot(x_sub, ysal_sub, label='Salinity', color='blue')
+ax2.plot(x_sub, ycice_sub, label='Sea Ice', color='orange')
+#ax2.plot(x_sub, lagged_sea_ice, label='Sea Ice lagged', color='green')
+ax_data.set_ylabel("Value")
+ax_data.set_title("Time Series: Salinity and Sea Ice")
+ax_data.legend()
+ax_data.grid(True)
+
+# --- Bottom panel: lead–lag correlation ---
+ax_corr.plot(lags, lag_corrs, marker='o', label='Correlation (r)')
+#ax_corr.plot(lags, lag_r2, marker='s', linestyle='--', label='R²')
+
+# Highlight the max correlation
+max_idx = np.nanargmax(np.abs(lag_corrs))
+ax_corr.axvline(lags[max_idx], color='red', linestyle=':', 
+                label=f"Peak at lag {lags[max_idx]}")
+
+# Shade regions for clarity
+ax_corr.axvspan(min(lags), -1, color='lightblue', alpha=0.2, label='Salinity leads')
+ax_corr.axvspan(1, max(lags), color='lightgreen', alpha=0.2, label='Seaice leads')
+
+ax_corr.axhline(0, color='black', linewidth=0.8)
+ax_corr.set_xlabel("Lag (positive = sea ice leads)")
+ax_corr.set_ylabel("Correlation")
+ax_corr.set_title("Lead–Lag Correlation")
+ax_corr.legend()
+ax_corr.grid(True)
+
+plt.tight_layout()
+plt.savefig(expt + '_lead_lag_corr_salinity_and_seaice.png')
+::::::::::::::
+plot_salinity_timeseries_alllevels.py
+::::::::::::::
+#python program
+#
+# this program will plot a timeseries of the salinity at different levels and
+# the gradients between them
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsio']
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+def run_mean(y):
+    window = 30
+    # convolution with a uniform window
+    y_smooth = np.convolve(y, np.ones(window)/window, mode='valid')
+    # put into an array the same size as y
+    left = window //2
+    right = window -1 -left
+
+    yout = np.full_like(y,np.nan,dtype=float)
+    yout[left:len(y)-right]=y_smooth
+ 
+    return yout
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+    y5_valsa = run_mean(y5_vals)
+    y25_valsa= run_mean(y25_vals)
+    y47_valsa= run_mean(y47_vals)
+    y203_valsa= run_mean(y203_vals)
+    y447_valsa= run_mean(y447_vals)
+    y666_valsa= run_mean(y666_vals)
+    y995_valsa= run_mean(y995_vals)
+    y1500_valsa= run_mean(y1500_vals)
+    
+    
+                
+    return (x_vals, y5_valsa, y25_valsa, y47_valsa,
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa)
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
+          'xpsie':'EP400','xpsig':'EP','xpsio':'highSHorb'}
+
+
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+
+#plot data from all the files
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+
+
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+   
+    # Plot the data
+    line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y25)
+    axes[0,1].set_title("25m")
+
+    axes[0,2].plot(x, y47)
+    axes[0,2].set_title("47m")
+    
+    axes[1,0].plot(x, y203)
+    axes[1,0].set_title("203m")
+
+    axes[1,1].plot(x, y447)
+    axes[1,1].set_title("447m")
+
+    axes[1,2].plot(x, y666)
+    axes[1,2].set_title("666m")
+    
+    axes[2,0].plot(x, y995)
+    axes[2,0].set_title("995m")
+
+    axes[2,1].plot(x, y1500)
+    axes[2,1].set_title("1500m")
+
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    #ax.axvline(x=1803,color='red',linestyle='--')
+    #ax.set_xlim(1500,2000)
+plt.tight_layout()
+#plt.show()
+#plt.close()
+#sys.exit(0)
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_'+lat+'.eps')
+plt.close()
+
+
+#sys.exit(0)
+
+
+# now plot difference between 203m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y203-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("203m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y203-y25)
+    axes[0,1].set_title("203m-25m")
+
+    axes[0,2].plot(x, y203-y47)
+    axes[0,2].set_title("203m -47m")
+    
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_203m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 447m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y447-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("447m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y447-y25)
+    axes[0,1].set_title("447m-25m")
+
+    axes[0,2].plot(x, y447-y47)
+    axes[0,2].set_title("447m -47m")
+
+    axes[1,0].plot(x, y447-y203)
+    axes[1,0].set_title("447m -203m")
+   
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_447m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 666m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y666-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("666m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y666-y25)
+    axes[0,1].set_title("666m-25m")
+
+    axes[0,2].plot(x, y666-y47)
+    axes[0,2].set_title("666m -47m")
+
+    axes[1,0].plot(x, y666-y203)
+    axes[1,0].set_title("666m -203m")
+
+    axes[1,1].plot(x, y666-y447)
+    axes[1,1].set_title("666m -447m")
+ 
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_666m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 995m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y995-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("995m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y995-y25)
+    axes[0,1].set_title("995m-25m")
+
+    axes[0,2].plot(x, y995-y47)
+    axes[0,2].set_title("995m -47m")
+
+    axes[1,0].plot(x, y995-y203)
+    axes[1,0].set_title("995m -203m")
+
+    axes[1,1].plot(x, y995-y447)
+    axes[1,1].set_title("995m -447m")
+
+    axes[1,2].plot(x, y995-y666)
+    axes[1,2].set_title("995m -666m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_995m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 1500m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/spinup/'+ expt +
+                 '_Pacific_salinity_levs')
+    if expt == 'xpsio':
+        filename = filestart + '1991_3000_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y1500-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("1500m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y1500-y25)
+    axes[0,1].set_title("1500m-25m")
+
+    axes[0,2].plot(x, y1500-y47)
+    axes[0,2].set_title("1500m -47m")
+
+    axes[1,0].plot(x, y1500-y203)
+    axes[1,0].set_title("1500m -203m")
+
+    axes[1,1].plot(x, y1500-y447)
+    axes[1,1].set_title("1500m -447m")
+
+    axes[1,2].plot(x, y1500-y666)
+    axes[1,2].set_title("1500m -666m")
+
+    axes[2,0].plot(x, y1500-y995)
+    axes[2,0].set_title("1500m -995m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('salinity_plots/'+expt+'_salinity_alllevs_1500m_diff'+lat+'.eps')
+plt.close()
+
+::::::::::::::
+plot_seaicearea.py
+::::::::::::::
+#python program
+#
+# this program will plot the sea ice area from files created from seaicearea.py
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+exptnames = ['xpsid','xpsig','xpsig']
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    x_vals = []
+    y_vals = []
+    print(filename)
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                x, y = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y_vals.append(y)
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+#plot data from all the files
+for expt in exptnames:
+    if expt == 'xpsij':
+        filename = 'seaice/seaice_area_' + expt + '_SH_1991_2999.tex'
+    else:
+        filename = 'seaice/seaice_area_' + expt + '_SH_2_2999.tex'
+  
+    x, y = read_data(filename)
+
+    # Plot the data
+    plt.subplot(211)
+    plt.plot(x, y, label=period.get(expt) )
+    plt.title('SH Sea ice area')
+
+plt.xlabel('year')
+plt.ylabel('km2')
+plt.legend()
+plt.grid(True)
+
+
+#do a 30 year running mean
+for expt in exptnames:
+    if expt == 'xpsij':
+        filename = 'seaice/seaice_area_' + expt + '_SH_1991_2999.tex'
+    else:
+        filename = 'seaice/seaice_area_' + expt + '_SH_2_2999.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    plt.subplot(212) 
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt),linestyle='--',
+                 linewidth=2)
+    else:
+        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt) )
+    plt.title('SH Sea ice area (30 year running mean)')
+
+plt.xlabel('year',fontsize=14)
+plt.ylabel('million km$^2$',fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+#plt.xlim(1000,2000)
+plt.grid(True)
+
+plt.tight_layout()
+
+
+# Save the plot to a file
+plt.savefig('seaice/sea-ice_2_2999.png')
+plt.close()
+
+# now do a 30 year running mean on its own for the paper
+#do a 30 year running mean
+plt.figure(figsize=(6.5, 2.5))
+
+for expt in exptnames:
+    if expt == 'xpsij':
+        filename = 'seaice/seaice_area_' + expt + '_SH_1991_2999.tex'
+    else:
+        filename = 'seaice/seaice_area_' + expt + '_SH_2_2999.tex'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt),linestyle='--',
+                 linewidth=3)
+    else:
+        plt.plot(x_mean, y_mean /1.0E6, label=period.get(expt) )
+    #plt.title('SH Sea ice area (30 year running mean)')
+    plt.title('a) Southern Hemisphere Sea Ice)',fontsize=20)
+
+#plt.xlabel('year',fontsize=16)
+plt.ylabel('million km$^2$',fontsize=18)
+#plt.xticks(fontsize=16)
+plt.yticks(fontsize=18)
+plt.legend(fontsize=20)
+plt.xlim(0,3000)
+plt.grid(True)
+plt.axvline(x=1803,color='red',linestyle='--')
+
+# remove x axis
+ax = plt.gca()
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+ax.set_xlabel(None)
+
+
+MARGINS = dict(left=0.14, right=0.98, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+
+# Save the plot to a file
+plt.savefig('seaice/sea-ice_30yr_2_2999.png')
+::::::::::::::
+plot_SST_bands.py
+::::::::::::::
+#python program
+#
+# this program will plot the salinity SH from files created from SH_salinity.py
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+exptnames = ['xpsic','xpsid','xpsij','xpsig','xpsie']
+#exptnames = ['xpsig']
+
+# Function to read data from a file, skipping the first line
+def read_data(filename,band_required):
+
+    band_index={'30S-30N':1,'30N-60N':2,'60N-90N':3,'30N-90N':4,
+                '60S-30S':5,'90S-60S':6,'90S-30S':7}
+    ix=band_index.get(band_required)
+  
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                values = line.strip().split(',')
+                x_vals.append(float(values[0]))
+                y_vals.append(float(values[ix]))
+   
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return (x_vals, y_vals)
+   
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+def process_band(band,exptnames):
+    """
+    this will plot everything for one of the latitude bands
+    """
+    plt.figure(figsize=(12, 9))
+
+    for expt in exptnames:
+        filestart = ('/home/earjcti/um/' + expt +
+                     '/timeseries/SST_bands_' + expt)
+   
+        if expt == 'xpsij':
+            filename = filestart + '_1991_2999.tex'
+        else:
+            filename = filestart + '_12_2999.tex'
+  
+        (x, y) = read_data(filename,band)
+ 
+        # Plot the data
+        plt.subplot(211)
+        plt.plot(x, y, label=expt + ': ' + period.get(expt) )
+        plt.title('SST ' + band)
+
+    plt.xlabel('year')
+    plt.ylabel('degC')
+    plt.xlim(0,1000)
+    plt.legend()
+    plt.grid(True)
+  
+    #do a 30 year running mean
+    for expt in exptnames:
+        filestart = ('/home/earjcti/um/' + expt +
+                     '/timeseries/SST_bands_' + expt)
+   
+        if expt == 'xpsij':
+            filename = filestart + '_1991_2999.tex'
+        else:
+            filename = filestart + '_12_2999.tex'
+  
+        x, y = read_data(filename,band)
+        # calculate running mean
+        window=30
+        y_mean=running_mean(y,window)
+        x_mean=x[window-1:]
+
+  
+        # Plot the data
+        plt.subplot(212)
+        plt.plot(x_mean, y_mean, label=expt + ': ' + period.get(expt) )
+        plt.title('SST 60S-90S (30 year running mean)')
+        plt.title('SST ' + band + '(30 year running mean)')
+
+    plt.xlabel('year')
+    plt.ylabel('degC')
+    plt.legend()
+    plt.xlim(1000,2000)
+    plt.grid(True)
+
+ 
+    # Save the plot to a file
+    plt.savefig('SST_'+band+'.png')
+    print("Plot saved to 'combined_plot.png'.")
+
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+bands_required = ['30S-30N','30N-60N','60N-90N','30N-90N',
+                  '60S-30S','90S-60S','90S-30S']
+
+for band in bands_required:
+    process_band(band,exptnames)
+
+::::::::::::::
+plot_SST_corr_bands.py
+::::::::::::::
+#python program
+#
+# this program will plot the salinty from different bands and see what leads
+# what
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import sys
+
+expt = 'xpsig'
+band1='90S-60S'
+band2='60N-90N'
+
+corr_yearstart =100
+corr_yearend = 1800
+
+# Function to read data from a file, skipping the first line
+def read_data(filename,bandreq):
+    band_index={'30S-30N':1,'30N-60N':2,'60N-90N':3,'30N-90N':4,
+                '60S-30S':5,'90S-60S':6,'90S-30S':7}
+    ix=band_index.get(bandreq)
+
+    x_vals = []
+    y_vals = []
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                values = line.strip().split(',')
+                x_vals.append(float(values[0]))
+                y_vals.append(float(values[ix]))
+             
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+    return x_vals, y_vals
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400','xpsig':'EP',
+          'xpsic':'PI'}
+axis_label = {'salinity':'psu','AABW':'SV'}
+
+#plot data from all the files
+if expt == 'xpsij':
+    startyear=1991
+else:
+    startyear=12
+
+labels=[]
+filename = ('/home/earjcti/um/' + expt + '/timeseries/SST_bands_' +
+            expt + '_' + str(startyear) + '_2999.tex')
+
+xband1, yband1 = read_data(filename,band1)
+xband2, yband2= read_data(filename,band2)
+
+# Plot the data
+plt.subplot(211)
+
+line1=plt.plot(xband1, [value - yband1[0] for value in yband1], label=band1, color='blue' )
+line2=plt.plot(xband2, [value - yband2[0] for value in yband2], label=band2, color='orange' )
+        
+plt.title('Temperature trend: '+expt + ': ' +  period.get(expt))
+plt.xlabel('year')
+plt.ylabel('degC')
+plt.legend(loc='lower right')
+plt.grid(True)
+
+
+#do a 30 year running mean
+window=100
+yband1_mean=running_mean(yband1,window)
+xband1_mean=xband1[window-1:]
+yband2_mean=running_mean(yband2,window)
+xband2_mean=xband2[window-1:]
+
+# Plot the data
+plt.subplot(212)
+
+plt.plot(xband1_mean, [value - yband1_mean[20] for value in yband1_mean], label=band1, color='blue' )
+plt.plot(xband2_mean, [value - yband2_mean[20] for value in yband2_mean], label=band2,color='orange' )
+        
+plt.title(expt + '(30 year mean) : ' +  period.get(expt))
+
+plt.xlabel('year')
+plt.ylabel('degC')
+plt.legend(loc='lower right')
+plt.grid(True)
+plt.xlim(corr_yearstart,corr_yearend)
+plt.grid(True)
+#plt.show()
+plt.close()
+
+##################################################################
+# do a lag correlation on the raw data.  To avoid too high correlations
+# only use xvalues between year start and yearend
+print('LAG CORRELATIONS RAW DATA')
+print('--------------------------------------')
+
+xband1_arr = np.array(xband1)
+mask=(xband1_arr >= corr_yearstart) & (xband1_arr <=corr_yearend)
+yband1_sub = np.array(yband1)[mask]
+yband2_sub=np.array(yband2)[mask]
+
+yband1_series = pd.Series(yband1_sub)
+yband2_series = pd.Series(yband2_sub)
+
+# Choose the maximum lag to test (in time steps)
+max_lag = 30  # 30 years
+
+# Compute correlations for lags from -max_lag to +max_lag
+lags = range(-max_lag, max_lag + 1)
+lag_corrs = [yband1_series.corr(yband2_series.shift(lag)) for lag in lags]
+
+# Print results
+for lag, corr in zip(lags, lag_corrs):
+    if lag < 0:
+        relation = f"{band1} leads {band2} by {lag} steps"
+    elif lag > 0:
+        relation = f"{band2} leads {band1} by {abs(lag)} steps"
+    else:
+        relation = "No lead/lag (simultaneous)"
+        
+    r_squared = corr**2 if corr is not None else np.nan
+    if r_squared > 0.2:
+        print(f"{relation}: r = {corr:.3f}, R² = {r_squared:.3f}")
+
+
+##################################################################
+# do a lag correlation on the 30 year averaged data
+print('LAG CORRELATIONS 30 yr avg DATA ')
+print('--------------------------------------')
+xband1_arr = np.array(xband1_mean)
+mask=(xband1_arr >= corr_yearstart) & (xband1_arr <=corr_yearend)
+yband1_sub = np.array(yband1_mean)[mask]
+yband2_sub=np.array(yband2_mean)[mask]
+x_sub = xband1_arr[mask]
+print(np.shape(yband1_sub))
+print(np.shape(yband1))
+
+yband1_series = pd.Series(yband1_sub)
+yband2_series = pd.Series(yband2_sub)
+
+# Choose the maximum lag to test (in time steps)
+max_lag = 50  # 30 years
+
+
+# Compute correlations for lags from -max_lag to +max_lag on 30 year mean data
+lags = range(-max_lag, max_lag + 1)
+lag_corrs = [yband1_series.corr(yband2_series.shift(lag)) for lag in lags]
+lag_r2 = [corr**2 if corr is not None else np.nan for corr in lag_corrs]
+
+lagged_AABW = np.array(yband2_series.shift(-2))
+
+# Print results
+for lag, corr, r2 in zip(lags, lag_corrs, lag_r2):
+    if lag < 0:
+        relation = f"{band1} leads {band2} by {lag} steps"
+    elif lag > 0:
+        relation = f"{band2} leads {band1} by {abs(lag)} steps"
+    else:
+        relation = "No lead/lag (simultaneous)"
+        
+    if r2 > 0.2:
+        print(f"{relation}: r = {corr:.3f}, R² = {r2:.3f}")
+
+# --- Create subplots: top = data, bottom = lead–lag correlation ---
+fig, (ax_data, ax_corr) = plt.subplots(2, 1, figsize=(8, 8), sharex=False)
+
+# --- Top panel: time series data ---
+
+ax_data.plot(x_sub, [value - yband1_sub[20] for value in yband1_sub], label=band1, color='blue')
+ax_data.plot(x_sub, [value - yband2_sub[20] for value in yband2_sub], label=band2, color='orange')
+ax_data.set_ylabel("Value")
+ax_data.set_title("Time Series: SST")
+ax_data.legend(loc="lower right")
+ax_data.legend()
+ax_data.grid(True)
+
+# --- Bottom panel: lead–lag correlation ---
+ax_corr.plot(lags, lag_corrs, marker='o', label='Correlation (r)')
+#ax_corr.plot(lags, lag_r2, marker='s', linestyle='--', label='R²')
+
+# Highlight the max correlation
+max_idx = np.nanargmax(np.abs(lag_corrs))
+ax_corr.axvline(lags[max_idx], color='red', linestyle=':', 
+                label=f"Peak at lag {lags[max_idx]}")
+
+# Shade regions for clarity
+ax_corr.axvspan(min(lags), -1, color='lightblue', alpha=0.2, label=f'{band1} leads')
+ax_corr.axvspan(1, max(lags), color='lightgreen', alpha=0.2, label=f'{band2} leads')
+
+ax_corr.axhline(0, color='black', linewidth=0.8)
+ax_corr.set_xlabel(f"Lag (positive = {band2} leads)")
+ax_corr.set_ylabel("Correlation")
+ax_corr.set_title("Lead–Lag Correlation")
+ax_corr.legend()
+ax_corr.grid(True)
+
+plt.tight_layout()
+plt.show()
+#plt.savefig(expt + '_lead_lag_corr_salin_and_AABW.png')
+
+::::::::::::::
+plot_temp_diff_203_5.py
+::::::::::::::
+#python program
+#
+# this program will plot the timeseries of the temperature difference between 203m and 5m.  The file used was created by:  spinup/and/timeseries/density_gradients.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y203_vals) - np.array(y5_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('temperature 203m-temperature 5m')
+
+plt.xlabel('year',fontsize=16)
+plt.ylabel('$^o$C',fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.xlim(0,3000)
+plt.axvline(x=1803,color='red',linestyle='--')
+
+#plt.legend(fontsize=14)
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+#ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+#ax.set_xlabel(None)
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('temp_diff_203_5_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_temp_diff_666_203.py
+::::::::::::::
+#python program
+#
+# this program will plot the timeseries of the temperature difference between 666m and 204m.  The file used was created by:  spinup/and/timeseries/temperature_gradients.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+# Function to read data from a file, skipping the first line
+def read_data(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+
+    ydiff=np.array(y666_vals) - np.array(y203_vals)
+    
+    
+                
+    return (x_vals, ydiff)
+
+
+
+
+
+##################################################################
+plt.figure(figsize=(12, 9))
+period = {'xpsid':'LP','xpsij':'LP490','xpsie':'EP400',
+          'xpsig':'EP','xpsic':'PI'}
+
+
+#do the 30 year running mean on its own for the paper
+plt.figure(figsize=(12, 4))
+
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/' + expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    x, y = read_data(filename)
+    window=30
+    y_mean=running_mean(y,window)
+    x_mean=x[window-1:]
+
+    # Plot the data
+    if expt == 'xpsie':
+        plt.plot(x_mean, y_mean, label=period.get(expt),
+                 linewidth=3,linestyle='--')
+    else:
+        plt.plot(x_mean, y_mean, label=period.get(expt) )
+    plt.title('temperature 666m-temperature 203m')
+
+plt.xlabel('year',fontsize=16)
+plt.axvline(x=1803,color='red',linestyle='--')
+  
+plt.ylabel('$^o$C',fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.xlim(0,3000)
+#plt.legend(fontsize=14)
+plt.grid(True)
+
+# Hide bottom spine and all x ticks/labels
+#ax.spines['bottom'].set_visible(False)
+ax = plt.gca()
+#ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+# Remove x label if present
+#ax.set_xlabel(None)
+
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+
+# Save the plot to a file
+plt.savefig('temp_diff_666_203_30yr.png')
+print("Plot saved to 'combined_plot.png'.")
+::::::::::::::
+plot_temperature_timeseries_alllevels.py
+::::::::::::::
+#python program
+#
+# this program will plot a timeseries of the temperature at different levels and
+# the gradients between them
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+#exptnames = ['xpsid','xpsic','xpsig','xpsie']
+exptnames = ['xpsid','xpsig','xpsie']
+lat = "-65"  # we have the average southwards of this latitude in the file
+
+
+def run_mean(y):
+    window = 30
+    # convolution with a uniform window
+    y_smooth = np.convolve(y, np.ones(window)/window, mode='valid')
+    # put into an array the same size as y
+    left = window //2
+    right = window -1 -left
+
+    yout = np.full_like(y,np.nan,dtype=float)
+    yout[left:len(y)-right]=y_smooth
+ 
+    return yout
+
+def roll_linear_trend(ts,years,expt,threshold):
+    window=100
+
+    # ts   = your data array
+
+    trends = np.full(len(ts), np.nan)   # will store the rolling slopes
+
+    for i in range(len(ts) - window):
+        y = ts[i:i+window]
+        
+        x = np.arange(window)  # 0..9
+        # linear fit: slope only
+        slope, intercept = np.polyfit(x, y, 1)
+        trends[i + window//2] = slope *100.  # center the window and
+                                             # convert to centuary
+        #if slope > 0.006:
+        #    print(i,years[i],slope)
+        
+    # threshold will be passed but will be calculated here from xpsid
+    if expt == 'xpsig':
+        # the threshold for xpsie will be xpsid + 10%
+        threshold  = (trends[500:2501].max()) *  1.1
+        print(expt,'threshold - julia',threshold)
+
+    if expt == 'xpsie':
+        # find first index where slope > threshold 
+        idx = np.where(trends > threshold)[0]
+        print(len(idx))
+
+        if len(idx) == 0:
+            print(expt, ": No positive trend found.")
+        else:
+            start_index = idx[0]
+            start_year = years[start_index]
+            print(expt, ": Trend exceeds threshold around:", start_year)
+            #for val in range(start_index,start_index-100,-1):
+            #    print(val,trends[val],years[val])
+            #    if val < 0:
+            #        print('found first negative')
+            #        break
+
+
+    
+                             
+    #threshold=0.726  # this is the threshold calculated as
+                             # xpsig * 1.1 
+
+    return threshold,trends
+
+# Function to read data from a file, skipping the first line
+def read_data_nothreshold(filename):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+    y5_valsa = run_mean(y5_vals)
+    y25_valsa= run_mean(y25_vals)
+    y47_valsa= run_mean(y47_vals)
+    y203_valsa= run_mean(y203_vals)
+    y447_valsa= run_mean(y447_vals)
+    y666_valsa= run_mean(y666_vals)
+    y995_valsa= run_mean(y995_vals)
+    y1500_valsa= run_mean(y1500_vals)
+
+                
+    return (x_vals, y5_valsa, y25_valsa, y47_valsa,
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa)
+
+
+def read_data(filename,expt,threshold):
+    print(filename)
+    x_vals = []
+    y5_vals = []
+    y25_vals = []
+    y47_vals = []
+    y203_vals = []
+    y447_vals = []
+    y666_vals = []
+    y995_vals = []
+    y1500_vals = []
+   
+    with open(filename, 'r') as file:
+        next(file)  # Skip the title line
+        for line in file:
+            try:
+                (x, y5, y25,y47,y203,
+                 y447,y666,y995,y1500) = map(float, line.strip().split(','))
+                x_vals.append(x)
+                y5_vals.append(y5)
+                y25_vals.append(y25)
+                y47_vals.append(y47)
+                y203_vals.append(y203)
+                y447_vals.append(y447)
+                y666_vals.append(y666)
+                y995_vals.append(y995)
+                y1500_vals.append(y1500)
+     
+            except ValueError:
+                print(f"Skipping invalid line in {filename}: {line.strip()}")
+
+    y5_valsa = run_mean(y5_vals)
+    y25_valsa= run_mean(y25_vals)
+    y47_valsa= run_mean(y47_vals)
+    y203_valsa= run_mean(y203_vals)
+    y447_valsa= run_mean(y447_vals)
+    y666_valsa= run_mean(y666_vals)
+    y995_valsa= run_mean(y995_vals)
+    y1500_valsa= run_mean(y1500_vals)
+
+    threshold,trends=roll_linear_trend(y5_valsa,x_vals,expt,threshold)
+                
+    return (x_vals, y5_valsa, y25_valsa, y47_valsa,
+            y203_valsa,y447_valsa,y666_valsa,y995_valsa,y1500_valsa,
+            threshold,trends)
+
+# Function to compute running mean**
+def running_mean(data, window_size):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+
+##################################################################
+period = {'xpsid':'LP','xpsij':'LP490','xpsic':'PI',
+          'xpsie':'EP$_{400}$','xpsig':'EP'}
+
+
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+
+for_paper_list = []
+for_paper_trends= []
+#plot data from all the files
+for expt in exptnames:
+    if expt == 'xpsid' or expt == 'xpsig':
+        #threshold=0.726 # this is the threshold calculated as xpsig * 1.1
+        threshold=1.186
+
+        
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500,
+     threshold,trends)  = read_data(filename,expt,threshold)
+    print(expt,threshold)
+    for_paper_list.append(y5)
+    for_paper_trends.append(trends)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y25)
+    axes[0,1].set_title("25m")
+
+    axes[0,2].plot(x, y47)
+    axes[0,2].set_title("47m")
+    
+    axes[1,0].plot(x, y203)
+    axes[1,0].set_title("203m")
+
+    axes[1,1].plot(x, y447)
+    axes[1,1].set_title("447m")
+
+    axes[1,2].plot(x, y666)
+    axes[1,2].set_title("666m")
+    
+    axes[2,0].plot(x, y995)
+    axes[2,0].set_title("995m")
+
+    axes[2,1].plot(x, y1500)
+    axes[2,1].set_title("1500m")
+
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+plt.close()
+
+# do plots for paper.  This is temperature at 5m and rolling linear trends
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+
+for i,expt in enumerate(exptnames):
+    ax.plot(x,for_paper_list[i],label=period.get(expt))
+ax.legend(frameon=True,fontsize=14)
+plt.xlabel('year',fontsize=16)
+plt.ylabel('$^\circ$ C',fontsize=16)
+plt.yticks(fontsize=16)
+plt.xticks(fontsize=16)
+MARGINS = dict(left=0.10, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+plt.savefig('temperature_timeseries_5m.png')
+
+# grends
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+
+for i,expt in enumerate(exptnames):
+    ax.plot(x,for_paper_trends[i],label=period.get(expt))
+ax.legend(frameon=True,fontsize=14)
+plt.xlabel('year',fontsize=14)
+plt.ylabel('$^\circ$ C / centuary',fontsize=14)
+plt.yticks(fontsize=14)
+plt.xticks(fontsize=14)
+plt.axvline(x=1803,color='orange',linestyle='--')
+plt.axhline(y=threshold,color='orange',linestyle='--')
+
+MARGINS = dict(left=0.15, right=0.95, bottom=0.16, top=0.96)  # tweak to suit labels
+plt.subplots_adjust(**MARGINS)
+plt.savefig('temperature_roll_linear_trend.png')
+
+
+
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+    ax.set_xlim(1500, 2000)
+
+plt.tight_layout()
+plt.savefig('temperature_plots/temperature_alllevs_'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 203m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y203-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("203m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y203-y25)
+    axes[0,1].set_title("203m-25m")
+
+    axes[0,2].plot(x, y203-y47)
+    axes[0,2].set_title("203m -47m")
+    
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('temperature_plots/temperature_alllevs_203m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 447m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y447-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("447m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y447-y25)
+    axes[0,1].set_title("447m-25m")
+
+    axes[0,2].plot(x, y447-y47)
+    axes[0,2].set_title("447m -47m")
+
+    axes[1,0].plot(x, y447-y203)
+    axes[1,0].set_title("447m -203m")
+   
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('temperature_plots/temperature_alllevs_447m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 666m level and all ones above
+fig,axes = plt.subplots(2,3,figsize=(12,8))
+ax_legend=axes[1,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y666-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("666m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y666-y25)
+    axes[0,1].set_title("666m-25m")
+
+    axes[0,2].plot(x, y666-y47)
+    axes[0,2].set_title("666m -47m")
+
+    axes[1,0].plot(x, y666-y203)
+    axes[1,0].set_title("666m -203m")
+
+    axes[1,1].plot(x, y666-y447)
+    axes[1,1].set_title("666m -447m")
+ 
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('temperature_plots/temperature_alllevs_666m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 995m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,1]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y995-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("995m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y995-y25)
+    axes[0,1].set_title("995m-25m")
+
+    axes[0,2].plot(x, y995-y47)
+    axes[0,2].set_title("995m -47m")
+
+    axes[1,0].plot(x, y995-y203)
+    axes[1,0].set_title("995m -203m")
+
+    axes[1,1].plot(x, y995-y447)
+    axes[1,1].set_title("995m -447m")
+
+    axes[1,2].plot(x, y995-y666)
+    axes[1,2].set_title("995m -666m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+
+plt.tight_layout()
+plt.savefig('temperature_plots/temperature_alllevs_995m_diff'+lat+'.eps')
+plt.close()
+
+
+# now plot difference between 1500m level and all ones above
+fig,axes = plt.subplots(3,3,figsize=(12,12))
+ax_legend=axes[2,2]
+ax_legend.axis('off')
+legend_handles=[]
+for expt in exptnames:
+    filestart = ('/home/earjcti/um/' + expt + '/timeseries/'+ expt +
+                 '_Pacific_temperature_levs')
+    if expt == 'xpsij':
+        filename = filestart + '1991_2999_'+lat+'.txt'
+    else:
+        filename = filestart + '12_2999_'+lat+'.txt'
+  
+    (x, y5, y25, y47, y203,
+     y447 ,y666, y995,y1500)  = read_data_nothreshold(filename)
+
+    # Plot the data
+    line=axes[0,0].plot(x, y1500-y5,label=expt + ': ' + period.get(expt))[0]
+    axes[0,0].set_title("1500m-5m")
+    legend_handles.append(line)
+
+    axes[0,1].plot(x, y1500-y25)
+    axes[0,1].set_title("1500m-25m")
+
+    axes[0,2].plot(x, y1500-y47)
+    axes[0,2].set_title("1500m -47m")
+
+    axes[1,0].plot(x, y1500-y203)
+    axes[1,0].set_title("1500m -203m")
+
+    axes[1,1].plot(x, y1500-y447)
+    axes[1,1].set_title("1500m -447m")
+
+    axes[1,2].plot(x, y1500-y666)
+    axes[1,2].set_title("1500m -666m")
+
+    axes[2,0].plot(x, y1500-y995)
+    axes[2,0].set_title("1500m -995m")
+
+ 
+legend_labels = [h.get_label() for h in legend_handles]                 
+ax_legend.legend(legend_handles,legend_labels,loc='center',
+                 frameon=True,fontsize=14)
+#ax_legend.legend(loc='center',frameon=True)
+#plt.xlabel('year')
+#plt.ylabel('Sv')
+#plt.legend()
+for ax in axes.flat[:-1]:
+    ax.grid(True)
+    ax.axvline(x=1803,color='red',linestyle='--')
+plt.tight_layout()
+plt.savefig('temperature_plots/temperature_alllevs_1500m_diff'+lat+'.eps')
+plt.close()
+
+

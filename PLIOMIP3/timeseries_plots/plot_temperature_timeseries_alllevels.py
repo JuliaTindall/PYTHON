@@ -39,7 +39,7 @@ def roll_linear_trend(ts,years,expt,threshold):
         # linear fit: slope only
         slope, intercept = np.polyfit(x, y, 1)
         trends[i + window//2] = slope *100.  # center the window and
-                                             # convert to centuary
+                                             # convert to century
         #if slope > 0.006:
         #    print(i,years[i],slope)
         
@@ -260,7 +260,7 @@ for i,expt in enumerate(exptnames):
     ax.plot(x,for_paper_trends[i],label=period.get(expt))
 ax.legend(frameon=True,fontsize=14)
 plt.xlabel('year',fontsize=14)
-plt.ylabel('$^\circ$ C / centuary',fontsize=14)
+plt.ylabel('$^\circ$ C / century',fontsize=14)
 plt.yticks(fontsize=14)
 plt.xticks(fontsize=14)
 plt.axvline(x=1803,color='orange',linestyle='--')

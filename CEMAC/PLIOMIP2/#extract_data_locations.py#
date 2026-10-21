@@ -11,7 +11,7 @@
 #
 import csv
 import sys
-from mpl_toolkits.basemap import Basemap
+#from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
@@ -61,7 +61,7 @@ class Getinitialdata:
             self.filestart = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\regridded\\'
             self.fileout = 'C:\\Users\\julia\\OneDrive\\WORK\\DATA\\proxydata\\'+self.outend
 
-
+ 
     def read_file(self):
         count = 0
         latlist = []
@@ -111,7 +111,7 @@ class Getmodeldata:
                                'CCSM4-Utr',  
                                'CESM1.2','CESM2',
                                'COSMOS', 'EC-Earth3.3', 
-                               'GISS2.1G', 'HadCM3',
+                               'GISS2.1G', 'HadCM3','HadCM3_new',
                                'IPSLCM6A', 'IPSLCM5A2', 'IPSLCM5A',
                                'MIROC4m', 'MRI2.3',
                                'NorESM-L', 'NorESM1-F'
