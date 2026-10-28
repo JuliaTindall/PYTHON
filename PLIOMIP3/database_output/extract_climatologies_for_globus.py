@@ -107,21 +107,21 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwc'
+expt = 'xqbwr'
 
 
-fields = [# "SNOW AMOUNT AFTER TIMESTEP     KG/M2",
-          #"SURFACE RUNOFF RATE          KG/M2/S",
-          #"SUB-SURFACE RUNOFF RATE      KG/M2/S",
-          #"SOIL MOISTURE CONTENT",
-          # "INCOMING SW RAD FLUX (TOA): ALL TSS",
-          # "OUTGOING SW RAD FLUX (TOA)",
-          # "OUTGOING LW RAD FLUX (TOA)",
-          # "CLEAR-SKY (II) UPWARD LW FLUX (TOA)",
-          # "DOWNWARD LW RAD FLUX: SURFACE",
-          # "TOTAL DOWNWARD SURFACE SW FLUX",
-          # "NET DOWN SURFACE LW RAD FLUX",
-          # "NET DOWN SURFACE SW FLUX: SW TS ONLY",
+fields = [ "SNOW AMOUNT AFTER TIMESTEP     KG/M2",
+          "SURFACE RUNOFF RATE          KG/M2/S",
+          "SUB-SURFACE RUNOFF RATE      KG/M2/S",
+          "SOIL MOISTURE CONTENT",
+           "INCOMING SW RAD FLUX (TOA): ALL TSS",
+           "OUTGOING SW RAD FLUX (TOA)",
+           "OUTGOING LW RAD FLUX (TOA)",
+           "CLEAR-SKY (II) UPWARD LW FLUX (TOA)",
+           "DOWNWARD LW RAD FLUX: SURFACE",
+           "TOTAL DOWNWARD SURFACE SW FLUX",
+           "NET DOWN SURFACE LW RAD FLUX",
+           "NET DOWN SURFACE SW FLUX: SW TS ONLY",
            "CLEAR-SKY (II) UP SURFACE SW FLUX",
            "CLEAR-SKY (II) DOWN SURFACE SW FLUX",
            "CLEAR-SKY (II) DOWN SURFACE LW FLUX",

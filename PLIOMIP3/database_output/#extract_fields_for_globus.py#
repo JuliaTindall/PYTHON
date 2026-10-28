@@ -3,7 +3,7 @@
 
 #Created on Thu Mar 18 14:13:50 2019
 
-#@author: earjcti1
+#@author: earjcti
 #
 #  This program will extract fileds and put in a timeseries file
 #  this is what we will upload to globus for PlioMIP2
@@ -138,19 +138,19 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwd'
-fields = [#"U COMPNT OF WIND ON PRESSURE LEVELS",
-          #"V COMPNT OF WIND ON PRESSURE LEVELS",
-          #"OMEGA ON PRESSURE LEVELS",
-          #"TEMPERATURE ON PRESSURE LEVELS",
-          #"TOTAL PRECIPITATION RATE     KG/M2/S",
-          #"SURFACE TEMPERATURE AFTER TIMESTEP",
-          #"TEMPERATURE AT 1.5M",
-          #"OCN TOP-LEVEL TEMPERATURE          K",
-          #"AICE : ICE CONCENTRATION",
-          #"HICE: MEAN ICE DEPTH OVER GRIDBOX  M",
-          #"TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
-         # "SNOWFALL",
+expt = 'xqbwr'
+fields = ["U COMPNT OF WIND ON PRESSURE LEVELS",
+          "V COMPNT OF WIND ON PRESSURE LEVELS",
+          "OMEGA ON PRESSURE LEVELS",
+          "TEMPERATURE ON PRESSURE LEVELS",
+          "TOTAL PRECIPITATION RATE     KG/M2/S",
+          "SURFACE TEMPERATURE AFTER TIMESTEP",
+          "TEMPERATURE AT 1.5M",
+          "OCN TOP-LEVEL TEMPERATURE          K",
+          "AICE : ICE CONCENTRATION",
+          "HICE: MEAN ICE DEPTH OVER GRIDBOX  M",
+          "TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
+          "SNOWFALL",
           "X-COMP OF SURF & BL WIND STRESS N/M2",
           "Y-COMP OF SURF & BL WIND STRESS N/M2",
           "PRESSURE AT MEAN SEA LEVEL",
@@ -174,7 +174,8 @@ alt_expt = {'xqfmg': 'F_EP280',
             'xqbwc' : 'PI', 'xqbwd' : 'LP',
             'xqbwg':'EP',
             'xqbwn':'high_NH',
-            'xqbwo':'high_SH'}
+            'xqbwo':'high_SH',
+            'xqbwr':'LP_min_LSM_change'}
 
 # CMIP name  ; this is from fernandas spreadsheet
 

@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 import iris.analysis.cartography
 import iris.coord_categorisation
+from iris.cube import CubeList
 import cf_units as unit
 import cftime
 import sys
@@ -68,29 +69,46 @@ def get_ccsm4_2deg():
     return cube
 
 
-def get_cesm12_singlecube(filename_, fielduse_):
+def get_cesm13_singlecube(filename_, fielduse_,expt_):
     """
     get a single cube from a single file
     this is needed because total precipitation is the sum of two cubes
     """
-    allcube = iris.load(filename_)
-    ncubes = len(allcube)
-    for i in range(0, ncubes):
-        print(allcube[i].var_name,fielduse_)
-        if allcube[i].var_name == fielduse_:
-            singlecube = allcube[i]
+    fileends = []
+    if expt_ == 'LP':
+        fileends.append('.089001-093912_regrid.nc')
+        fileends.append('.094001-098912_regrid.nc')
+    if expt_ == 'PI':
+        fileends.append('.050101-055012_regrid.nc')
+        fileends.append('.055101-060012_regrid.nc')
+
+    cubes = CubeList([])
+    for end in fileends:
+        fileuse = filename_ + end
+        allcube = iris.load(fileuse)
+        ncubes = len(allcube)
+        for i in range(0, ncubes):
+            #print(allcube[i].var_name,fielduse_)
+            if allcube[i].var_name == fielduse_:
+                filecube = allcube[i]
+                cubes.append(filecube)
+
+    iris.util.equalise_attributes(cubes)
+    singlecube = cubes.concatenate_cube()
             
     return singlecube
     
-def get_cesm12(exptnamein):
+def get_cesm13(expt):
     """
-    get cesm1.2 data
+    get cesm1.3 data
     """
     
     if type(fielduse) is list: # perhaps a list containing large scale and convective precip
                                # that need to be added together for total precipitaiton
-       cube1 = get_cesm12_singlecube(filename[0], fielduse[0])
-       cube2 = get_cesm12_singlecube(filename[1], fielduse[1])
+       cube1 = get_cesm13_singlecube(filename[0], fielduse[0],expt)
+       cube2 = get_cesm13_singlecube(filename[1], fielduse[1],expt)
+
+       
        if fieldnameout == 'TotalPrecipitation':
            cube = cube1 + cube2
        if fieldnameout == 'SST':
@@ -203,7 +221,7 @@ def cube_avg(cube):
     #it starts at month = 2. but should be 1
     # we are doing dome roundabout way of reordering the data
     if (modelname  == 'NorESM1-F' or modelname  == 'NorESM-L'
-       or modelname == 'CESM1.2' or modelname == 'CCSM4-1deg'):
+       or modelname == 'iCESM1.3' or modelname == 'CCSM4-1deg'):
         allcubes = iris.cube.CubeList([])
         for mon in range(2, 13):
             slice  =  meanmonthcube.extract(iris.Constraint(month = mon))
@@ -224,7 +242,8 @@ def cube_avg(cube):
         print(meanmonthcube.coord('month').points)
 
     meanmonthcube.long_name = fieldnameout
-    
+
+    print('months',meanmonthcube.coord('month').points)
     iris.util.promote_aux_coord_to_dim_coord(meanmonthcube, 'month')
     sdmonthcube = cube.aggregated_by('month', iris.analysis.STD_DEV)
     sdmonthcube.long_name = fieldnameout
@@ -373,7 +392,12 @@ def regrid_data(fieldnamein, exptnamein):
    
     #####################################
     # get all data in a single cube
-    cube = iris.load_cube(filename)
+
+
+    if modelname == 'iCESM1.3':
+        cube = get_cesm13(exptnamein)
+    else:
+        cube = iris.load_cube(filename)
 
     # if too many points extract last 1200 times (assuming time is last dim)
     cube = cube[-1200:]
@@ -832,7 +856,8 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
     ECearth_EXPT = {"Eoi400": "mPlio",
               "E280":"PI"
               }
-    HadCM3_EXPT = {"LP": "xqbwd","PI": "xqbwc", "EP" : "xqbwg"}
+    HadCM3_EXPT = {"LP": "xqbwd","PI": "xqbwc", "EP" : "xqbwg",
+                   "LP_min_LSM_change":"xqbwr"}
     
     CESM12_EXPT = {"Eoi400": "PlioMIP2",
               "E280":"PI"
@@ -1015,18 +1040,24 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
                   '.nc')
         fielduse = fieldnamein
         
-    if modelname == 'CESM1.2':
+    if modelname == 'iCESM1.3':
+        fileinit = filestart + 'CESM/iCESM1.3/' + exptnamein
+        if fieldnamein == 'tos':
+            fileinit = fileinit + '/OCN'
+        else:
+            fileinit = fileinit + '/ATM/b.e13.B1850C5'
+        
+        if exptnamein == 'LP':
+            fileinit = fileinit + 'CN.ne30_g16.icesm13_ihesp.'
+            fileinit = fileinit + 'midPliocene.001.cam.h0.'
+        if exptnamein == 'PI':
+            fileinit = fileinit + '.ne30_g16.icesm13_ihesp.'
+            fileinit = fileinit + 'PI.002.cam.h0.'
         if fieldnamein == 'pr':
             # this has been passed in two files. 
             # for convective and large scale precipitaiton put filename in a list
-            filename1 = (filestart + 'NCAR/' + 
-                  CESM12_EXTRA.get(exptnamein) + 
-                  'PRECC' +
-                  CESM12_TIME.get(exptnamein) + '.nc')
-            filename2 = (filestart + 'NCAR/' + 
-                  CESM12_EXTRA.get(exptnamein) + 
-                  'PRECL' +
-                  CESM12_TIME.get(exptnamein) + '.nc')
+            filename1 = (fileinit + 'PRECC')
+            filename2 = (fileinit + 'PRECL')
             filename = [filename1, filename2]
             fielduse = ['PRECC', 'PRECL']
         if fieldnamein == 'tos':
@@ -1046,40 +1077,11 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
                   CESM12_EXTRA.get(exptnamein) + 
                   CESM12_FIELDS.get(fieldnamein) +
                   CESM12_TIME.get(exptnamein) + '.nc')
-            fielduse = CESM12_FIELDS.get(fieldnamein)
+            print(filename)
+            print(fieldnamein)
+            fielduse = CESM12_FIELDS.get(fieldnamein,fieldnamein)
+
             
-    if modelname == 'CCSM4-1deg':
-        if fieldnamein == 'pr':
-            # this has been passed in two files. 
-            # for convective and large scale precipitaiton put filename in a list
-            filename1 = (filestart + 'NCAR/' + 
-                  CCSM4_EXTRA.get(exptnamein) + 
-                  'PRECC' +
-                  CCSM4_TIME.get(exptnamein) + '.nc')
-            filename2 = (filestart + 'NCAR/' + 
-                  CCSM4_EXTRA.get(exptnamein) + 
-                  'PRECL' +
-                  CCSM4_TIME.get(exptnamein) + '.nc')
-            filename = [filename1, filename2]
-            fielduse = ['PRECC', 'PRECL']
-        if fieldnamein == 'tos':
-            # if we are using SST we also need to pass ice fraction
-            filename1 = (filestart + 'NCAR/' + 
-                  CCSM4_EXTRA.get(exptnamein) + 
-                  'TS' +
-                  CCSM4_TIME.get(exptnamein) + '.nc')
-            filename2 = (filestart + 'NCAR/' + 
-                  CCSM4_EXTRA.get(exptnamein) + 
-                  'ICEFRAC' +
-                  CCSM4_TIME.get(exptnamein) + '.nc')
-            filename = [filename1, filename2]
-            fielduse = ['TS', 'ICEFRAC']
-        if fieldnamein == 'tas':
-            filename=(filestart + 'NCAR/' + 
-                  CCSM4_EXTRA.get(exptnamein) + 
-                  CESM12_FIELDS.get(fieldnamein) +
-                  CCSM4_TIME.get(exptnamein) + '.nc')
-            fielduse = CESM12_FIELDS.get(fieldnamein)
             
       
     retdata = [fielduse, filename]
@@ -1091,7 +1093,8 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
 
 filename  =  ' '
 linux_win  =  'l'
-modelname  = "COSMOS"  # 'ACCESS' 'AWI-CM2' 'AWI-ESM2' 'COSMOS' 'MIROC4m'
+modelname  = "HadCM3"  # 'ACCESS' 'AWI-CM2' 'AWI-ESM2' 'COSMOS' 'MIROC4m'
+                        # 'iCESM1.3'
 exptname  =  {
         "E280" : "E280",
         "Eoi400" : "EOI400",
@@ -1120,9 +1123,9 @@ fieldname  =  {
 fieldnamein = ['tos'] # ocean tempeature or sst
 #exptnamein = ['Eoi400']
 
-#fieldnamein = ['tas','pr']
-exptnamein = ['LP','PI']
-#exptnamein = ['E560']
+fieldnamein = ['pr','tas']
+#exptnamein = ['PI','LP']
+exptnamein = ['LP_min_LSM_change']
 if linux_win  == 'l':
     filestart = '/uolstore/Research/b/b0164/Data/PlioMIP3/'
 else:
