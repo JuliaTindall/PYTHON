@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+# overturning environment
 # -*- coding: utf-8 -*-
 
 #Created on Thu Mar 18 14:13:50 2019
@@ -54,14 +54,16 @@ def monthly_data_single_level(field,shortname):
         cubes = allcubes.concatenate_cube()
     cubes.var_name = shortname
 
-    if shortname == 'pr' or shortname == 'prsn':
-        # precipitation need to convert from kg/m2/s to mm/day
+    if shortname == 'pr' or shortname == 'prsn' or shortname == 'e':
+        # precipitation / evap need to convert from kg/m2/s to mm/day
         cubes.units = "mm day-1"
         cubes.data = cubes.data * 24. * 60. * 60.
         if shortname == 'pr':
             cubes.long_name = "TOTAL PRECIPITATION RATE"
         if shortname == 'prsn':
             cubes.long_name = "TOTAL SNOWFALL RATE"
+        if shortname == 'e':
+            cubes.long_name = "SURF & BL TOTL MOISTURE"
 
         cubes.attributes["title"] = cubes.long_name
 
@@ -138,7 +140,7 @@ def monocn_data_single_level(field,shortname):
 # when rerunning
             
 
-expt = 'xqbwd'
+expts = ['xqbwc','xqbwd','xqbwg']
 fields = [#"U COMPNT OF WIND ON PRESSURE LEVELS",
           #"V COMPNT OF WIND ON PRESSURE LEVELS",
           #"OMEGA ON PRESSURE LEVELS",
@@ -150,13 +152,14 @@ fields = [#"U COMPNT OF WIND ON PRESSURE LEVELS",
           #"AICE : ICE CONCENTRATION",
           #"HICE: MEAN ICE DEPTH OVER GRIDBOX  M",
           #"TOTAL CLOUD AMOUNT - RANDOM OVERLAP",
-         # "SNOWFALL",
-          "X-COMP OF SURF & BL WIND STRESS N/M2",
-          "Y-COMP OF SURF & BL WIND STRESS N/M2",
-          "PRESSURE AT MEAN SEA LEVEL",
-          "PSTAR AFTER TIMESTEP",
-          "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS",
-          "SPECIF HUM;P LEVS;U GRID.  USE MACRO"]
+          #"SNOWFALL",
+          #"X-COMP OF SURF & BL WIND STRESS N/M2",
+          #"Y-COMP OF SURF & BL WIND STRESS N/M2",
+          #"PRESSURE AT MEAN SEA LEVEL",
+          #"PSTAR AFTER TIMESTEP",
+          #"GEOPOTENTIAL HEIGHT: PRESSURE LEVELS",
+          #"SPECIF HUM;P LEVS;U GRID.  USE MACRO",
+           "SURF & BL TOTL MOISTURE FLUX KG/M2/S"]
 
 #expt = 'xqfmg'
 
@@ -174,7 +177,8 @@ alt_expt = {'xqfmg': 'F_EP280',
             'xqbwc' : 'PI', 'xqbwd' : 'LP',
             'xqbwg':'EP',
             'xqbwn':'high_NH',
-            'xqbwo':'high_SH'}
+            'xqbwo':'high_SH',
+            'xqbwr':'LP_min_LSM_change'}
 
 # CMIP name  ; this is from fernandas spreadsheet
 
@@ -195,33 +199,34 @@ cmip_name = {"TEMPERATURE AT 1.5M" : "tas",
              "PRESSURE AT MEAN SEA LEVEL":"psl",
              "PSTAR AFTER TIMESTEP":"ps",
              "GEOPOTENTIAL HEIGHT: PRESSURE LEVELS":"zg",
-             "SPECIF HUM;P LEVS;U GRID.  USE MACRO":"hus" } 
+             "SPECIF HUM;P LEVS;U GRID.  USE MACRO":"hus",
+             "SURF & BL TOTL MOISTURE FLUX KG/M2/S" : "e" } 
 levels_req = {'ua':'y','va':'y','ta':'y','wa':'y','zg':'y','hus':'y'}
 ocean_req = {'tos':'y', 'siconc':'y','sithick':'y'}
             
-
-for field in fields:
-    shortname = cmip_name.get(field)
-    print(field,shortname)
-    ocn = ocean_req.get(shortname,'n')
-    multlev = levels_req.get(shortname,'n')
+for expt in expts:
+    for field in fields:
+        shortname = cmip_name.get(field)
+        print(field,shortname)
+        ocn = ocean_req.get(shortname,'n')
+        multlev = levels_req.get(shortname,'n')
     
-    if multlev == 'n' and ocn == 'n':  # single level only atmosphere
-        cubes = monthly_data_single_level(field,shortname)
+        if multlev == 'n' and ocn == 'n':  # single level only atmosphere
+            cubes = monthly_data_single_level(field,shortname)
 
-    if multlev == 'y' and ocn == 'n':  # multiple level atm
-        cubes = monthly_data_all_levels(field,shortname)
+        if multlev == 'y' and ocn == 'n':  # multiple level atm
+            cubes = monthly_data_all_levels(field,shortname)
 
-    if  multlev == 'n' and ocn == 'y': #single level ocean
-        cubes = monocn_data_single_level(field,shortname)
+        if  multlev == 'n' and ocn == 'y': #single level ocean
+            cubes = monocn_data_single_level(field,shortname)
 
         
-    fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/globus/HadCM3_')
-    fileout = (fileout + alt_expt.get(expt) + '_' + expt + '_' + 
+        fileout = ('/uolstore/Research/a/hera1/earjcti/um/' + expt + '/globus/HadCM3_')
+        fileout = (fileout + alt_expt.get(expt) + '_' + expt + '_' + 
                cmip_name.get(field) + '_monthly_timeseries.nc')
-    if ocn == 'y':
-        iris.save(cubes,fileout,fill_value=-999.999)
-    else:
-        iris.save(cubes,fileout)
+        if ocn == 'y':
+            iris.save(cubes,fileout,fill_value=-999.999)
+        else:
+            iris.save(cubes,fileout)
 
 

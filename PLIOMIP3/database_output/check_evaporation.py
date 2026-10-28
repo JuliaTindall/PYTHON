@@ -5,6 +5,9 @@
 #
 #  I just want to check that the surface moisture flux to level one of the 
 #  boundary layer is the same as the evaporation from all the other sources
+#  (excluding transpiration)
+#
+# this has been checked and I would suggest using SF_MOISTURE_FLUX FOR EVAP
 """
 
 # Import necessary libraries
@@ -49,12 +52,12 @@ def get_cube_data(fieldname):
     cube.units='mm day-1'
     cube.data = np.where(cube.data > 1.0E10,0.0,cube.data)
 
-    print(cube.data)
+    #print(cube.data)
     return cube
 #=================================================================
 # MAIN PROGRAM STARTS HERE
 
-FILENAME = '/nfs/hera1/earjcti/um/xqbwc/pcpd/xqbwca#pd000003001ag+.nc'
+FILENAME = '/uolstore/Research/a/hera1/earjcti/um/xqbwc/pcpd/xqbwca#pd000003001ag+.nc'
 #print(iris.load(filename))
 
 # read in moitures flux
@@ -70,10 +73,10 @@ evap_canp_cube = get_cube_data('EVAP FROM CANOPY : RATE      KG/M2/S')
 sublim_cube = get_cube_data('SUBLIM. SURFACE (GBM) : RATE KG/M2/S')
 transp_cube = get_cube_data('TRANSPIRATION RATE           KG/M2/S')
 
-sum_fluxes_cube = (evap_sea_cube +   
-                   evap_canp_cube + sublim_cube + transp_cube)
-#sum_fluxes_cube = (evap_sea_cube +  evap_soil_cube +  
-#                   evap_canp_cube + sublim_cube)
+#sum_fluxes_cube = (evap_sea_cube +   
+#                   evap_canp_cube + sublim_cube + transp_cube)
+sum_fluxes_cube = (evap_sea_cube +  evap_soil_cube +  
+                   evap_canp_cube + sublim_cube)
 sum_fluxes_cube.long_name='sum fluxes (no transp'
 
 diff_cube_pcent = (((sum_fluxes_cube - moisture_flux_cube) * 100.) / 
@@ -82,7 +85,7 @@ diff_cube_pcent.long_name='difference percentage change'
 diff_cube = sum_fluxes_cube - moisture_flux_cube
 diff_cube.long_name='diff'
 
-
+iris.save([moisture_flux_cube,sum_fluxes_cube,diff_cube,transp_cube],'temporary.nc')
 
 # plot
 plt.figure(figsize=[12,12])
@@ -92,6 +95,7 @@ plt.subplot(2,2,2)
 qplt.contourf(sum_fluxes_cube)
 plt.subplot(2,2,3)
 qplt.contourf((diff_cube))
+plt.show()
 plt.subplot(2,2,4)
 qplt.contourf((transp_cube))
 plt.show()
