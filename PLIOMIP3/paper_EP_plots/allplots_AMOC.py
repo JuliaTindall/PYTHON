@@ -37,6 +37,41 @@ EPmoc_cube = iris.load_cube(file_EP,field)
 LP490moc_cube = iris.load_cube(file_LP490,field)
 EP400moc_cube = iris.load_cube(file_EP400,field)
 
+###################################################
+# 
+# Write data used to produce Figure 3
+constraint = iris.Constraint(latitude=lambda cell: cell > -30)
+
+LP_out = LPmoc_cube.extract(constraint)
+LP490_out = LP490moc_cube.extract(constraint)
+EP_out = EPmoc_cube.extract(constraint)
+EP400_out = EP400moc_cube.extract(constraint)
+
+# EP and EP400 are not plotted south of 8 degrees
+for cube in [EP_out, EP400_out]:
+    for j, lat in enumerate(cube.coord('latitude').points):
+        if lat < 8.:
+            cube.data[:, j] = np.nan
+
+# Give the variables useful names in the output NetCDF
+LP_out.var_name = 'LP_AMOC'
+LP490_out.var_name = 'LP490_AMOC'
+EP_out.var_name = 'EP_AMOC'
+EP400_out.var_name = 'EP400_AMOC'
+LP_out.long_name = 'LP_AMOC'
+LP490_out.long_name = 'LP490_AMOC'
+EP_out.long_name = 'EP_AMOC'
+EP400_out.long_name = 'EP400_AMOC'
+
+iris.save([LP_out, LP490_out, EP_out, EP400_out],
+          'data_for_figure3_AMOC.nc',fill_value = -99999.)
+
+
+
+
+##############################################
+# plotting program
+
 #temperature xqbwg-xqbwj Atlantic
 ax0=fig.add_subplot(spec[0])
 

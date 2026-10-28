@@ -45,7 +45,7 @@ Tanom_cube = xqbwg_atltemp_cube - xqbwj_atltemp_cube
 cs=iplt.contourf(Tanom_cube,cmap='RdBu_r',
               levels=np.arange(-2.0,2.2,0.2),extend='both')
 
-ax0.set_title('a) Atlantic temperature anomaly: EP-LP$_{490}$',fontsize=15)
+ax0.set_title('a) Atlantic Tanom: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 #plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -85,7 +85,7 @@ Sanom_cube = xqbwg_atl_cube - xqbwj_atl_cube
 cs2=iplt.contourf(Sanom_cube,cmap='RdBu_r',
               levels=np.arange(-0.5,0.55,0.05),extend='both')
 
-ax1.set_title('b) Atlantic salinity anomaly: EP-LP$_{490}$',fontsize=15)
+ax1.set_title('b) Atlantic salin_anom: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 #plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -122,7 +122,7 @@ Tanom_cube = xqbwg_pactemp_cube - xqbwj_pactemp_cube
 iplt.contourf(Tanom_cube,cmap='RdBu_r',
               levels=np.arange(-2.0,2.2,0.2),extend='both')
 
-ax2.set_title('c) Pacific temperature anomaly: EP-LP$_{490}$',fontsize=15)
+ax2.set_title('c) Indo-Pacific Tanom: EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -139,7 +139,7 @@ Sanom_cube = xqbwg_pac_cube - xqbwj_pac_cube
 iplt.contourf(Sanom_cube,cmap='RdBu_r',
               levels=np.arange(-0.5,0.55,0.05),extend='both')
 
-ax3.set_title('d) Pacific salinity anomaly: EP-LP$_{490}$',fontsize=15)
+ax3.set_title('d) Indo-Pacific salin_anom : EP-LP$_{490}$',fontsize=15)
 plt.ylabel('depth (m)',fontsize=14)
 plt.xlabel('latitude ($^\circ$)',fontsize=14)
 plt.yticks(fontsize=14)
@@ -157,3 +157,23 @@ plt.savefig('T_S.png')
 
 # Save the plot to a file
 #plt.savefig('seaice/sea-ice_30yr_2_2999.png')
+# save data used to make Figure 5
+
+xqbwg_atltemp_cube.long_name = 'Atlantic temperature EP'
+xqbwj_atltemp_cube.long_name = 'Atlantic temperature LP490'
+
+xqbwg_atl_cube.long_name = 'Atlantic salinity EP'
+xqbwj_atl_cube.long_name = 'Atlantic salinity LP490'
+
+xqbwg_pactemp_cube.long_name = 'Indo-Pacific temperature EP'
+xqbwj_pactemp_cube.long_name = 'Indo-Pacific temperature LP490'
+
+xqbwg_pac_cube.long_name = 'Indo-Pacific salinity EP'
+xqbwj_pac_cube.long_name = 'Indo-Pacific salinity LP490'
+
+iris.save([xqbwg_atltemp_cube, xqbwj_atltemp_cube,
+           xqbwg_atl_cube, xqbwj_atl_cube,
+           xqbwg_pactemp_cube, xqbwj_pactemp_cube,
+           xqbwg_pac_cube, xqbwj_pac_cube],
+          'data_for_figure5_T_S.nc',
+          fill_value=-99999.)

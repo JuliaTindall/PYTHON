@@ -85,6 +85,8 @@ period = {'d':'LP','j':'LP$_{490}$','e':'EP$_{400}$',
 
 #plot TOA radiative inbalance
 ax0=fig.add_subplot(spec[0])
+outfile = open('data_for_figure1_spinup.txt', 'w')
+
 for expt in exptnames:
     filename = ('/home/earjcti/um/xpsi' + expt + '/timeseries/xpsi'
                 + expt + '_TOAinbal.tex')
@@ -93,7 +95,12 @@ for expt in exptnames:
     window=100
     y_mean=running_mean(y,window)
     x_mean=x[window//2 : -(window//2)+1]
-   
+
+    outfile.write(f'# TOA radiative imbalance (100 year mean): {period.get(expt)}\n')
+    outfile.write('# model_year value\n')
+    for xx, yy in zip(x_mean, y_mean):
+        outfile.write(f'{xx} {yy}\n')
+    
     # Plot the data
     #if expt == 'xpsie':
     #    ax0.plot(x_mean, y_mean /1.0E6, label=period.get(expt),linestyle='--',
@@ -134,6 +141,10 @@ for expt in exptnames:
     y_mean=running_mean(y,window)
     x_mean=x[window//2 : -(window//2)+1]
 
+    outfile.write(f'# Mean ocean temperature 0-360 m (100 year mean): {period.get(expt)}\n')
+    outfile.write('# model_year temperature_degC\n')
+    for xx, yy in zip(x_mean, y_mean):
+        outfile.write(f'{xx} {yy}\n')
    
     # Plot the data
     ax1.plot(x_mean, y_mean, label=period.get(expt),linestyle='--',
@@ -163,7 +174,10 @@ for expt in exptnames:
     y_mean=running_mean(y,window)
     x_mean=x[window//2 : -(window//2)+1]
 
-   
+    outfile.write(f'# Global mean ocean temperature (100 year mean): {period.get(expt)}\n')
+    outfile.write('# model_year temperature_degC\n')
+    for xx, yy in zip(x_mean, y_mean):
+       outfile.write(f'{xx} {yy}\n')
     # Plot the data
     ax1.plot(x_mean, y_mean, label=period.get(expt),linestyle='--',
                  linewidth=3)
@@ -193,7 +207,11 @@ for expt in exptnames:
     x, y = read_data(filename,',')
     y_mean=running_mean(y,window)
     x_mean=x[window//2 : -(window//2)+1]
-
+    
+    outfile.write(f'# Mean ocean salinity 0-360 m (100 year mean): {period.get(expt)}\n')
+    outfile.write('# model_year salinity_psu\n')
+    for xx, yy in zip(x_mean, y_mean):
+        outfile.write(f'{xx} {yy}\n')
    
     # Plot the data
     ax1.plot(x_mean, y_mean,label=period.get(expt),linestyle='--',
@@ -216,7 +234,7 @@ plt.grid(True)
 
 plt.tight_layout()
 plt.savefig('spinup.png')
-
+outfile.close()
 
 # Save the plot to a file
 #plt.savefig('seaice/sea-ice_30yr_2_2999.png')

@@ -20,7 +20,7 @@ timeseries_req='n'
 latreq=-20.0
 yearstart=3900
 yearend=4000
-basin='global'  # basin must be global / atlantic / pacific
+basin='pacific'  # basin must be global / atlantic / pacific
 
 
 
@@ -52,10 +52,10 @@ def get_data(filestart,yearstart,yearend):
         allcubes.append(cube)
 
     if yearstart== 3900 and yearend == 4000:
-        #cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
-        #                      'Ocean heat transport ('+basin+')')
-        cube = iris.load_cube(filestart + '_3900_4000.nc',
+        cube = iris.load_cube(filestart + '_3900_4000Tref_is_zero.nc',
                               'Ocean heat transport ('+basin+')')
+        #cube = iris.load_cube(filestart + '_3900_4000.nc',
+        #                      'Ocean heat transport ('+basin+')')
         allcubes.append(cube)
 
 
@@ -168,11 +168,20 @@ if meanreq == 'y':
        
         
     plt.tight_layout() 
-    plt.show()
-    sys.exit()
+    #plt.show()
+    #sys.exit()
     plt.savefig('OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '.png')
     plt.close()
 
+
+    txtfile = 'OHT/'+basin+'OHT_mean_' + str(yearstart) + '_' + str(yearend) + '.txt'
+
+with open(txtfile, 'w') as f:
+    f.write('latitude ' + ' '.join(period.get(expt) for expt in exptnames) + '\n')
+    for j, lat in enumerate(latitudes):
+        f.write(f"{lat:.2f} " +
+        " ".join(f"{cube.collapsed('t', iris.analysis.MEAN).data[j]:.2f}"
+                 for cube in allexpts_cubes) + "\n")
     #plt.subplot(111)
     #plt.plot(diffcube.data)
     #plt.show()
@@ -203,7 +212,7 @@ if timeseries_req=='y':
     plt.title(basin+' ocean heat transport across: ' + str(latreq) + ' years:' +  str(yearstart) +'-' + str(yearend))
     plt.legend()
     plt.grid(True)
-#    plt.close()
+    plt.close()
 
     # do a 30 year mean
 

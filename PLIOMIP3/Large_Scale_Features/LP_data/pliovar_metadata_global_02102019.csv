@@ -1,0 +1,53 @@
+site,name,lon,lat,waterdepth,basin,uk37,bayspline,site_nearby_uk37_coretop,lat_uk37_coretop,lon_uk37_coretop,uk37_nearby_coretop,mgca,mgca_species,mgca_baymag,mgca_seasonality,note
+a1,ODP907,-12.6983,69.2415,1801.5,natl,y,y,M23480-2,69.378,-10.778,0.324,n,NA,NA,NA,use resorted datafile from Erin
+a2,ODP642,2.9263167,67.222,1280.9,natl,y,y,M23001-1,67.7,3.7,0.444,n,NA,NA,NA,
+a3,ODP982,-15.8667,57.5167,1134.2,natl,y,y,KNR-51-29GGC,56.22,-12.63,0.643,n,NA,NA,NA,use resorted datafile from Erin
+a4,DSDP610,-18.8868,53.2215,2426.3,natl,y,n,GIK17048-4,54.308,-18.177,0.486,y,bulloides,13.2347,annual,
+a5,U1308,-24.2383,49.8781,3871.9,natl,y,y,GIK17056-1,48.037,-25.897,0.592,y,bulloides,14.241,annual,
+a6,U1313,-32.95716666,41.0012333,3412.6,natl,y,y,SU90.09,43.787,-31.748,0.608,y,bulloides,18.6015,annual,use datafile from Erin; modified header for deep-dwelling pf mgca; moved crassaformis data to deep-dwepping pf columns; unknown data ref Rohlingetal2014; contacted Stijn
+a7,DSDP607,-32.9573,41.0012,3427,natl,y,y,SU90.09,43.787,-31.748,0.608,n,NA,NA,NA,
+a8,DSDP603,-70.0292666,35.49526666,4633,natl,n,n,NA,NA,NA,NA,y,bulloides,24.5493,annual,
+a9,ODP999,-78.73981667,12.743633,2827.9,natl,y,n,ODP1002C,10.7,-65.17,0.883,y,sacculifer,27.5334,annual,
+a10,ODP662,-11.7392,-1.3902,3813.8,natl,y,n,GeoB1403-2,-1.198,-11.712,0.886,n,NA,NA,NA,overlapped file b2 removed
+a11,U1387,-7.718,36.805,558,natl,y,y,GeoB5901.2,36.38,-7.071,0.682,n,NA,NA,NA,contacted Stijn about depth/age reversal at ariund 484m
+a12,ODP978,-2.05695,36.2311,1929,natl,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+a13,SicilySanNicola,14.2078,37.14777,NA,natl,y,n,M40-4-SL78,37.036,13.19,0.569,n,NA,NA,NA,Erin moved data from raw uk37 to AlkConc; no data beyond 2.6Ma; Erin noted age inconsistency; details in datafile and email
+a14,SicilyPuntaPiccola,13.49333,37.28889,NA,natl,y,n,M40-4-SL78,37.036,13.19,0.569,n,NA,NA,NA,Erin moved data from raw uk37 to AlkConc; Erin notes in datafile and email
+a15,U1307,-46.400545,58.50578,2575,natl,y,n,SU90-20,59.862,-39.663,0.397,n,NA,NA,NA,
+a16,DSDP609,-24.238117,49.877783,3883,natl,y,n,GIK17056-1,48.037,-25.897,0.592,y,bulloides,13.8771,annual,
+a17,ODP959,-2.7353,3.6278,2091,natl,n,n,,,,,,,,,
+a18,ODP625,-87.16,28.831667,NA,natl,y,n,,,,,,,,,
+b1,ODP516,-35.2853,-30.2765,1313,satl,n,n,NA,NA,NA,NA,y,sacculifer,22.0667,dec-jun,mgca not converted to temperature; contacted Ben
+b3,ODP665,-19.6678,2.9512,4746,satl,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+b4,ODP704,7.4208,-46.879,2542,satl,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+b5,ODP1081,11.319333,-19.619944,794.1,satl,y,n,GeoB1705-2,-19.5,11.382,0.676,n,NA,NA,NA,moved uk37 sst which were in wrong column
+b6,ODP1082,11.820556,-21.094194,853,satl,y,y,GeoB3608-1,-22.36,12.2,0.642,n,NA,NA,NA,
+b7,ODP1084,13.027778,-25.513667,1991.9,satl,y,n,GeoB3606-2,-25.47,13.08,0.614,n,NA,NA,NA,
+b8,ODP1085,13.989944,-29.374417,1713.2,satl,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+b9,ODP1087,15.310889,-31.465083,1371.6,satl,y,y,GeoB3605-1,-31.45,15.3,0.651,n,NA,NA,NA,deleted low res foram data and replaced by foram data from e03
+b10,ODP1264,2.84551,-28.53268,2507,satl,n,n,NA,NA,NA,NA,n,NA,NA,NA,adopted instead of e06
+b11,ODP1267,1.71096,-28.09816,4355.1,satl,n,n,NA,NA,NA,NA,n,NA,NA,NA,adopted instead of e07
+c1,ODP1143,113.285,9.362,2772,pac,y,y,GIK17961-1,8.507,112.332,0.956,y,ruber,27.6266,annual,Mg/Ca data not sent to Jess yet; age data are jumbled up probably because dataset is sorted by foram proxy data instead of age
+c2,ODP1148,116.5655,18.8361,3294,pac,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+c3,ODP1208,158.2016,36.1272,3346,pac,y,y,NB73,35.25,175,0.586,n,NA,NA,NA,
+c4,ODP1239,-82.0808,-0.672,1414,pac,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+c5,ODP1241,-86.4445,5.8428,2027,pac,n,n,NA,NA,NA,NA,y,sacculifer,25.1871,annual,
+c6,U1417,-147.109,56.9598,4187,pac,y,n,PAR87A-8A,54.22,-148.82,0.422,n,NA,NA,NA,bayspline based on recalculated uk'37 but uk37 reported in ori paper; may consider re-run bayspline as maria sent us the raw uk'37 data
+c7,ODP806,159.361,0.319,2520,pac,n,n,NA,NA,NA,NA,y,ruber,28.7843,annual,no splice created for hole A and B; data not sent to Jess yet
+c8,ODP846,-90.818,-3.0949,3296,pac,y,y,ODP846,-3.095,-90.818,0.803,n,NA,NA,NA,use resorted datafile from Erin
+c9,ODP849,-110.5197,0.1831,3839,pac,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+c10,ODP851,-110.571633,2.770283,3760.3,pac,n,n,NA,NA,NA,NA,n,NA,NA,NA,multiple foram species
+c11,U1337,-123.206,3.8334,4476,pac,y,n,PLDS-077BX,1.06,-119.93,0.914,n,NA,NA,NA,waiting for bayspline
+c12,U1463,117.6237,-18.965,145,pac,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+d1,ODP214,88.7,-11.3,1665,ind,n,n,NA,NA,NA,NA,y,ruber,27.2019,annual,mgca sacculifer only older than 3.5 Ma
+d2,ODP709,60.6,-3.9,3041,ind,n,n,NA,NA,NA,NA,y,sacculifer,28.2441,annual,
+d3,ODP722,59.8,16.6,2022,ind,y,y,TN47 MC3A,16.614,59.806,0.951,n,NA,NA,NA,ages in new version shifted inconsistently throughout too time-consuming to copy-paste manually
+d4,ODP758,90.4,5.4,2925,ind,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+d5,ODP763,112.2,-20.6,1367,ind,n,n,NA,NA,NA,NA,y,sacculifer,25.7765,annual,
+e1,U1361,143.8866,-64.409,3454.3,so,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+e2,DSDP593,167.6745,-40.508,1088,so,y,y,So136-GC11,-43.44,167.851,0.539,n,NA,NA,NA,
+e3,DSDP594,174.9578,-45.68333,1204,so,y,n,MD97-2120,-45.534,174.931,0.386,n,NA,NA,NA,bayspline back-calculated from sst
+e4,ODP1088,13.5628,-41.1361,2082,so,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+e5,ODP1090,8.899817,-42.913617,3699,so,y,y,PS2489-4,-42.883,8.968,0.432,n,NA,NA,NA,
+e6,ODP1092,7.0799,-46.4118,1974,so,n,n,NA,NA,NA,NA,n,NA,NA,NA,
+e7,ODP1125,-178.166,-42.55,1365,so,y,n,W266,-42.14,179.22,0.521,n,NA,NA,NA,bayspline back-calculated from sst
