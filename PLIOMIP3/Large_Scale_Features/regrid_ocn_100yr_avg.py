@@ -1093,7 +1093,7 @@ def getnames(modelname, filestart, fieldnamein, exptnamein):
 
 filename  =  ' '
 linux_win  =  'l'
-modelname  = "HadCM3"  # 'ACCESS' 'AWI-CM2' 'AWI-ESM2' 'COSMOS' 'MIROC4m'
+modelname  = "ACCESS"  # 'ACCESS' 'AWI-CM2' 'AWI-ESM2' 'COSMOS' 'MIROC4m'
                         # 'iCESM1.3'
 exptname  =  {
         "E280" : "E280",
@@ -1123,9 +1123,9 @@ fieldname  =  {
 fieldnamein = ['tos'] # ocean tempeature or sst
 #exptnamein = ['Eoi400']
 
-fieldnamein = ['pr','tas']
+#fieldnamein = ['pr','tas','tos']
 #exptnamein = ['PI','LP']
-exptnamein = ['LP_min_LSM_change']
+exptnamein = ['LP']
 if linux_win  == 'l':
     filestart = '/uolstore/Research/b/b0164/Data/PlioMIP3/'
 else:
